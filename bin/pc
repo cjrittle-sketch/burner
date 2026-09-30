@@ -1,0 +1,1335 @@
+#!/usr/bin/env python3
+"""pc - burner phone-control CLI for the dedicated Pixel 7 ("mobile").
+
+Replaces the old dump -> inline-python -> tap -> sleep loop with one-liners:
+
+    pc tap "Not now"                 tap the first node with that text
+    pc wait "Enter code" --timeout 30
+    pc type "42327079" --clear       char-by-char typing (works on Bloks/RN fields)
+    pc gcode --from "security@example.com"
+    pc vcode --from "security@example.com"     # full code-entry flow, one shot
+
+Verification codes are transient: pulled, typed, never stored.
+"""
+import argparse
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import time
+import xml.etree.ElementTree as ET
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+ROOT = os.path.dirname(HERE)  # ~/workspace/phone-control
+# Shared tools live beside the tree (~/workspace); PC_WORKSPACE overrides.
+WORKSPACE = os.environ.get("PC_WORKSPACE", os.path.dirname(ROOT))
+ADB_BIN = os.path.join(WORKSPACE, ".android-tools", "platform-tools", "adb")
+
+
+def load_config():
+    cfg = {}
+    try:
+        with open(os.path.join(ROOT, "config.env")) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    cfg[k.strip()] = v.strip().strip('"')
+    except FileNotFoundError:
+        pass
+    return cfg
+
+
+CFG = load_config()
+TARGET = "127.0.0.1:{}".format(CFG.get("LOCAL_PORT", "15555"))
+UI_PATH = "/sdcard/pc-ui.xml"
+
+
+def adb(*args, timeout=30):
+    return subprocess.run(
+        [ADB_BIN, "-s", TARGET] + [str(a) for a in args],
+        capture_output=True, text=True, timeout=timeout)
+
+
+def ensure():
+    """Make sure the tunnel is up and adb is connected. Returns True if usable."""
+    subprocess.run([os.path.join(ROOT, "tunnel.sh"), "start"],
+                   capture_output=True, timeout=45)
+    adb("connect", TARGET)
+    r = adb("get-state")
+    if r.stdout.strip() != "device":
+        # adb daemon itself can wedge (stale server) — restart it once.
+        adb("kill-server")
+        time.sleep(2)
+        adb("start-server")
+        adb("connect", TARGET)
+        time.sleep(1)
+        r = adb("get-state")
+    ok = r.stdout.strip() == "device"
+    if not ok:
+        print("phone not reachable (state: {}). Check wireless debugging + Tailscale.".format(
+            r.stdout.strip() or "none"), file=sys.stderr)
+    # Heal the fast paths too (best effort — legacy adb still works without them).
+    try:
+        scrcpy_send("ping")
+    except Exception as e:
+        print("scrcpy mux heal failed: {}".format(e), file=sys.stderr)
+    try:
+        u2ctl("health", timeout=45)
+    except Exception as e:
+        print("u2 mux heal failed: {}".format(e), file=sys.stderr)
+    return ok
+
+
+def adb_or_ensure(*args, **kwargs):
+    r = adb(*args, **kwargs)
+    err = (r.stderr or "")
+    if ("device offline" in err or "no devices" in err
+            or "not found" in err or "no device" in err.lower()):
+        if ensure():
+            r = adb(*args, **kwargs)
+    return r
+
+
+# ---------------------------------------------------------------- fast paths
+# scrcpy persistent input channel + uiautomator2 persistent UI reads.
+# Both auto-start their mux daemons; every call falls back to legacy adb.
+
+SCRCPY_DIR = os.path.join(ROOT, "lib", "scrcpy")
+U2CTL = os.path.join(ROOT, "bin", "u2ctl")
+_scrcpy_send = None
+_screen_wh = "1080 2400"  # updated from each dump's rotation attribute
+
+
+def _update_screen_from_dump(root):
+    global _screen_wh
+    try:
+        rot = int(root.attrib.get("rotation", "0") or 0)
+    except ValueError:
+        rot = 0
+    _screen_wh = "2400 1080" if rot in (1, 3) else "1080 2400"
+
+
+def scrcpy_send(line):
+    """Send a command to the scrcpy mux (persistent input channel)."""
+    global _scrcpy_send
+    if os.environ.get("PC_SCRCPY") == "0":
+        # Test copies must not spawn a second scrcpy mux next to live's.
+        raise RuntimeError("scrcpy disabled (PC_SCRCPY=0)")
+    if _scrcpy_send is None:
+        sys.path.insert(0, SCRCPY_DIR)
+        from scrcpy_ctl import _mux_send
+        _scrcpy_send = _mux_send
+    for attempt in range(2):
+        try:
+            reply = _scrcpy_send(line)
+            if reply == "ok":
+                return True
+            raise RuntimeError("mux replied: {}".format(reply))
+        except Exception as e:
+            if attempt == 0:
+                time.sleep(2)  # mux may be mid-recovery; retry once
+            else:
+                raise
+    return False
+
+
+def scrcpy_available():
+    try:
+        return scrcpy_send("ping")
+    except Exception as e:
+        print("scrcpy fast path unavailable: {}".format(e), file=sys.stderr)
+        return False
+
+
+def u2ctl(*args, timeout=30):
+    """Run u2ctl; returns stdout or None on failure."""
+    try:
+        r = subprocess.run([U2CTL] + list(args), capture_output=True,
+                           text=True, timeout=timeout)
+        return r.stdout if r.returncode == 0 else None
+    except Exception:
+        return None
+
+
+U2_SOCK = os.path.join(ROOT, "run", "u2-mux.sock")
+U2_NOT_FOUND = "__NOT_FOUND__"
+
+
+def u2sock(cmd, arg="", timeout=30):
+    """Talk to the u2 mux daemon directly over its Unix socket.
+
+    Protocol (see u2mux.py): send "cmd arg\\n", read "ok <nbytes>\\n" +
+    <nbytes> payload. Saves ~50-100ms vs spawning u2ctl per call.
+    Returns payload str, None on transport failure, or U2_NOT_FOUND
+    sentinel when the daemon reports an expected miss."""
+    import socket
+    try:
+        s = socket.socket(socket.AF_UNIX)
+        s.settimeout(timeout)
+        s.connect(U2_SOCK)
+        s.sendall(("{} {}\n".format(cmd, arg)).encode())
+        buf = b""
+        while b"\n" not in buf:
+            chunk = s.recv(64)
+            if not chunk:
+                return None
+            buf += chunk
+        head, rest = buf.split(b"\n", 1)
+        parts = head.decode().strip().split(" ", 1)
+        if len(parts) != 2 or parts[0] != "ok":
+            return None
+        n = int(parts[1])
+        payload = rest
+        while len(payload) < n:
+            chunk = s.recv(min(65536, n - len(payload)))
+            if not chunk:
+                return None
+            payload += chunk
+        return payload.decode()
+    except Exception:
+        return None
+    finally:
+        try:
+            s.close()
+        except Exception:
+            pass
+
+
+def u2_invalidate():
+    """Tell the u2 mux the screen changed (drops its 2s dump cache)."""
+    u2sock("invalidate", timeout=5)
+
+
+def fast_dump():
+    """UI hierarchy XML via uiautomator2 mux. None on failure."""
+    xml = u2sock("dump", timeout=40)
+    if xml and ("<hierarchy" in xml or "<?xml" in xml):
+        try:
+            root = ET.fromstring(xml)
+            _update_screen_from_dump(root)
+            return root
+        except ET.ParseError:
+            pass
+    return None
+
+
+# ---------------------------------------------------------------- UI tree
+
+def ui_dump(retries=4):
+    """Dump the UI hierarchy, retrying through app transitions/empty dumps.
+    Fast path: uiautomator2 persistent server (~1s). Fallback: adb shell."""
+    root = fast_dump()
+    if root is not None:
+        return root
+    wake()  # screen timeout is 10s; dumps come back empty when asleep
+    time.sleep(1)
+    last = ""
+    for _ in range(retries):
+        adb_or_ensure("shell", "uiautomator", "dump", UI_PATH)
+        r = adb_or_ensure("shell", "cat", UI_PATH)
+        last = (r.stdout or "").strip()
+        if last.startswith("<?xml") or last.startswith("<hierarchy"):
+            try:
+                return ET.fromstring(r.stdout)
+            except ET.ParseError:
+                pass
+        time.sleep(2)
+    raise RuntimeError("uiautomator dump kept coming back empty: {!r}".format(last[:80]))
+
+
+def walk(root):
+    """Yield dicts for every node, with parent chain attached."""
+    out = []
+
+    def rec(node, parents):
+        b = node.attrib.get("bounds", "")
+        m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", b or "")
+        cx = cy = None
+        if m:
+            x1, y1, x2, y2 = map(int, m.groups())
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+        out.append({
+            "text": node.attrib.get("text", ""),
+            "desc": node.attrib.get("content-desc", ""),
+            "rid": node.attrib.get("resource-id", ""),
+            "class": node.attrib.get("class", ""),
+            "bounds": b,
+            "center": (cx, cy),
+            "clickable": node.attrib.get("clickable") == "true",
+            "enabled": node.attrib.get("enabled") != "false",
+            "focused": node.attrib.get("focused") == "true",
+            "checked": node.attrib.get("checked") == "true",
+            "parents": list(parents),
+        })
+        for ch in node:
+            rec(ch, parents + [node])
+
+    rec(root, [])
+    return out
+
+
+def clickable_target(node):
+    """Return center of the node or its nearest clickable ancestor."""
+    if node["clickable"] and node["center"][0] is not None:
+        return node["center"]
+    for p in reversed(node["parents"]):
+        if p.attrib.get("clickable") == "true":
+            m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", p.attrib.get("bounds", "") or "")
+            if m:
+                x1, y1, x2, y2 = map(int, m.groups())
+                return ((x1 + x2) // 2, (y1 + y2) // 2)
+    return node["center"]
+
+
+def find_nodes(nodes, text, exact=True):
+    def label(n):
+        return n["text"] or n["desc"] or ""
+    if exact:
+        return [n for n in nodes if label(n) == text]
+    tl = text.lower()
+    return [n for n in nodes if tl in label(n).lower()]
+
+
+def as_json(args):
+    """True when --json output was requested (flag lives on the top-level
+    parser and on the dump/tap/wait/state/doctor subparsers)."""
+    return bool(getattr(args, "json", False))
+
+
+# ------------------------------------------------- occlusion + geometry
+
+def _bounds_rect(bounds):
+    """Parse a '[x1,y1][x2,y2]' bounds string into (x1, y1, x2, y2), or None."""
+    m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds or "")
+    return tuple(map(int, m.groups())) if m else None
+
+
+def is_point_covered(nodes, x, y, exclude_node):
+    """Return the topmost node covering point (x, y), or None if uncovered.
+
+    "Topmost" = latest in document order (walk() order: parents before
+    children, siblings in order — later nodes paint on top). exclude_node is
+    skipped (the tap target itself); pass None to check every node.
+    Pure function: no adb, unit-testable."""
+    idx = -1
+    if exclude_node is not None:
+        for i, n in enumerate(nodes):
+            if n is exclude_node:
+                idx = i
+                break
+    cover = None
+    for n in nodes[idx + 1:]:
+        r = _bounds_rect(n.get("bounds"))
+        if r and r[0] <= x <= r[2] and r[1] <= y <= r[3]:
+            cover = n
+    return cover
+
+
+def find_uncovered_point(node, nodes):
+    """Find a tappable point inside node's bounds that no other node covers.
+
+    Samples a 3x3 grid — center first, then the 1/4 and 3/4 points along each
+    axis — and returns the first (x, y) not covered by any node drawn after
+    `node` in document order. Returns None when every sample is occluded or
+    the node's bounds are unparseable. Pure function: unit-testable."""
+    r = _bounds_rect(node.get("bounds"))
+    if not r:
+        return None
+    x1, y1, x2, y2 = r
+    for fy in (0.5, 0.25, 0.75):
+        for fx in (0.5, 0.25, 0.75):
+            x = int(x1 + fx * (x2 - x1))
+            y = int(y1 + fy * (y2 - y1))
+            if is_point_covered(nodes, x, y, node) is None:
+                return (x, y)
+    return None
+
+
+def _covers_screen(node, w, h):
+    """True if node's bounds cover >=95% of the WxH screen: a window/root
+    container, not a real occluder. Pure function: no adb, unit-testable."""
+    r = _bounds_rect(node.get("bounds"))
+    if not r or w <= 0 or h <= 0:
+        return False
+    x1, y1, x2, y2 = r
+    area = max(0, x2 - x1) * max(0, y2 - y1)
+    return area >= 0.95 * w * h
+
+
+def topmost_occluder(nodes, x, y, w, h):
+    """Topmost node covering (x, y) that isn't a full-screen container.
+
+    For --xy taps there is no named target: the tap lands on the topmost
+    node at the point. Full-screen window/root containers are the expected
+    background, not obstructions — only a smaller overlay (dialog, popup,
+    banner) counts as blocking. Returns the blocker node or None.
+    Pure function: no adb, unit-testable."""
+    cover = None
+    for n in nodes:  # document order; later = on top, so last match wins
+        r = _bounds_rect(n.get("bounds"))
+        if r and r[0] <= x <= r[2] and r[1] <= y <= r[3]:
+            if not _covers_screen(n, w, h):
+                cover = n
+    return cover
+
+
+def screen_dims():
+    """(width, height) in pixels, from the last dump's rotation attribute."""
+    w, h = _screen_wh.split()
+    return int(w), int(h)
+
+
+def parse_normalized_xy(s):
+    """Parse '--xy X,Y' with X,Y in 0.0-1.0. Returns (x, y) floats.
+
+    Raises ValueError with a clear message when the format or range is bad."""
+    try:
+        xs, ys = s.split(",")
+        x, y = float(xs.strip()), float(ys.strip())
+    except (ValueError, AttributeError):
+        raise ValueError("--xy must be 'X,Y' with numbers in 0.0-1.0, got {!r}".format(s))
+    if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
+        raise ValueError("--xy values must be within [0.0, 1.0], got {!r}".format(s))
+    return x, y
+
+
+# ------------------------------------------------- compact dump rendering
+
+INTERACTIVE_CLASSES = {"Button", "CheckBox", "Switch", "SeekBar"}
+
+
+def is_interactive(n):
+    """True when a node is tappable/typable: clickable, an EditText, or one of
+    Button/CheckBox/Switch/SeekBar (matched on the short class name)."""
+    if n.get("clickable"):
+        return True
+    short = (n.get("class") or "").split(".")[-1]
+    return short.endswith("EditText") or short in INTERACTIVE_CLASSES
+
+
+def node_label(n):
+    """Display label: text, or [content-desc] when there is no text."""
+    return n.get("text") or ("[%s]" % n["desc"] if n.get("desc") else "")
+
+
+def compact_bounds_str(bounds):
+    """'[12,34][56,78]' -> '12,34-56,78'; '' when unparseable."""
+    r = _bounds_rect(bounds)
+    return "{},{}-{},{}".format(*r) if r else ""
+
+
+def format_compact(n, show_bounds=False):
+    """One-line compact rendering: 'label (flags) [Class] (cx,cy)'.
+
+    Flags are omitted when empty; bounds only appear when show_bounds is set
+    (the --all view)."""
+    label = node_label(n)
+    flags = []
+    if n.get("clickable"):
+        flags.append("click")
+    if not n.get("enabled", True):
+        flags.append("disabled")
+    head = label + (" ({})".format(",".join(flags)) if flags else "")
+    parts = []
+    if head.strip():
+        parts.append(head.strip())
+    parts.append("[{}]".format((n.get("class") or "").split(".")[-1]))
+    if show_bounds:
+        cb = compact_bounds_str(n.get("bounds"))
+        if cb:
+            parts.append(cb)
+    cx, cy = n.get("center") or (None, None)
+    parts.append("({},{})".format(cx if cx is not None else "?",
+                                 cy if cy is not None else "?"))
+    return " ".join(parts)
+
+
+def node_compact(n):
+    """Compact dict for --json dumps. Empty fields are omitted entirely."""
+    d = {"class": (n.get("class") or "").split(".")[-1]}
+    if n.get("text"):
+        d["text"] = n["text"]
+    if n.get("desc"):
+        d["desc"] = n["desc"]
+    cx, cy = n.get("center") or (None, None)
+    if cx is not None:
+        d["x"], d["y"] = cx, cy
+    if n.get("clickable"):
+        d["clickable"] = True
+    if not n.get("enabled", True):
+        d["enabled"] = False
+    return d
+
+
+def compact_visible(n, include_all):
+    """True when a node belongs in the compact dump: it is interactive or has
+    text/content-desc. include_all (--all) keeps every node."""
+    return include_all or is_interactive(n) or bool(node_label(n))
+
+
+def wake():
+    try:
+        if scrcpy_send("wake"):
+            return
+    except Exception:
+        pass
+    if os.environ.get("PC_SCRCPY") == "0":
+        return  # test copy: phone is stay-awake on charger; skip the adb keyevent
+    adb_or_ensure("shell", "input", "keyevent", "224")
+
+
+def wake_async():
+    """Start wake() in the background; join the returned thread before tapping."""
+    import threading
+    t = threading.Thread(target=wake, daemon=True)
+    t.start()
+    return t
+
+
+def tap_center(x, y, waker=None):
+    # Use adb input tap: orientation-aware and reliable. Scrcpy taps are
+    # faster (48ms vs 280ms) but the server's cached display metrics go stale
+    # when the foreground app rotates (Chrome forces landscape, launcher is
+    # portrait), causing taps to land wrong and background the app.
+    # Scrcpy is still used for keys (home/back/wake) which are orientation-independent.
+    # waker: a wake_async() thread already in flight (overlaps the lookup).
+    if waker is None:
+        wake()
+    else:
+        waker.join()
+    adb_or_ensure("shell", "input", "tap", x, y)
+    u2_invalidate()
+
+
+def cmd_dump(args):
+    root = ui_dump()
+    nodes = [n for n in walk(root)
+             if compact_visible(n, args.all)
+             # drop the <hierarchy> root itself (no class/label/clickable)
+             and (n["class"] or node_label(n) or n["clickable"])]
+    if as_json(args):
+        print(json.dumps({"ok": True,
+                          "nodes": [node_compact(n) for n in nodes]}))
+        return 0
+    if args.verbose:
+        # Legacy format: label (+flags) [Class] [x1,y1][x2,y2]
+        for n in nodes:
+            t = node_label(n)
+            flags = []
+            if n["clickable"]:
+                flags.append("click")
+            if not n["enabled"]:
+                flags.append("disabled")
+            if n["focused"]:
+                flags.append("focused")
+            print("{}{} [{}] {}".format(
+                t, " ({})".format(",".join(flags)) if flags else "",
+                n["class"].split(".")[-1], n["bounds"]))
+    else:
+        for n in nodes:
+            print(format_compact(n, show_bounds=args.all))
+    return 0
+
+
+def _tap_fail(args, msg):
+    """Report a tap failure: human text on stderr, pure JSON on stdout with --json."""
+    print(msg, file=sys.stderr)
+    if as_json(args):
+        print(json.dumps({"ok": False, "error": msg}))
+    return 1
+
+
+def _tap_ok(args, label, xy, via=None):
+    """Report a successful tap. xy is (x, y) or None for on-device daemon taps."""
+    if as_json(args):
+        print(json.dumps({"ok": True, "tapped": {
+            "text": label,
+            "x": xy[0] if xy else None,
+            "y": xy[1] if xy else None}}))
+    elif via:
+        print("tapped {} ({})".format(label, via))
+    else:
+        print("tapped {} @ {}".format(label, xy))
+    return 0
+
+
+def _tap_refused(args, x, y, cover):
+    """Refuse a tap whose point is covered by another node (exit 1)."""
+    msg = 'tap refused: point ({},{}) is covered by "{}" [{}] {}'.format(
+        x, y, cover.get("text") or cover.get("desc") or "",
+        (cover.get("class") or "").split(".")[-1], cover.get("bounds"))
+    return _tap_fail(args, msg)
+
+
+def cmd_tap(args):
+    # Occlusion checking needs the local node list, so the daemon fast path
+    # (on-device click / coord lookup) only runs with --no-occlusion-check.
+    # Validate args before waking the phone. Wake runs concurrently with the
+    # lookup either way.
+    if args.xy is None and not args.text:
+        return _tap_fail(args, "tap needs a text or --xy X,Y")
+    xy_norm = None
+    if args.xy is not None:
+        try:
+            xy_norm = parse_normalized_xy(args.xy)
+        except ValueError as e:
+            return _tap_fail(args, str(e))
+    waker = wake_async()
+    if args.no_occlusion_check and args.xy is None \
+            and not args.fuzzy and args.index == 0:
+        r = u2sock("click_text", args.text, timeout=20)
+        if r is not None and r != U2_NOT_FOUND:
+            try:
+                hit = json.loads(r)
+            except ValueError:
+                hit = None
+            if isinstance(hit, dict) and hit.get("clicked"):
+                # daemon clicked on-device (exact text, 1 RPC)
+                waker.join()
+                return _tap_ok(args, args.text, None, via="u2")
+            if isinstance(hit, dict) and "x" in hit:
+                xy = (hit["x"], hit["y"])
+                tap_center(*xy, waker=waker)
+                return _tap_ok(args, hit["text"] or hit["desc"] or args.text, xy)
+    waker.join()
+    root = ui_dump()
+    _update_screen_from_dump(root)
+    nodes = walk(root)
+
+    if args.xy is not None:
+        # Normalized 0.0-1.0 coordinates -> pixels (already validated above).
+        nx, ny = xy_norm
+        w, h = screen_dims()
+        x, y = int(nx * w), int(ny * h)
+        if not args.no_occlusion_check:
+            cover = topmost_occluder(nodes, x, y, w, h)
+            if cover is not None:
+                return _tap_refused(args, x, y, cover)
+        tap_center(x, y)
+        return _tap_ok(args, "--xy {}".format(args.xy), (x, y))
+
+    hits = find_nodes(nodes, args.text, exact=not args.fuzzy)
+    if not hits and not args.fuzzy:
+        # Auto-retry with fuzzy match before giving up (saves a manual retry
+        # on long labels like Amazon order titles).
+        hits = find_nodes(nodes, args.text, exact=False)
+    if not hits:
+        return _tap_fail(args, 'no match for "{}"'.format(args.text))
+    node = hits[args.index] if args.index < len(hits) else hits[0]
+    xy = clickable_target(node)
+    if xy[0] is None:
+        return _tap_fail(args, "match has no tappable bounds")
+    if not args.no_occlusion_check:
+        cover = is_point_covered(nodes, xy[0], xy[1], node)
+        if cover is not None:
+            alt = find_uncovered_point(node, nodes)
+            if alt is not None:
+                xy = alt
+                if not as_json(args):
+                    print("tap point covered, using {}".format(xy))
+            else:
+                return _tap_refused(args, xy[0], xy[1], cover)
+    tap_center(*xy)
+    return _tap_ok(args, node["text"] or node["class"], xy)
+
+
+def _wait_fail(args, msg):
+    """Wait failure: human text on stderr, pure JSON on stdout with --json."""
+    print(msg, file=sys.stderr)
+    if as_json(args):
+        print(json.dumps({"ok": False, "error": msg}))
+    return 1
+
+
+def _wait_found(args, text, bounds, enabled, node=None):
+    if as_json(args):
+        found = {"text": text, "bounds": bounds}
+        if node is not None:
+            found = node_compact(node)
+        print(json.dumps({"ok": True, "found": found}))
+    else:
+        print("found: {} {} {}".format(text, bounds,
+                                       "disabled" if not enabled else ""))
+    return 0
+
+
+def _wait_gone(args):
+    if as_json(args):
+        print(json.dumps({"ok": True, "gone": True}))
+    else:
+        print("gone: {}".format(args.text))
+    return 0
+
+
+def cmd_wait(args):
+    # Fast path: the daemon polls (0.25s interval, fresh dump each poll) and
+    # returns the matched node — one socket call, no per-poll RPC from here.
+    # Matches exact label first, then case-insensitive substring (text/desc).
+    r = u2sock("wait_for", json.dumps({"text": args.text, "timeout": args.timeout,
+                                       "absent": args.absent}),
+               timeout=args.timeout + 30)
+    if r == U2_NOT_FOUND:
+        return _wait_fail(args, 'timeout waiting for "{}"'.format(args.text))
+    if r is not None:
+        try:
+            n = json.loads(r)
+        except ValueError:
+            n = None
+        if isinstance(n, dict) and n.get("gone"):
+            return _wait_gone(args)
+        if isinstance(n, dict) and n.get("found"):
+            return _wait_found(args, n["text"] or n["desc"] or args.text,
+                               n["bounds"], n["enabled"])
+    # Legacy path.
+    deadline = time.time() + args.timeout
+    while True:
+        nodes = walk(ui_dump())
+        hits = find_nodes(nodes, args.text, exact=not args.fuzzy)
+        if args.absent and not hits:
+            return _wait_gone(args)
+        if not args.absent and hits:
+            n = hits[0]
+            return _wait_found(args, n["text"], n["bounds"], n["enabled"], node=n)
+        if time.time() > deadline:
+            return _wait_fail(args, 'timeout waiting for "{}"'.format(args.text))
+        time.sleep(2)
+
+
+def esc_char(c):
+    if c == " ":
+        return "%s"
+    if re.match(r"[A-Za-z0-9]", c):
+        return c
+    return "\\" + c
+
+
+# ------------------------------------------------- unicode input (ADBKeyboard)
+
+ADBKEYBOARD_IME = "com.android.adbkeyboard/.AdbIME"
+
+
+def needs_unicode_route(text):
+    """True when text contains any non-ASCII char (emoji, CJK, accents) —
+    plain `input text` mangles those, so the ADBKeyboard route is needed."""
+    return any(ord(c) > 127 for c in text)
+
+
+def get_current_ime():
+    """Return the current default IME id (for restore), or None if unreadable."""
+    r = adb("shell", "settings", "get", "secure", "default_input_method")
+    return (r.stdout or "").strip() or None
+
+
+def set_ime(ime_id):
+    """Switch the active IME. Returns True on success."""
+    r = adb("shell", "ime", "set", ime_id)
+    return r.returncode == 0
+
+
+def broadcast_adbkeyboard_text(text):
+    """Send text through the ADBKeyboard IME broadcast.
+
+    Uses subprocess list args (via adb()) so no shell quoting is involved —
+    arbitrary unicode passes through intact."""
+    r = adb("shell", "am", "broadcast", "-a", "ADB_INPUT_TEXT",
+            "--es", "msg", text)
+    return r.returncode == 0
+
+
+def type_via_adbkeyboard(text, field_xy=None, clear=False, clear_keys=20):
+    """Type text through the ADBKeyboard IME (handles emoji/CJK/accents).
+
+    Switches to ADBKeyboard, focuses field_xy, broadcasts the text, then
+    restores the previous IME. Prints the route used. Small adb wrappers
+    (get_current_ime/set_ime/broadcast_adbkeyboard_text) keep this mockable."""
+    prev = get_current_ime()
+    set_ime(ADBKEYBOARD_IME)
+    try:
+        if field_xy is not None and field_xy[0] is not None:
+            tap_center(*field_xy)
+            time.sleep(0.6)
+        if clear:
+            for _ in range(clear_keys):
+                adb_or_ensure("shell", "input", "keyevent", "67")
+            time.sleep(0.5)
+        broadcast_adbkeyboard_text(text)
+    finally:
+        if prev:
+            set_ime(prev)
+    print("typed {} chars (adbkeyboard)".format(len(text)))
+    return 0
+
+
+def cmd_type(args):
+    # Route selection: --ascii forces the legacy path, --unicode forces the
+    # ADBKeyboard path, otherwise auto-detect on non-ASCII content.
+    if args.ascii:
+        use_unicode = False
+    elif args.unicode:
+        use_unicode = True
+    else:
+        use_unicode = needs_unicode_route(args.text)
+    if use_unicode:
+        nodes = walk(ui_dump())
+        xy = None
+        if args.field:
+            hits = find_nodes(nodes, args.field, exact=True)
+            if not hits:
+                print('field "{}" not found'.format(args.field), file=sys.stderr)
+                return 1
+            xy = clickable_target(hits[0])
+        else:
+            for n in nodes:
+                if n["focused"] and "EditText" in n["class"]:
+                    xy = clickable_target(n)
+                    break
+        return type_via_adbkeyboard(args.text, xy, clear=args.clear,
+                                    clear_keys=args.clear_keys)
+    # Fast path: atomic ACTION_SET_TEXT via uiautomator2 (one shot, watchers fire).
+    # set_text replaces the field content, so --clear is implicit here.
+    if u2sock("health", timeout=10) is not None:
+        try:
+            nodes = walk(ui_dump())
+            target = None
+            if args.field:
+                hits = find_nodes(nodes, args.field, exact=True)
+                if hits:
+                    target = hits[0]
+            else:
+                for n in nodes:
+                    if n["focused"] and "EditText" in n["class"]:
+                        target = n
+                        break
+            if target is not None:
+                # tap to focus (scrcpy, fast), then atomic set_text on the focused field
+                xy = clickable_target(target)
+                if xy[0] is not None:
+                    tap_center(*xy)
+                    time.sleep(0.6)
+                out = u2sock("set_text", json.dumps({"text": args.text}), timeout=40)
+                if out is not None:
+                    print("typed {} chars (atomic)".format(len(args.text)))
+                    return 0
+                print("u2 set_text failed, falling back to char-by-char", file=sys.stderr)
+            elif args.field:
+                print('field "{}" not found'.format(args.field), file=sys.stderr)
+                return 1
+        except Exception as e:
+            print("fast type failed, falling back: {}".format(e), file=sys.stderr)
+    # Legacy char-by-char path (Bloks/RN-safe).
+    nodes = walk(ui_dump())
+    if args.field:
+        hits = find_nodes(nodes, args.field, exact=True)
+        if not hits:
+            print('field "{}" not found'.format(args.field), file=sys.stderr)
+            return 1
+        xy = clickable_target(hits[0])
+        tap_center(*xy)
+        time.sleep(0.8)
+    if args.clear:
+        for _ in range(args.clear_keys):
+            adb_or_ensure("shell", "input", "keyevent", "67")
+        time.sleep(0.5)
+    delay = 0.4 if args.slow else 0.2
+    for ch in args.text:
+        if ch == "\n":
+            adb_or_ensure("shell", "input", "keyevent", "66")
+        else:
+            adb_or_ensure("shell", "input", "text", esc_char(ch))
+        time.sleep(delay)
+    u2_invalidate()
+    print("typed {} chars (char-by-char)".format(len(args.text)))
+    return 0
+
+
+def cmd_press(args):
+    try:
+        if scrcpy_send("key {}".format(args.key)):
+            u2_invalidate()
+            print("pressed {}".format(args.key))
+            return 0
+    except Exception as e:
+        print("scrcpy key failed, falling back: {}".format(e), file=sys.stderr)
+    wake()
+    adb_or_ensure("shell", "input", "keyevent", args.key)
+    u2_invalidate()
+    print("pressed {}".format(args.key))
+    return 0
+
+
+def cmd_state(args):
+    r = adb_or_ensure("shell", "dumpsys", "activity", "activities")
+    m = re.search(r"mFocusedApp=.*?\s+u0\s+(\S+)", r.stdout)
+    app = m.group(1) if m else "?"
+    nodes = walk(ui_dump())
+    texts = [n["text"] for n in nodes if n["text"]][:25]
+    if as_json(args):
+        print(json.dumps({"ok": True, "app": app, "texts": texts}))
+        return 0
+    print("app: {}".format(app))
+    for t in texts:
+        print("  " + t)
+    return 0
+
+
+def cmd_start(args):
+    adb_or_ensure("shell", "monkey", "-p", args.package,
+                  "-c", "android.intent.category.LAUNCHER", "1")
+    u2_invalidate()
+    print("launched {}".format(args.package))
+    return 0
+
+
+def cmd_shot(args):
+    r = subprocess.run([os.path.join(ROOT, "screenshot.sh")],
+                       capture_output=True, text=True, timeout=60)
+    print(r.stdout.strip())
+    return r.returncode
+
+# ------------------------------------------------------- Gmail code pull
+
+CODE_RES = [
+    re.compile(r"(\d{6,10})\s+is your"),            # Facebook: "42327079 is your Facebook code"
+    re.compile(r"Enter this code:\s*(\d{4,10})"),
+    re.compile(r"verification code\D{0,30}(\d{4,10})", re.I),
+    re.compile(r"code\D{0,20}(\d{4,10})", re.I),
+]
+
+
+def extract_code(subject, body):
+    for text in (subject or "", body or ""):
+        for rx in CODE_RES:
+            m = rx.search(text)
+            if m:
+                return m.group(1)
+    for text in (subject or "", body or ""):
+        m = re.search(r"\b(\d{4,10})\b", text)
+        if m:
+            return m.group(1)
+    return None
+
+
+def gmail_cli():
+    """Gmail CLI command base. Override with GMAIL_CLI in config.env.
+    Expected interface: <cmd> gmail +triage --query Q --max N --format json
+    and <cmd> gmail +read --id ID --format json, both emitting JSON."""
+    return shlex.split(CFG.get("GMAIL_CLI", "hatch_gws_cli"))
+
+
+def gmail_triage(query, maxn=5):
+    try:
+        r = subprocess.run(
+            gmail_cli() + ["gmail", "+triage", "--query", query,
+                           "--max", str(maxn), "--format", "json"],
+            capture_output=True, text=True, timeout=60)
+    except FileNotFoundError:
+        print("gmail CLI not found ({}). Set GMAIL_CLI in config.env "
+              "to a tool providing 'gmail +triage/+read --format json'."
+              .format(CFG.get("GMAIL_CLI", "hatch_gws_cli")),
+              file=sys.stderr)
+        return []
+    data = json.loads(r.stdout)
+    return data.get("messages", [])
+
+
+def gmail_read(msg_id):
+    r = subprocess.run(
+        gmail_cli() + ["gmail", "+read", "--id", msg_id, "--format", "json"],
+        capture_output=True, text=True, timeout=60)
+    return json.loads(r.stdout)
+
+
+def cmd_gcode(args):
+    query = "({}) newer_than:{}m".format(args.query, args.mins)
+    msgs = gmail_triage(query)
+    if not msgs:
+        print("no messages for: {}".format(query), file=sys.stderr)
+        return 1
+    msg = gmail_read(msgs[0]["id"])
+    code = extract_code(msg.get("subject"), msg.get("body_text"))
+    if not code:
+        print("no code found in newest message ({})".format(
+            msg.get("subject")), file=sys.stderr)
+        return 1
+    # Transient only: printed for immediate use, never stored.
+    print(code)
+    return 0
+
+
+# ------------------------------------------------- one-shot code entry flow
+
+def wait_enabled_button(nodes, text, timeout=15):
+    """Wait until a button matching text is present AND enabled."""
+    deadline = time.time() + timeout
+    while True:
+        hits = find_nodes(nodes, text, exact=True)
+        btns = [n for n in hits
+                if n["clickable"] and n["enabled"] and n["center"][0] is not None]
+        if btns:
+            return btns[0]
+        if time.time() > deadline:
+            return None
+        time.sleep(2)
+        nodes = walk(ui_dump())
+
+
+def cmd_vcode(args):
+    """End-to-end: wait for a code field, pull the email code, type it, submit."""
+    print("waiting for code field...", flush=True)
+    deadline = time.time() + args.timeout
+    field = None
+    while time.time() < deadline:
+        nodes = walk(ui_dump())
+        edits = [n for n in nodes if n["class"].endswith("EditText")]
+        if edits:
+            field = edits[0]
+            break
+        time.sleep(2)
+    if field is None:
+        print("no code field appeared", file=sys.stderr)
+        return 1
+
+    msgs = gmail_triage("({}) newer_than:{}m".format(args.query, args.mins))
+    if not msgs:
+        print("no code email found", file=sys.stderr)
+        return 1
+    msg = gmail_read(msgs[0]["id"])
+    code = extract_code(msg.get("subject"), msg.get("body_text"))
+    if not code:
+        print("no code in newest email", file=sys.stderr)
+        return 1
+    print("code pulled ({} chars), typing...".format(len(code)), flush=True)
+
+    xy = clickable_target(field)
+    tap_center(*xy)
+    time.sleep(0.8)
+    for _ in range(20):
+        adb_or_ensure("shell", "input", "keyevent", "67")
+    time.sleep(0.5)
+    for ch in code:
+        adb_or_ensure("shell", "input", "text", esc_char(ch))
+        time.sleep(0.25)
+    u2_invalidate()
+
+    print("waiting for '{}' button...".format(args.submit), flush=True)
+    btn = wait_enabled_button(walk(ui_dump()), args.submit, timeout=20)
+    if btn is None:
+        print("submit button never enabled", file=sys.stderr)
+        return 1
+    bxy = clickable_target(btn)
+    tap_center(*bxy)
+    print("submitted", flush=True)
+    return 0
+
+
+# ------------------------------------------------------------------ doctor
+
+def _doctor_check(name, fn):
+    """Run one doctor check, catching everything. Returns a
+    {"name":..., "ok":..., "detail":...} dict."""
+    try:
+        ok, detail = fn()
+    except Exception as e:
+        ok, detail = False, "{}: {}".format(type(e).__name__, e)
+    return {"name": name, "ok": bool(ok), "detail": str(detail)}
+
+
+def cmd_doctor(args):
+    """Run connectivity/health checks and summarize. Exit 0 iff all pass."""
+    checks = []
+    latency_ms = None
+
+    def check_adb_binary():
+        r = subprocess.run([ADB_BIN, "version"], capture_output=True,
+                           text=True, timeout=10)
+        if r.returncode != 0:
+            return False, "adb version failed: {}".format((r.stderr or "").strip()[:120])
+        line = (r.stdout or "").strip().splitlines()
+        return True, line[0] if line else "ok"
+
+    def check_adb_server():
+        r = subprocess.run([ADB_BIN, "devices"], capture_output=True,
+                           text=True, timeout=15)
+        if r.returncode != 0:
+            return False, (r.stderr or "").strip()[:120] or "no response"
+        return True, "server responded"
+
+    def check_tunnel():
+        r = subprocess.run([ADB_BIN, "connect", TARGET], capture_output=True,
+                           text=True, timeout=20)
+        out = ((r.stdout or "") + " " + (r.stderr or "")).strip()
+        low = out.lower()
+        ok = "connected" in low and "failed" not in low \
+            and "cannot" not in low and "refused" not in low
+        return ok, out.splitlines()[0][:120] if out else "no output"
+
+    def check_u2_daemon():
+        if not os.path.exists(U2_SOCK):
+            return False, "socket missing: {}".format(U2_SOCK)
+        r = u2sock("health", timeout=10)
+        return (r is not None,
+                "daemon answered health" if r is not None else "no reply to health")
+
+    def check_device_state():
+        r = adb("get-state", timeout=10)
+        st = (r.stdout or "").strip()
+        return st == "device", "state={}".format(st or "none")
+
+    def check_dump_pipeline():
+        root = fast_dump()
+        if root is None:
+            return False, "fast_dump returned nothing"
+        return True, "{} nodes".format(len(walk(root)))
+
+    checks.append(_doctor_check("adb binary", check_adb_binary))
+    checks.append(_doctor_check("adb server", check_adb_server))
+    checks.append(_doctor_check("tunnel target", check_tunnel))
+    checks.append(_doctor_check("u2 daemon", check_u2_daemon))
+    checks.append(_doctor_check("device state", check_device_state))
+    checks.append(_doctor_check("dump pipeline", check_dump_pipeline))
+
+    # Latency: one cached dump round-trip through the daemon socket.
+    t0 = time.time()
+    try:
+        xml = u2sock("dump", timeout=40)
+        latency_ms = int((time.time() - t0) * 1000)
+        if xml and ("<hierarchy" in xml or "<?xml" in xml):
+            checks.append({"name": "latency", "ok": True,
+                           "detail": "cached dump round-trip: {} ms".format(latency_ms)})
+        else:
+            checks.append({"name": "latency", "ok": False,
+                           "detail": "dump call failed after {} ms".format(latency_ms)})
+    except Exception as e:
+        latency_ms = int((time.time() - t0) * 1000)
+        checks.append({"name": "latency", "ok": False,
+                       "detail": "{}: {}".format(type(e).__name__, e)})
+
+    allok = all(c["ok"] for c in checks)
+    if as_json(args):
+        print(json.dumps({"ok": allok, "checks": checks,
+                          "latency_ms": latency_ms}))
+    else:
+        print("doctor: {}/{} checks passed".format(
+            sum(1 for c in checks if c["ok"]), len(checks)))
+        for c in checks:
+            print("  [{}] {}: {}".format("ok" if c["ok"] else "FAIL",
+                                         c["name"], c["detail"]))
+        if not allok:
+            print("run `pc ensure` to heal the tunnel, adb server, and daemons",
+                  file=sys.stderr)
+    return 0 if allok else 1
+
+
+# ------------------------------------------------------------------- main
+
+def cmd_open(args):
+    adb_or_ensure("shell", "am", "start", "-a", "android.intent.action.VIEW",
+                  "-d", args.url)
+    u2_invalidate()
+    print("opened {}".format(args.url))
+    return 0
+
+
+def cmd_amazon_status(args):
+    """One-shot: latest Amazon order status from the app's order list.
+    Stops at the list (no detail-page drill-in). Each step runs as a fresh
+    pc subprocess — the Amazon WebView only exposes its nodes to a new
+    u2 session after a scroll, and in-process reuse returns stale trees."""
+    import re
+    import subprocess
+    pc_bin = os.path.join(ROOT, "bin", "pc")
+
+    def run(*a):
+        r = subprocess.run([pc_bin] + [str(x) for x in a],
+                           capture_output=True, text=True, timeout=90)
+        return r.stdout or ""
+
+    run("open", "https://www.amazon.com/gp/css/order-history")
+    time.sleep(8)
+    # scroll once to force the WebView to expose order nodes
+    subprocess.run([ADB_BIN, "-s", TARGET, "shell", "input", "swipe",
+                    "1200", "800", "1200", "300", "200"],
+                   capture_output=True, timeout=30)
+    time.sleep(3)
+    order_re = re.compile(
+        r"(.+?), Order placed (.+?), (Delivered|Shipped|Arriving|Out for delivery)([^.]*\.?)",
+        re.IGNORECASE)
+    for _ in range(3):
+        out = run("dump")
+        for line in out.splitlines():
+            m = order_re.search(line)
+            if m and "Buy again" not in line:
+                item, placed, status, extra = m.groups()
+                item = item.lstrip("[").strip()
+                item = item[:55] + "..." if len(item) > 55 else item
+                detail = (extra or "").strip().rstrip(".")
+                print("{}".format(item))
+                print("{} — ordered {}".format(status, placed)
+                      + (" ({})".format(detail) if detail else ""))
+                return 0
+        subprocess.run([ADB_BIN, "-s", TARGET, "shell", "input", "swipe",
+                        "1200", "800", "1200", "300", "200"],
+                       capture_output=True, timeout=30)
+        time.sleep(2)
+    print("no orders found", file=sys.stderr)
+    return 1
+
+
+def cmd_sleep(args):
+    time.sleep(args.seconds)
+    return 0
+
+
+def build_parser():
+    ap = argparse.ArgumentParser(prog="pc", description="phone control CLI")
+    ap.add_argument("--json", action="store_true",
+                    help="machine-readable JSON on stdout (errors stay human on stderr)")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("dump", help="list visible UI texts + bounds")
+    p.add_argument("--all", action="store_true", help="include empty-text nodes")
+    p.add_argument("--verbose", action="store_true",
+                   help="legacy full format (label [Class] [x1,y1][x2,y2])")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_dump)
+
+    p = sub.add_parser("tap", help="tap node by text (or --xy normalized coords)")
+    p.add_argument("text", nargs="?", default=None,
+                   help="node text to tap (omit with --xy)")
+    p.add_argument("--fuzzy", action="store_true")
+    p.add_argument("--index", type=int, default=0, help="which match to tap")
+    p.add_argument("--xy", metavar="X,Y",
+                   help="normalized 0.0-1.0 coordinates, e.g. --xy 0.5,0.8")
+    p.add_argument("--no-occlusion-check", action="store_true",
+                   help="skip the occlusion check (faster when you know it's safe)")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_tap)
+
+    p = sub.add_parser("wait", help="wait for text to appear (or vanish)")
+    p.add_argument("text")
+    p.add_argument("--timeout", type=int, default=30)
+    p.add_argument("--fuzzy", action="store_true")
+    p.add_argument("--absent", action="store_true",
+                   help="wait until the text disappears")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_wait)
+
+    p = sub.add_parser("type", help="type text (auto ADBKeyboard route for non-ASCII)")
+    p.add_argument("text")
+    p.add_argument("--field", help="tap this text first to focus its field")
+    p.add_argument("--clear", action="store_true")
+    p.add_argument("--clear-keys", type=int, default=20)
+    p.add_argument("--slow", action="store_true", help="0.4s between chars")
+    p.add_argument("--unicode", action="store_true",
+                   help="force the ADBKeyboard route even for ASCII text")
+    p.add_argument("--ascii", action="store_true",
+                   help="force the legacy path even for non-ASCII text")
+    p.set_defaults(fn=cmd_type)
+
+    p = sub.add_parser("press", help="keyevent (BACK, HOME, 224, 67, ...)")
+    p.add_argument("key")
+    p.set_defaults(fn=cmd_press)
+
+    p = sub.add_parser("state", help="focused app + top screen texts")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_state)
+
+    p = sub.add_parser("start", help="launch app by package")
+    p.add_argument("package")
+    p.set_defaults(fn=cmd_start)
+
+    p = sub.add_parser("shot", help="screenshot via screenshot.sh")
+    p.set_defaults(fn=cmd_shot)
+
+    p = sub.add_parser("ensure", help="tunnel + adb connect check")
+    p.set_defaults(fn=lambda a: 0 if ensure() else 1)
+
+    p = sub.add_parser("gcode", help="pull newest verification code from Gmail")
+    p.add_argument("--from", dest="query", required=True,
+                   help="triage query, e.g. 'from:security@example.com'")
+    p.add_argument("--mins", type=int, default=15)
+    p.set_defaults(fn=cmd_gcode)
+
+    p = sub.add_parser("vcode", help="one-shot: wait for code field, pull email code, type, submit")
+    p.add_argument("--from", dest="query", required=True)
+    p.add_argument("--mins", type=int, default=15)
+    p.add_argument("--timeout", type=int, default=60,
+                   help="how long to wait for the code field")
+    p.add_argument("--submit", default="Continue", help="submit button text")
+    p.set_defaults(fn=cmd_vcode)
+
+    p = sub.add_parser("open", help="open URL/deep link via VIEW intent")
+    p.add_argument("url")
+    p.set_defaults(fn=cmd_open)
+
+    p = sub.add_parser("sleep", help="sleep N seconds (for use in 'do')")
+    p.add_argument("seconds", type=float)
+    p.set_defaults(fn=cmd_sleep)
+
+    p = sub.add_parser("do",
+                       help='run a ;-separated flow in one call, e.g. pc do \'open URL; wait "X" --timeout 20\'')
+    p.add_argument("flow")
+    p.set_defaults(fn=cmd_do)
+
+    p = sub.add_parser("recipe", help="run a saved flow from recipes/<name>.pc")
+    p.add_argument("name")
+    p.set_defaults(fn=cmd_recipe)
+
+    p = sub.add_parser("amazon-status",
+                       help="latest Amazon order status (one-shot, stops at order list)")
+    p.set_defaults(fn=cmd_amazon_status)
+
+    p = sub.add_parser("doctor", help="run connectivity/health checks")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_doctor)
+
+    return ap
+
+
+def cmd_do(args):
+    ap = build_parser()
+    steps = [s.strip() for s in args.flow.split(";") if s.strip()]
+    for i, step in enumerate(steps, 1):
+        try:
+            ns = ap.parse_args(shlex.split(step))
+        except SystemExit:
+            print("do: bad step {}: {}".format(i, step), file=sys.stderr)
+            return 1
+        print("do [{}]: {}".format(i, step), flush=True)
+        rc = ns.fn(ns)
+        if rc:
+            print("do: step {} failed, stopping".format(i), file=sys.stderr)
+            return rc
+    return 0
+
+
+def cmd_recipe(args):
+    path = os.path.join(ROOT, "recipes", args.name + ".pc")
+    if not os.path.exists(path):
+        print("no recipe: {}".format(path), file=sys.stderr)
+        return 1
+    steps = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                steps.append(line)
+    return cmd_do(argparse.Namespace(flow="; ".join(steps)))
+
+
+def main():
+    ap = build_parser()
+    args = ap.parse_args()
+    sys.exit(args.fn(args))
+
+
+if __name__ == "__main__":
+    main()

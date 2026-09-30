@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "burner"
+version = "0.1.0"
+description = "Give your AI a physical Android phone: drive a dedicated Android device over ADB with the pc CLI."
+readme = "README.md"
+authors = [{ name = "Hal" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = ["uiautomator2"]
+keywords = ["android", "adb", "phone-control", "automation"]
+
+[project.urls]
+Homepage = "https://github.com/HALPLACEHOLDER/burner"
+Repository = "https://github.com/HALPLACEHOLDER/burner"
+
+[project.scripts]
+pc = "burner.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["burner*"]
+
+[tool.setuptools.package-data]
+burner = ["py.typed"]

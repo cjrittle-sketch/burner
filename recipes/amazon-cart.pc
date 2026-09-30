@@ -1,0 +1,3 @@
+# Amazon cart, via deep link
+open https://www.amazon.com/gp/cart/view.html
+wait "Cart" --timeout 30

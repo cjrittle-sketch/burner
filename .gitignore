@@ -1,0 +1,23 @@
+# Local phone identity + tunnel endpoints (contains your tailnet IP and ports).
+config.env
+
+# Runtime state
+run/
+*.pid
+*.sock
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# Screenshots and captures (personal screen content)
+shots/
+*.png
+*.jpg
+*.jpeg
+
+# Platform tools installed by install.sh
+.android-tools/

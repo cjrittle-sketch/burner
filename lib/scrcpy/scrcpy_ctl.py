@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""Minimal scrcpy v4.1 control-channel client (control-only, no video).
+
+Speaks the binary control protocol over the adb forward
+tcp:27183 -> localabstract:scrcpy (created by scrcpyd.sh).
+
+Message layouts verified against scrcpy v4.1 server source
+(ControlMessage.java / ControlMessageReader.java / DesktopConnection.java).
+"""
+import socket
+import struct
+import sys
+import time
+
+HOST = "127.0.0.1"
+PORT = 27183
+
+# --- message types (scrcpy v4.1) ---
+T_INJECT_KEYCODE = 0
+T_INJECT_TEXT = 1
+T_INJECT_TOUCH_EVENT = 2
+T_INJECT_SCROLL_EVENT = 3
+T_BACK_OR_SCREEN_ON = 4
+T_SET_CLIPBOARD = 9
+T_START_APP = 16
+
+# --- actions ---
+ACTION_DOWN = 0
+ACTION_UP = 1
+ACTION_MOVE = 2
+
+# --- keycodes (android.view.KeyEvent) ---
+KEYCODE_HOME = 3
+KEYCODE_BACK = 4
+KEYCODE_VOLUME_UP = 24
+KEYCODE_VOLUME_DOWN = 25
+KEYCODE_POWER = 26
+KEYCODE_ENTER = 66
+KEYCODE_DEL = 67
+KEYCODE_TAB = 61
+KEYCODE_DPAD_UP = 19
+KEYCODE_DPAD_DOWN = 20
+KEYCODE_DPAD_LEFT = 21
+KEYCODE_DPAD_RIGHT = 22
+KEYCODE_WAKEUP = 224
+KEYCODE_APP_SWITCH = 187
+
+PRESSURE_FULL = 0xFFFF  # u16 fixed point -> exactly 1.0f server-side
+BUTTON_PRIMARY = 1
+INJECT_TEXT_MAX = 300
+
+
+class ScrcpyControl:
+    """A persistent control-channel connection. Create once, reuse."""
+
+    def __init__(self, host=HOST, port=PORT, screen=(1080, 2400), timeout=10):
+        self.screen = screen
+        self.sock = socket.create_connection((host, port), timeout=timeout)
+        # send_dummy_byte=true: server writes a single 0x00 on accept
+        dummy = self._recv_exact(1)
+        if dummy != b"\x00":
+            self.close()
+            raise RuntimeError(f"scrcpy handshake failed, got {dummy!r}")
+
+    def _recv_exact(self, n):
+        buf = b""
+        while len(buf) < n:
+            chunk = self.sock.recv(n - len(buf))
+            if not chunk:
+                raise ConnectionError("scrcpy control socket closed")
+            buf += chunk
+        return buf
+
+    def _send(self, data: bytes):
+        self.sock.sendall(data)
+
+    def close(self):
+        try:
+            self.sock.close()
+        except OSError:
+            pass
+
+    # ---- input primitives ----
+    def keyevent(self, keycode, action=ACTION_DOWN):
+        """Full key press = down + up."""
+        if action == ACTION_DOWN:
+            self._send(struct.pack(">BBiii", T_INJECT_KEYCODE, ACTION_DOWN, keycode, 0, 0))
+            self._send(struct.pack(">BBiii", T_INJECT_KEYCODE, ACTION_UP, keycode, 0, 0))
+        else:
+            self._send(struct.pack(">BBiii", T_INJECT_KEYCODE, action, keycode, 0, 0))
+
+    def _touch(self, action, x, y, pointer_id=1, buttons=0, screen=None):
+        w, h = screen or self.screen
+        self._send(struct.pack(
+            ">BBqiiHHHii",
+            T_INJECT_TOUCH_EVENT, action, pointer_id,
+            int(x), int(y), w, h, PRESSURE_FULL, 0, buttons,
+        ))
+
+    def tap(self, x, y, hold_ms=70, screen=None):
+        self._touch(ACTION_DOWN, x, y, buttons=BUTTON_PRIMARY, screen=screen)
+        if hold_ms:
+            time.sleep(hold_ms / 1000)
+        self._touch(ACTION_UP, x, y, buttons=0, screen=screen)
+
+    def swipe(self, x1, y1, x2, y2, duration_ms=300, steps=12, screen=None):
+        self._touch(ACTION_DOWN, x1, y1, buttons=BUTTON_PRIMARY, screen=screen)
+        for i in range(1, steps + 1):
+            t = i / steps
+            x = x1 + (x2 - x1) * t
+            y = y1 + (y2 - y1) * t
+            self._touch(ACTION_MOVE, x, y, buttons=BUTTON_PRIMARY, screen=screen)
+            time.sleep(duration_ms / 1000 / steps)
+        self._touch(ACTION_UP, x2, y2, buttons=0, screen=screen)
+
+    def text(self, s):
+        """Inject text as key events (ASCII-safe path; prefer set_text for fields)."""
+        data = s.encode("utf-8")
+        for i in range(0, len(data), INJECT_TEXT_MAX):
+            chunk = data[i:i + INJECT_TEXT_MAX]
+            self._send(struct.pack(">Bi", T_INJECT_TEXT, len(chunk)) + chunk)
+
+    def scroll(self, x, y, h_amount=0.0, v_amount=1.0):
+        """Scroll at (x,y); v_amount in 'clicks' (1.0 = one notch down)."""
+        w, h = self.screen
+        hs = int((h_amount / 16) * 32768)
+        vs = int((v_amount / 16) * 32768)
+        self._send(struct.pack(">BiiHHhhi", T_INJECT_SCROLL_EVENT,
+                               int(x), int(y), w, h, hs, vs, 0))
+
+    def back_or_screen_on(self):
+        self._send(struct.pack(">BB", T_BACK_OR_SCREEN_ON, ACTION_DOWN))
+
+    def back(self):
+        self.keyevent(KEYCODE_BACK)
+
+    def home(self):
+        self.keyevent(KEYCODE_HOME)
+
+    def wake(self):
+        self.keyevent(KEYCODE_WAKEUP)
+
+    def set_clipboard(self, text, paste=False):
+        data = text.encode("utf-8")
+        self._send(struct.pack(">BqBi", T_SET_CLIPBOARD, 0, 1 if paste else 0, len(data)) + data)
+
+    def start_app(self, package_name):
+        name = package_name.encode("utf-8")
+        if len(name) > 255:
+            raise ValueError("package name too long")
+        self._send(struct.pack(">BB", T_START_APP, len(name)) + name)
+
+    def ping(self):
+        """Cheap liveness check: inject nothing, just verify the socket is open."""
+        try:
+            self.sock.settimeout(2)
+            # BACK_OR_SCREEN_ON with ACTION_UP is a harmless no-op-ish probe;
+            # we only care that the send doesn't raise.
+            self._send(struct.pack(">BB", T_BACK_OR_SCREEN_ON, ACTION_UP))
+            return True
+        except OSError:
+            return False
+        finally:
+            self.sock.settimeout(None)
+
+
+def _mux_send(line, timeout=30):
+    """Send a command to the mux; start the mux daemon if not running."""
+    import os as _os
+    run = _os.path.join(_os.path.expanduser("~"), "workspace", "phone-control", "run")
+    sock_path = _os.path.join(run, "scrcpy-mux.sock")
+
+    def _try():
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        s.connect(sock_path)
+        s.sendall((line + "\n").encode())
+        data = b""
+        while not data.endswith(b"\n"):
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+        s.close()
+        return data.decode("utf-8", "replace").strip()
+
+    try:
+        return _try()
+    except (OSError, ConnectionRefusedError, FileNotFoundError):
+        pass
+    # start the mux daemon
+    import subprocess as _sp
+    _os.makedirs(run, exist_ok=True)
+    mux_py = _os.path.join(_os.path.expanduser("~"), "workspace", "phone-control",
+                           "lib", "scrcpy", "mux.py")
+    _sp.Popen([sys.executable, mux_py],
+              stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+              start_new_session=True)
+    last = None
+    for _ in range(60):
+        time.sleep(0.5)
+        try:
+            return _try()
+        except (OSError, ConnectionRefusedError, FileNotFoundError) as e:
+            last = e
+    raise RuntimeError(f"scrcpy mux did not come up: {last}")
+
+
+def main(argv):
+    if len(argv) < 2:
+        print("usage: scrcpy_ctl.py tap X Y | swipe X1 Y1 X2 Y2 [MS] | key CODE | back | home | wake | text STR | scroll X Y [H V] | startapp PKG | ping")
+        return 2
+    cmd = argv[1]
+    if cmd == "tap":
+        line = f"tap {argv[2]} {argv[3]}"
+    elif cmd == "swipe":
+        ms = argv[6] if len(argv) > 6 else "300"
+        line = f"swipe {argv[2]} {argv[3]} {argv[4]} {argv[5]} {ms}"
+    elif cmd == "key":
+        line = f"key {argv[2]}"
+    elif cmd == "scroll":
+        h = argv[4] if len(argv) > 4 else "0"
+        v = argv[5] if len(argv) > 5 else "1"
+        line = f"scroll {argv[2]} {argv[3]} {h} {v}"
+    elif cmd in ("back", "home", "wake", "ping"):
+        line = cmd
+    elif cmd == "text":
+        line = "text " + " ".join(argv[2:])
+    elif cmd == "startapp":
+        line = f"startapp {argv[2]}"
+    else:
+        print(f"unknown command {cmd}")
+        return 2
+    reply = _mux_send(line)
+    print(reply)
+    return 0 if reply == "ok" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

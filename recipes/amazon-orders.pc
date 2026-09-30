@@ -1,0 +1,3 @@
+# Amazon order history, via deep link (skips home -> menu -> orders navigation)
+open https://www.amazon.com/gp/css/order-history
+wait "Your Orders" --timeout 30
