@@ -99,9 +99,9 @@
   summary::after {
     content: ""; width: 8px; height: 8px; margin-right: 4px;
     border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
-    transform: rotate(45deg); transition: transform .2s ease;
+    transform: rotate(45deg); transition: transform .3s cubic-bezier(.2, .7, .2, 1);
   }
-  details[open] summary::after { transform: rotate(-135deg); }
+  details[open]:not(.closing) summary::after { transform: rotate(-135deg); }
   .panel { padding: 0 0 26px; }
 
   footer {
@@ -194,6 +194,40 @@
         try { document.execCommand('copy'); done(); } catch (e) {}
         document.body.removeChild(ta);
       }
+    });
+  });
+
+  // Ease the questions open and closed instead of snapping.
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  document.querySelectorAll('details').forEach(function (d) {
+    var summary = d.querySelector('summary');
+    var panel = d.querySelector('.panel');
+    if (!summary || !panel) return;
+    var anim = null, closing = false;
+    summary.addEventListener('click', function (e) {
+      if (reduceMotion.matches || !d.animate) return;
+      e.preventDefault();
+      var start = d.offsetHeight;
+      if (anim) anim.cancel();
+      d.style.overflow = 'hidden';
+      var end;
+      if (!d.open || closing) {
+        closing = false;
+        d.open = true;
+        d.classList.remove('closing');
+        end = d.offsetHeight;
+      } else {
+        closing = true;
+        d.classList.add('closing');
+        end = d.offsetHeight - panel.offsetHeight;
+      }
+      var a = anim = d.animate({ height: [start + 'px', end + 'px'] }, { duration: 300, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+      a.onfinish = function () {
+        if (a !== anim) return;
+        if (closing) { d.open = false; closing = false; d.classList.remove('closing'); }
+        anim = null;
+        d.style.overflow = '';
+      };
     });
   });
 </script>
