@@ -181,8 +181,10 @@ something they said), and ask only if you can't.
      random wireless-debugging port is never used again, and reboots need
      no human action.
 
-Last, tell the user to plug the phone into a charger and leave it there, on
-WiFi. It only stays awake while charging. Done.
+Last, close with a short message that's about them, not the setup parts,
+e.g. "All done. Plug the phone into a charger and leave it there on Wi-Fi."
+(The screen only stays on while charging, which is why it lives on the
+charger.) Done.
 
 ## Security notes
 
