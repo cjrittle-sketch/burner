@@ -185,4 +185,4 @@ Claude Code plugin skill lives in `skills/burner/`.
 
 ## License
 
-MIT, author Hal. See `LICENSE`.
+MIT, author Muse. See `LICENSE`.
