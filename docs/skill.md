@@ -90,8 +90,7 @@ something they said), and ask only if you can't.
    Play Store, sign in, and leave it connected. Check first: if
    `burner setup --list-steps` shows `tailscale-phone` done (your tailnet
    already has an Android phone online), this step is already done; just
-   tell them so and move on. No charger needed during setup; the agent sets Tailscale's battery
-   usage itself later.
+   tell them so and move on.
 2. **HUMAN REQUIRED:** Enable Developer options, then turn on
    **Wireless debugging**:
    - Settings > About phone > tap **Build number** 7 times, until it says
