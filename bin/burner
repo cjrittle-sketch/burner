@@ -2727,27 +2727,39 @@ SETUP_STEPS = [
      "instruction": (
          "On the burner phone: install Tailscale from the Play Store, sign in "
          "to your Tailscale account, and turn it on so it says Connected. "
-         "Then set Tailscale battery usage to Unrestricted (Settings > Apps > "
-         "Tailscale > Battery) so Android does not kill it.")},
+         "Then set Tailscale battery usage to Unrestricted so Android does "
+         "not kill it: Settings > Apps > Tailscale > App battery usage > "
+         "Unrestricted (on Samsung: Settings > Apps > Tailscale > Battery > "
+         "Unrestricted).")},
     {"name": "dev-options", "kind": "human", "title": "Enable Developer options",
      "shot": SETUP_SHOTS.format(2, "build-number"), "check": _check_dev_options,
      "run": None,
      "instruction": (
          "On the phone: Settings > About phone. Tap Build number 7 times "
-         "until it says you are now a developer.")},
+         "until it says \"You are now a developer\" (enter the phone PIN if "
+         "asked). On Samsung, Build number is in Settings > About phone > "
+         "Software information.")},
     {"name": "wireless-debug", "kind": "human", "title": "Turn on Wireless debugging",
      "shot": SETUP_SHOTS.format(3, "wireless-debugging"),
      "check": _check_wireless_debug, "run": None,
      "instruction": (
-         "On the phone: Settings > System > Developer options. Turn ON "
-         "Wireless debugging. Leave it on.")},
+         "On the phone: Settings > System > Developer options (on Samsung, "
+         "Developer options is at the bottom of the main Settings list). "
+         "Scroll to the Debugging section and turn ON Wireless debugging. "
+         "When it asks \"Allow wireless debugging on this network?\", check "
+         "Always allow on this network, then tap Allow. Leave it on. "
+         "Shortcut: search Settings for \"Wireless debugging\". No such "
+         "option means the phone is older than Android 11 and can't be used.")},
     {"name": "pair", "kind": "agent", "title": "Pair over adb",
      "shot": SETUP_SHOTS.format(4, "pairing-dialog"),
      "shot2": SETUP_SHOTS.format(5, "wireless-debugging-screen"),
      "check": _check_pair, "run": _run_pair,
      "instruction": (
-         "On the phone: Developer options > Wireless debugging > Pair device "
-         "with pairing code. Make sure Tailscale is ON first, or the dialog "
+         "On the phone: in Developer options, tap the words Wireless "
+         "debugging (not the switch) to open its screen, then tap Pair device "
+         "with pairing code. If you're chatting with the agent on this same "
+         "phone, use split screen so the dialog stays open while you send "
+         "the code; leaving it cancels the code. Make sure Tailscale is ON first, or the dialog "
          "shows the wrong IP. Send the agent the 6-digit code, the pairing "
          "port, and the IP shown. Codes expire in about a minute, so send "
          "them fast. Keep the phone in hand.")},

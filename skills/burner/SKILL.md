@@ -29,7 +29,10 @@ has no route to the phone. Same-LAN setups skip this.
 The guided path is `burner setup`: it walks every step, shows a screenshot for
 each human step (in `setup/`), runs the agent steps itself, and finishes with
 `burner doctor`. Keep the burner phone in hand during setup; pairing codes expire
-in about a minute.
+in about a minute. First ask which device the user is chatting from: if it's
+the burner phone itself, skip "use a spare phone" advice and have them pair in
+split screen so the dialog stays open. Walk the human steps one at a time,
+giving the full Settings path for each tap (the wizard prints them).
 
 **HUMAN REQUIRED:** on the phone, enable Developer options, turn on Wireless
 debugging, tap "Pair device with pairing code", and send the agent the IP,
