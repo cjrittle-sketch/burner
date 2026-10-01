@@ -12,16 +12,39 @@ home, so it can use the apps you use.
 
 ## What it can do for you
 
-> ### "Use my burner to…
+### Use my burner to…
 
-- …screen my Tinder matches and tell me who's worth a reply."
-- …keep my Snapchat streaks alive while I'm on vacation."
-- …spot underpriced flips on Vinted before anyone else sees them."
-- …download the Airbnb app and find me a cabin for next weekend."
-- …get last Friday's Uber Eats dinner ready to reorder."
-- …check my Ring app and tell me who came to the door."
-- …play my chill playlist on the living room speaker."
-- …turn off the lamps I left on. I'm already at the airport."
+```
+Use my burner to screen my Tinder matches and tell me who's worth a reply.
+```
+
+```
+Use my burner to keep my Snapchat streaks alive while I'm on vacation.
+```
+
+```
+Use my burner to spot underpriced flips on Vinted before anyone else sees them.
+```
+
+```
+Use my burner to download the Airbnb app and find me a cabin for next weekend.
+```
+
+```
+Use my burner to get last Friday's Uber Eats dinner ready to reorder.
+```
+
+```
+Use my burner to check my Ring app and tell me who came to the door.
+```
+
+```
+Use my burner to play my chill playlist on the living room speaker.
+```
+
+```
+Use my burner to turn off the lamps I left on. I'm already at the airport.
+```
 
 ## Get started
 
