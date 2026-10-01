@@ -29,7 +29,8 @@ has no route to the phone. Same-LAN setups skip this.
 The guided path is `burner setup`: it walks every step, shows a screenshot for
 each human step (in `setup/`), runs the agent steps itself, and finishes with
 `burner doctor`. Keep the burner phone in hand during setup; pairing codes expire
-in about a minute. First ask which device the user is chatting from: if it's
+in about a minute. First work out which device the user is chatting from (infer it from the
+client, platform or user agent, confirm in one line, ask only if unsure): if it's
 the burner phone itself, skip "use a spare phone" advice. Switching apps
 cancels the pairing code, so have them open Settings and the chat in split
 screen (Recent apps > Settings icon > Split screen) before tapping Pair. Walk the human steps one at a time,

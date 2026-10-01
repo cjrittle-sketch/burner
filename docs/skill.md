@@ -19,9 +19,15 @@ apps, social apps, store apps that block bots in the browser.
   setups skip this step.
 - A human available once for ~10 minutes to pair the phone (see below).
 
-## First, ask where the user is
+## First, work out where the user is
 
-Ask which device they are talking to you from, then follow that path:
+Work out which device they are talking to you from before asking. Use what
+you already know: the app or client they're chatting in, its platform or
+user agent, or anything they've said (a mobile app on Android usually means
+they're holding a phone, a desktop or web client means a computer). If you
+can tell, say it in one line and let them correct you ("Looks like you're
+on an Android phone, is this the spare one?"). Ask outright only when you
+can't tell. Then follow that path:
 
 - **From the spare phone itself:** that phone is the burner phone. Skip any
   "find a spare phone" advice and do the human steps below on the phone they
@@ -66,8 +72,10 @@ Do these on the phone. The agent cannot do them for you.
 Walk the user through them one at a time, as part of setup: say what to tap,
 link the screenshot, and wait for them to say it's done before the next
 step. Never hand them a list to do "meanwhile" while you install. Give the
-full Settings path for every tap, never just a screen name, and ask the phone
-brand first: menus differ (paths below are Pixel, with Samsung noted).
+full Settings path for every tap, never just a screen name. Menus differ by
+brand (paths below are Pixel, with Samsung noted), so know the brand first:
+infer it from their device if you can (a phone model in the user agent, or
+something they said), and ask only if you can't.
 
 1. **HUMAN REQUIRED:** Connect the phone to WiFi, plug it into a charger, and
    install Tailscale from the Play Store. Sign in, leave it connected, and set
