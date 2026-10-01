@@ -2500,8 +2500,10 @@ def _check_install_app():
 
 
 def _check_self_pair():
-    # Nothing to query live; the human confirms in the app.
-    return None
+    st = _setup_app_status()
+    if st is None:
+        return None
+    return bool(st.get("isPaired"))
 
 
 def _check_always_on_vpn():
@@ -2666,6 +2668,110 @@ def _run_install_app(args):
     return 0
 
 
+SETUP_APP_API_PORT = "9093"     # adb-auto-enable's local web API
+SETUP_APP_FWD_PORT = "19093"    # where we forward it on this machine
+
+
+def _setup_app_api(path, body=None, timeout=60):
+    """Call adb-auto-enable's local API through adb forward. Dict or None."""
+    r = adb("forward", "tcp:" + SETUP_APP_FWD_PORT,
+            "tcp:" + SETUP_APP_API_PORT, timeout=15)
+    if r.returncode != 0:
+        return None
+    import urllib.request
+    url = "http://127.0.0.1:{}{}".format(SETUP_APP_FWD_PORT, path)
+    data = body.encode() if body is not None else None
+    req = urllib.request.Request(url, data=data)
+    if data is not None:
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        # Error responses carry a JSON body too.
+        try:
+            return json.loads(e.read().decode("utf-8"))
+        except Exception:
+            return None
+
+
+def _setup_app_status():
+    return _setup_app_api("/api/status", timeout=15)
+
+
+def _setup_tap_label(label, scrolls=12):
+    """Tap the node labelled exactly `label`, scrolling down to find it."""
+    for _ in range(scrolls):
+        hits = find_nodes(walk(ui_dump()), label)
+        if hits:
+            x, y = clickable_target(hits[0])
+            tap_center(x, y)
+            time.sleep(1.5)
+            return True
+        w, h = screen_dims()
+        adb("shell", "input", "swipe", w // 2, h * 3 // 4, w // 2, h // 4, 300)
+        time.sleep(0.8)
+    return False
+
+
+def _setup_read_pair_dialog():
+    """Read (code, port) off the open pairing dialog. Never logged or stored."""
+    code = port = None
+    for n in walk(ui_dump()):
+        t = (n["text"] or "").strip()
+        if re.fullmatch(r"\d{6}", t):
+            code = t
+        m = re.fullmatch(r"[0-9a-fA-F.:\[\]]+:(\d{2,5})", t)
+        if m:
+            port = m.group(1)
+    return code, port
+
+
+def _run_self_pair(args):
+    """Do adb-auto-enable's one-time self-pairing for the human, over adb.
+
+    Opens the app once (starts its service and local API), opens Settings >
+    Developer options > Wireless debugging > Pair device with pairing code
+    on the phone, reads the code and port off the screen, and hands them to
+    the app's /api/pair. The app then pairs with the phone over localhost."""
+    if _check_self_pair():
+        print("ADB Auto Enable is already paired.")
+        return 0
+    print("the phone will open ADB Auto Enable and Settings by itself for a "
+          "few seconds; nothing to tap.")
+    adb("shell", "monkey", "-p", SETUP_APK_PKG, "-c",
+        "android.intent.category.LAUNCHER", "1", timeout=20)
+    time.sleep(3)
+    if _setup_app_status() is None:
+        print("ADB Auto Enable's service did not start. Open the app once on "
+              "the phone and re-run this step.", file=sys.stderr)
+        return 1
+    adb("shell", "am", "start", "-a",
+        "android.settings.APPLICATION_DEVELOPMENT_SETTINGS", timeout=15)
+    time.sleep(2)
+    for label in ("Wireless debugging", "Pair device with pairing code"):
+        if not _setup_tap_label(label):
+            print("could not find '{}' on the phone screen.".format(label),
+                  file=sys.stderr)
+            return 1
+    code, port = _setup_read_pair_dialog()
+    if not code or not port:
+        print("could not read the pairing code and port off the phone "
+              "screen.", file=sys.stderr)
+        return 1
+    res = _setup_app_api("/api/pair", "port={}&code={}".format(port, code))
+    for _ in range(3):
+        adb("shell", "input", "keyevent", "KEYCODE_BACK", timeout=10)
+        time.sleep(0.5)
+    if not res or not res.get("success"):
+        print("ADB Auto Enable pairing failed: {}".format(
+            (res or {}).get("error", "no response")), file=sys.stderr)
+        return 1
+    time.sleep(2)
+    print("ADB Auto Enable is paired and will keep ADB on after reboots.")
+    return 0
+
+
 def _run_always_on_vpn(args):
     lock = _setup_get_setting("secure", "always_on_vpn_lockdown")
     if lock == "1":
@@ -2771,13 +2877,13 @@ SETUP_STEPS = [
      "title": "Install adb-auto-enable", "shot": None,
      "check": _check_install_app, "run": _run_install_app,
      "instruction": None},
-    {"name": "self-pair", "kind": "human", "title": "In-app self-pairing",
+    {"name": "self-pair", "kind": "agent", "title": "In-app self-pairing",
      "shot": SETUP_SHOTS.format(6, "adb-auto-enable"),
-     "check": _check_self_pair, "run": None,
+     "check": _check_self_pair, "run": _run_self_pair,
      "instruction": (
-         "On the phone: open the ADB Auto Enable app and tap its pair "
-         "button. It pairs with the phone itself over localhost, one time "
-         "only. This is what re-enables ADB after every reboot.")},
+         "Nothing to tap: the agent opens ADB Auto Enable and the pairing "
+         "dialog on the phone, reads the code, and pairs the app with the "
+         "phone itself. This is what re-enables ADB after every reboot.")},
     {"name": "always-on-vpn", "kind": "agent", "title": "Always-on VPN for Tailscale",
      "shot": SETUP_SHOTS.format(7, "vpn-settings"),
      "check": _check_always_on_vpn, "run": _run_always_on_vpn,

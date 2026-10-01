@@ -1417,7 +1417,7 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(kinds["prereqs"], "agent")
         self.assertEqual(kinds["tailscale-phone"], "human")
         self.assertEqual(kinds["pair"], "agent")
-        self.assertEqual(kinds["self-pair"], "human")
+        self.assertEqual(kinds["self-pair"], "agent")
         # Human steps must carry an instruction and a screenshot path.
         for s in pc.SETUP_STEPS:
             if s["kind"] == "human":
@@ -1447,10 +1447,30 @@ class SetupWizardTests(OfflineTestCase):
 
     def test_confirm_records_human_done(self):
         with self.cap():
-            rc = pc.cmd_setup(_setup_args(step="self-pair", confirm=True))
+            rc = pc.cmd_setup(_setup_args(step="tailscale-phone", confirm=True))
         self.assertEqual(rc, 0)
         st = pc._setup_state_load()
-        self.assertIn("self-pair", st["done"])
+        self.assertIn("tailscale-phone", st["done"])
+
+    def test_read_pair_dialog(self):
+        xml = ('<hierarchy><node text="Pair with device" bounds="[0,0][1,1]"/>'
+               '<node text="Wi-Fi pairing code" bounds="[0,0][1,1]"/>'
+               '<node text="482915" bounds="[0,0][1,1]"/>'
+               '<node text="IP address &amp; Port" bounds="[0,0][1,1]"/>'
+               '<node text="100.64.1.2:37129" bounds="[0,0][1,1]"/>'
+               '</hierarchy>')
+        with mock.patch.object(pc, "ui_dump",
+                               return_value=pc.ET.fromstring(xml)):
+            self.assertEqual(pc._setup_read_pair_dialog(),
+                             ("482915", "37129"))
+
+    def test_self_pair_already_paired(self):
+        with mock.patch.object(pc, "_setup_app_status",
+                               return_value={"isPaired": True}):
+            with self.cap() as (out, err):
+                rc = pc._run_self_pair(_setup_args())
+        self.assertEqual(rc, 0)
+        self.assertIn("already paired", out.getvalue())
 
     def test_unknown_status_falls_back_to_state_file(self):
         pc._setup_state_save("self-pair")

@@ -45,7 +45,8 @@ installs **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
 downloaded from GitHub; warn the user their assistant may ask to reach
 api.github.com), grants
 it `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization; then
-**HUMAN REQUIRED:** open the app and finish its one-time self-pairing. From
+does the app's one-time self-pairing itself (`burner setup --step self-pair`;
+the phone flips through Settings on its own, nothing to tap). From
 then on ADB re-enables on every boot on the fixed port **5555**, so
 `ADB_PORT="5555"` in `config.env` is permanent - reboots need no human action.
 The agent also sets Always-on VPN for Tailscale

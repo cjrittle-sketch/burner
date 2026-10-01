@@ -108,8 +108,11 @@ brand first: menus differ (paths below are Pixel, with Samsung noted).
    **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
    https://github.com/mouldybread/adb-auto-enable/releases), grants it
    `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization.
-   **HUMAN REQUIRED:** open the app on the phone and finish its one-time
-   self-pairing (enter the code it shows; takes about a minute).
+   Then it does the app's one-time self-pairing itself with
+   `burner setup --step self-pair`: it opens the app once, opens the pairing
+   dialog in Settings, reads the code off the screen, and hands it to the
+   app. Nothing for the user to tap; tell them the phone will flip through
+   Settings on its own for a few seconds.
    (Screenshot: [setup/setup-06-adb-auto-enable.png](https://useburner.si/setup/setup-06-adb-auto-enable.png).)
 5. From then on the app re-enables ADB on every boot and pins adbd to the
    fixed port **5555**. Put `ADB_PORT="5555"` in `config.env` once - the
