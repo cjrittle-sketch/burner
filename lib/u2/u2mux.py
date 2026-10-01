@@ -197,8 +197,11 @@ def ensure_server():
         return
     except Exception as e:
         log("server not responding (%s), (re)initing" % e)
+    # Pass the serial: with one, init only pushes u2.jar. Without it, init
+    # also installs the ATX keyboard app, which Android 14+ blocks as an
+    # "unsafe app" (it targets an old Android). burner doesn't need it.
     r = subprocess.run(
-        [VENV_PY, "-m", "uiautomator2", "init"],
+        [VENV_PY, "-m", "uiautomator2", "init", "--serial", TARGET],
         capture_output=True, text=True, timeout=120)
     d = u2.connect(TARGET)
     d.info

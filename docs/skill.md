@@ -160,6 +160,7 @@ If `burner doctor` reports green, the agent can drive the phone.
 |---|---|
 | Phone unreachable after a reboot / adb connect fails | Wait 60-90s for boot plus ~30s for adb-auto-enable to switch adbd to port 5555, then run `burner ensure`. If it stays down, check the app is still installed and exempt from battery optimization. |
 | No Wireless debugging option in Developer options | It needs Android 11 or newer. Check Settings > About phone > Android version. If it's 11+, scroll to the Debugging section of Developer options or search Settings for "Wireless debugging". On Android 10 or older, the phone can't be a burner phone. |
+| Phone shows "Unsafe app blocked: ATX" | An older burner tried to install an extra keyboard app burner doesn't need. Tap OK to dismiss it, then update burner (re-run the installer). |
 | `adb unauthorized` | The adb key was revoked. Re-run the pairing flow above (send a fresh pairing code). |
 | u2 daemon dead / commands hang | Run `burner ensure`: it restarts the tunnel, the u2 daemon, and the adb server (~5s). |
 | Dumps come back empty | The screen must stay awake. Keep the phone on its charger; use `burner sleep`-free flows, and do not let the display time out mid-run. |
