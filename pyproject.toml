@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "burner"
 version = "0.1.0"
-description = "Give your AI a physical Android phone: drive a dedicated Android device over ADB with the pc CLI."
+description = "Give your AI a physical Android phone: drive a dedicated Android device over ADB with the burner CLI."
 readme = "README.md"
 authors = [{ name = "Muse" }]
 license = { text = "MIT" }
@@ -18,7 +18,7 @@ Homepage = "https://useburner.si"
 Repository = "https://github.com/useburner/burner"
 
 [project.scripts]
-pc = "burner.cli:main"
+burner = "burner.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["burner*"]

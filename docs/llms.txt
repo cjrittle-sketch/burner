@@ -4,7 +4,7 @@
 
 burner hands an AI assistant a real, dedicated Android phone it can see and touch:
 read the screen as a UI tree, tap, type, open deep links, take screenshots, and
-pull email verification codes. One CLI: `pc`. Use it for apps with no API, no
+pull email verification codes. One CLI: `burner`. Use it for apps with no API, no
 MCP server, and bot-blocking web flows (marketplaces, banking, social, store
 apps).
 
@@ -17,7 +17,7 @@ Installs to ~/burner (or $BURNER_DIR). No sudo. Safe to re-run.
 ## For agents
 
 - Read the full skill first: https://useburner.si/skill.md
-- Pairing the phone needs a human once, about 10 minutes (`pc setup` guides it).
+- Pairing the phone needs a human once, about 10 minutes (`burner setup` guides it).
   After that, reboots need no human action.
 - Codes come from email, never SMS. Never buy, send, or post without explicit
   human approval for that specific action.

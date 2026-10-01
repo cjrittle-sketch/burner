@@ -81,7 +81,7 @@ command are in [SKILL.md](SKILL.md).
 ## Gotchas
 
 - After a restart, give the phone about 2 minutes to come back. If your AI
-  assistant still can't reach it, `pc ensure` reconnects it.
+  assistant still can't reach it, `burner ensure` reconnects it.
 - Tailscale has to turn itself on after a restart. Your AI assistant sets that
   up during setup, so you never have to open the app.
 - Keep the phone on its charger with the screen allowed to stay on. If the
@@ -93,7 +93,7 @@ command are in [SKILL.md](SKILL.md).
 
 ## How it works
 
-burner is a small command-line tool, `pc`, that your AI assistant runs. It
+burner is a small command-line tool that your AI assistant runs. It
 connects to the phone through Android's wireless debugging, over Tailscale (or
 your home Wi-Fi when both are on the same network). From there it reads what's
 on the screen, taps, types, opens apps and links, and takes screenshots, the

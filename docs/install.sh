@@ -66,12 +66,12 @@ burner is ready in $DEST
 
 Add it to your PATH (put both lines in your shell rc to keep them):
 
-  export PC_WORKSPACE="$DEST"
+  export BURNER_WORKSPACE="$DEST"
   export PATH="$DEST/bin:\$PATH"
 
 Next step: pair the phone (a human, once, about 10 minutes):
 
-  pc setup
+  burner setup
 
 Agent guide: https://useburner.si/skill.md
 EOF

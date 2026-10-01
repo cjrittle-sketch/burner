@@ -27,9 +27,9 @@ fi
 info "pip OK"
 
 # --- 3. adb -------------------------------------------------------------------
-# bin/pc looks for adb at $PC_WORKSPACE/.android-tools/platform-tools/adb
-# (PC_WORKSPACE defaults to the repo's parent dir, so we install repo-local
-# and export PC_WORKSPACE in the next steps below).
+# bin/burner looks for adb at $BURNER_WORKSPACE/.android-tools/platform-tools/adb
+# (BURNER_WORKSPACE defaults to the repo's parent dir, so we install repo-local
+# and export BURNER_WORKSPACE in the next steps below).
 ATOOLS="$ROOT/.android-tools/platform-tools"
 ADB_BIN="$ATOOLS/adb"
 
@@ -87,15 +87,15 @@ else
 fi
 
 # --- 6. executable bit -----------------------------------------------------------
-chmod +x "$ROOT/bin/pc" || die "cannot chmod bin/pc"
-info "bin/pc is executable"
+chmod +x "$ROOT/bin/burner" || die "cannot chmod bin/burner"
+info "bin/burner is executable"
 
 # --- next steps ------------------------------------------------------------------
 cat <<EOF
 
 burner installed. Next steps:
 
-  1. export PC_WORKSPACE="$ROOT"
+  1. export BURNER_WORKSPACE="$ROOT"
      export PATH="$ROOT/bin:\$PATH"
      (add both lines to your shell rc to make them permanent)
 
@@ -106,7 +106,7 @@ burner installed. Next steps:
 
   3. Your agent installs adb-auto-enable (re-enables ADB on every boot,
      fixed port 5555). Put ADB_PORT="5555" in config.env, then run:
-       pc doctor
+       burner doctor
 
 See SKILL.md for the agent guide and README.md for full docs.
 EOF

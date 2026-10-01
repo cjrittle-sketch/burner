@@ -3,7 +3,7 @@
 
 Holds ONE persistent scrcpy control connection (the server handles a single
 client per launch, then exits) and serves local commands over a unix socket,
-so every `pc` invocation gets ~5ms input without paying server startup.
+so every `burner` invocation gets ~5ms input without paying server startup.
 
 Unix socket: ~/workspace/phone-control/run/scrcpy-mux.sock
 Line protocol:  "tap 540 1200" | "swipe x1 y1 x2 y2 ms" | "key 4" |

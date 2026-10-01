@@ -1,4 +1,4 @@
-"""Offline test suite for burner bin/pc.
+"""Offline test suite for burner bin/burner.
 
 100% OFFLINE GUARANTEE: every device/network touchpoint is guarded in
 OfflineTestCase.setUp -- pc.adb, pc.adb_or_ensure, pc.u2sock, pc.ui_dump,
@@ -25,11 +25,11 @@ from importlib.machinery import SourceFileLoader
 from types import SimpleNamespace
 from unittest import mock
 
-_PC_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "pc")
+_PC_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "burner")
 
 
 def _load_pc():
-    # bin/pc has no .py extension, so spec_from_file_location can't find a
+    # bin/burner has no .py extension, so spec_from_file_location can't find a
     # loader -- use SourceFileLoader explicitly.
     loader = SourceFileLoader("pc_under_test", _PC_PATH)
     spec = importlib.util.spec_from_loader("pc_under_test", loader)
@@ -939,7 +939,7 @@ class RegressionTests(OfflineTestCase):
         with tempfile.TemporaryDirectory() as d:
             rdir = os.path.join(d, "recipes")
             os.makedirs(rdir)
-            with open(os.path.join(rdir, "r.pc"), "w") as f:
+            with open(os.path.join(rdir, "r.burner"), "w") as f:
                 f.write("# a comment\n\nsleep 0\n# another\nsleep 0\n")
             with mock.patch.object(pc, "ROOT", d):
                 with mock.patch.object(pc, "cmd_do", return_value=0) as m:
@@ -951,12 +951,24 @@ class RegressionTests(OfflineTestCase):
         with tempfile.TemporaryDirectory() as d:
             rdir = os.path.join(d, "recipes")
             os.makedirs(rdir)
-            with open(os.path.join(rdir, "r.pc"), "w") as f:
+            with open(os.path.join(rdir, "r.burner"), "w") as f:
                 f.write("sleep 0\nnosuchcmd\n")
             with mock.patch.object(pc, "ROOT", d):
                 with self.cap():
                     rc = pc.cmd_recipe(SimpleNamespace(name="r"))
         self.assertEqual(rc, 1)
+
+    def test_cmd_recipe_reads_legacy_pc_extension(self):
+        with tempfile.TemporaryDirectory() as d:
+            rdir = os.path.join(d, "recipes")
+            os.makedirs(rdir)
+            with open(os.path.join(rdir, "r.pc"), "w") as f:
+                f.write("sleep 0\n")
+            with mock.patch.object(pc, "ROOT", d):
+                with mock.patch.object(pc, "cmd_do", return_value=0) as m:
+                    rc = pc.cmd_recipe(SimpleNamespace(name="r"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(m.call_args[0][0].flow, "sleep 0")
 
     # gmail_cli()
     def test_gmail_cli_default(self):
@@ -980,7 +992,7 @@ class DocsTests(OfflineTestCase):
         cmds = {}
         for line in "\n".join(sections).splitlines():
             s = line.strip()
-            if not s.startswith("pc "):
+            if not s.startswith("burner "):
                 continue
             parts = s.split(None, 2)
             if len(parts) < 2:
@@ -1076,16 +1088,16 @@ class OfflineSafetyTests(OfflineTestCase):
         with self.assertRaises(AssertionError):
             _socket.socket(_socket.AF_UNIX)
 
-    def test_bin_pc_compiles(self):
+    def test_bin_burner_compiles(self):
         r = subprocess.run(
-            [sys.executable, "-m", "py_compile", os.path.join(ROOT, "bin", "pc")],
+            [sys.executable, "-m", "py_compile", os.path.join(ROOT, "bin", "burner")],
             capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
 
-    def test_bin_pc_help_offline(self):
-        env = dict(os.environ, PC_WORKSPACE=ROOT)
+    def test_bin_burner_help_offline(self):
+        env = dict(os.environ, BURNER_WORKSPACE=ROOT)
         r = subprocess.run(
-            [os.path.join(ROOT, "bin", "pc"), "--help"],
+            [os.path.join(ROOT, "bin", "burner"), "--help"],
             capture_output=True, text=True, timeout=30, env=env, cwd=ROOT)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("phone control CLI", r.stdout)
@@ -1239,7 +1251,7 @@ class SnapTests(OfflineTestCase):
         self.assertEqual(pc.snap_resolve("  @e3 "), (250, 650))
 
     def test_snap_resolve_no_file(self):
-        with self.assertRaisesRegex(ValueError, "run `pc snap` first"):
+        with self.assertRaisesRegex(ValueError, "run `burner snap` first"):
             pc.snap_resolve("@e1")
 
     def test_snap_resolve_bad_handle(self):

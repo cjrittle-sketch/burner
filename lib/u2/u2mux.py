@@ -28,10 +28,11 @@ import sys
 import time
 
 # Paths derive from this file's real location (lib/u2/u2mux.py), so a copy
-# of the tree runs its own daemon. PC_WORKSPACE overrides where the shared
+# of the tree runs its own daemon. BURNER_WORKSPACE overrides where the shared
 # venv/adb live (default: the tree's parent, i.e. ~/workspace on live).
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-WORKSPACE = os.environ.get("PC_WORKSPACE", os.path.dirname(ROOT))
+WORKSPACE = (os.environ.get("BURNER_WORKSPACE") or os.environ.get("PC_WORKSPACE")
+             or os.path.dirname(ROOT))
 VENV_PY = os.path.join(WORKSPACE, ".u2venv", "bin", "python")
 SOCK_PATH = os.path.join(ROOT, "run", "u2-mux.sock")
 PID_PATH = os.path.join(ROOT, "run", "u2-mux.pid")
@@ -230,7 +231,7 @@ class U2Daemon:
             ensure_server()
             self.d = u2.connect(TARGET)
             # Kill the idle wait: Chrome never idles, so every UiObject call
-            # was paying ~1s waitForIdle(). Zero it; pc does its own polling.
+            # was paying ~1s waitForIdle(). Zero it; burner does its own polling.
             # Re-applied on every connect since the server loses it on restart.
             try:
                 cfg = self.d.jsonrpc.getConfigurator()
@@ -319,7 +320,7 @@ class U2Daemon:
 
     def cmd_click_text(self, arg):
         # Three tiers, cheapest first (median over Tailscale, 2026-09-30):
-        #  1. fresh cached dump -> return coords; pc taps via adb (~0.45s total)
+        #  1. fresh cached dump -> return coords; burner taps via adb (~0.45s total)
         #  2. stale cache -> ONE device-side click(selector) RPC on the exact
         #     (case-insensitive) text (~0.43s). Beats dump+adb (~1.3s) cold.
         #  3. miss -> dump, match exact text/desc then substring, return
@@ -354,7 +355,7 @@ class U2Daemon:
         other clients interleave. Match = exact label (text/content-desc,
         case-insensitive), else substring. Returns JSON with the matched
         node (or {"gone": true}); U2NotFound on timeout. The last dump stays
-        cached, so an immediate `pc tap` needs no further lookup RPC."""
+        cached, so an immediate `burner tap` needs no further lookup RPC."""
         POLL_S = 0.25
         p = json.loads(arg)
         text, absent = p["text"], bool(p.get("absent"))

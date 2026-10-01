@@ -1,21 +1,21 @@
-"""Console-script entry point for the `pc` command.
+"""Console-script entry point for the `burner` command.
 
-The real implementation lives in bin/pc (a python3 script). This wrapper
+The real implementation lives in bin/burner (a python3 script). This wrapper
 locates it and execs it, so `pip install .` / `pip install -e .` produces a
-working `pc` command while keeping a single source of truth for the CLI.
+working `burner` command while keeping a single source of truth for the CLI.
 """
 import os
 import sys
 
 
-def _pc_script():
+def _burner_script():
     here = os.path.dirname(os.path.realpath(__file__))
     # Installed layout guesses, in order of likelihood:
     candidates = [
         # Editable / source-tree install: burner/cli.py sits next to bin/.
-        os.path.join(os.path.dirname(here), "bin", "pc"),
+        os.path.join(os.path.dirname(here), "bin", "burner"),
         # Regular install: look next to the interpreter's prefix (rare).
-        os.path.join(sys.prefix, "bin", "pc"),
+        os.path.join(sys.prefix, "bin", "burner"),
     ]
     for c in candidates:
         if os.path.isfile(c):
@@ -24,10 +24,10 @@ def _pc_script():
 
 
 def main(argv=None):
-    script = _pc_script()
+    script = _burner_script()
     if script is None:
         print(
-            "burner: could not find bin/pc next to this package. "
+            "burner: could not find bin/burner next to this package. "
             "If you installed from a source checkout, run `pip install -e .` "
             "from the repo root.",
             file=sys.stderr,

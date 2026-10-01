@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""pc - burner phone-control CLI for the dedicated Pixel 7 ("mobile").
+"""burner - phone-control CLI for the dedicated Pixel 7 ("mobile").
 
 Replaces the old dump -> inline-python -> tap -> sleep loop with one-liners:
 
-    pc tap "Not now"                 tap the first node with that text
-    pc wait "Enter code" --timeout 30
-    pc type "42327079" --clear       char-by-char typing (works on Bloks/RN fields)
-    pc gcode --from "security@example.com"
-    pc vcode --from "security@example.com"     # full code-entry flow, one shot
+    burner tap "Not now"                 tap the first node with that text
+    burner wait "Enter code" --timeout 30
+    burner type "42327079" --clear       char-by-char typing (works on Bloks/RN fields)
+    burner gcode --from "security@example.com"
+    burner vcode --from "security@example.com"     # full code-entry flow, one shot
 
 Verification codes are transient: pulled, typed, never stored.
 """
@@ -23,8 +23,10 @@ import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)  # ~/workspace/phone-control
-# Shared tools live beside the tree (~/workspace); PC_WORKSPACE overrides.
-WORKSPACE = os.environ.get("PC_WORKSPACE", os.path.dirname(ROOT))
+# Shared tools live beside the tree (~/workspace); BURNER_WORKSPACE overrides
+# (the old PC_WORKSPACE name still works).
+WORKSPACE = (os.environ.get("BURNER_WORKSPACE") or os.environ.get("PC_WORKSPACE")
+             or os.path.dirname(ROOT))
 ADB_BIN = os.path.join(WORKSPACE, ".android-tools", "platform-tools", "adb")
 
 
@@ -44,8 +46,8 @@ def load_config():
 
 CFG = load_config()
 TARGET = "127.0.0.1:{}".format(CFG.get("LOCAL_PORT", "15555"))
-UI_PATH = "/sdcard/pc-ui.xml"
-SNAP_DIR = os.path.join(os.path.expanduser("~"), ".cache", "pc")
+UI_PATH = "/sdcard/burner-ui.xml"
+SNAP_DIR = os.path.join(os.path.expanduser("~"), ".cache", "burner")
 SNAP_PATH = os.path.join(SNAP_DIR, "snap.json")
 SNAP_TTL = 120  # seconds: @eN handles expire after this (belt and braces;
                 # any mutating action already deletes the snap file)
@@ -128,9 +130,9 @@ def _update_screen_from_dump(root):
 def scrcpy_send(line):
     """Send a command to the scrcpy mux (persistent input channel)."""
     global _scrcpy_send
-    if os.environ.get("PC_SCRCPY") == "0":
+    if (os.environ.get("BURNER_SCRCPY") or os.environ.get("PC_SCRCPY")) == "0":
         # Test copies must not spawn a second scrcpy mux next to live's.
-        raise RuntimeError("scrcpy disabled (PC_SCRCPY=0)")
+        raise RuntimeError("scrcpy disabled (BURNER_SCRCPY=0)")
     if _scrcpy_send is None:
         sys.path.insert(0, SCRCPY_DIR)
         from scrcpy_ctl import _mux_send
@@ -214,7 +216,7 @@ def u2sock(cmd, arg="", timeout=30):
 def u2_invalidate():
     """Tell the u2 mux the screen changed (drops its 2s dump cache)."""
     u2sock("invalidate", timeout=5)
-    snap_invalidate()  # @eN handles from pc snap are now stale
+    snap_invalidate()  # @eN handles from burner snap are now stale
 
 
 def fast_dump():
@@ -575,7 +577,7 @@ def wake():
             return
     except Exception:
         pass
-    if os.environ.get("PC_SCRCPY") == "0":
+    if (os.environ.get("BURNER_SCRCPY") or os.environ.get("PC_SCRCPY")) == "0":
         return  # test copy: phone is stay-awake on charger; skip the adb keyevent
     adb_or_ensure("shell", "input", "keyevent", "224")
 
@@ -607,7 +609,7 @@ def snap_save(nodes, include_all=False):
     """Number the visible nodes @e1..@eN and persist handles to SNAP_PATH.
 
     Returns the list of (handle, line) pairs. Handles are single-use: any
-    mutating pc action deletes the snap file via snap_invalidate().
+    mutating burner action deletes the snap file via snap_invalidate().
     Each snap gets a generation number; handles render as @eN~s<gen> so a
     stale handle from an older snap is rejected with a clear error instead
     of silently tapping the wrong coordinates (agent-device ref-pinning pattern)."""
@@ -643,7 +645,7 @@ def snap_save(nodes, include_all=False):
 
 
 def snap_resolve(handle):
-    """Resolve '@eN' or '@eN~s<gen>' to (x, y) pixel coords from the last pc snap.
+    """Resolve '@eN' or '@eN~s<gen>' to (x, y) pixel coords from the last burner snap.
 
     Returns (x, y) or raises ValueError with a human-readable reason.
     A pinned handle (@eN~s<gen>) whose generation does not match the current
@@ -656,15 +658,15 @@ def snap_resolve(handle):
         with open(SNAP_PATH) as f:
             snap = json.load(f)
     except (OSError, ValueError):
-        raise ValueError("no snap saved (run `pc snap` first)")
+        raise ValueError("no snap saved (run `burner snap` first)")
     if time.time() - snap.get("ts", 0) > SNAP_TTL:
-        raise ValueError("snap expired (run `pc snap` again)")
+        raise ValueError("snap expired (run `burner snap` again)")
     cur_gen = snap.get("gen", 0)
     want_gen = m.group(2)
     if want_gen is not None and int(want_gen) != cur_gen:
         raise ValueError(
             "handle {} is from snap generation {}, current snap is generation {} "
-            "(run `pc snap` again for fresh handles)".format(handle, want_gen, cur_gen))
+            "(run `burner snap` again for fresh handles)".format(handle, want_gen, cur_gen))
     entry = snap.get("entries", {}).get(m.group(1))
     if entry is None:
         raise ValueError("no such handle {} in current snap".format(handle))
@@ -706,7 +708,7 @@ def cmd_dump(args):
 def cmd_snap(args):
     """Numbered snapshot: same rows as dump, prefixed @e1..@eN.
 
-    Handles resolve in `pc tap @eN` (exact coordinates, no re-matching).
+    Handles resolve in `burner tap @eN` (exact coordinates, no re-matching).
     The snap file is deleted by any mutating action, so handles never
     outlive the screen they were taken from."""
     root = ui_dump()
@@ -1580,22 +1582,22 @@ def cmd_doctor(args):
         fix="Run ./install.sh to download platform-tools to .android-tools/"))
     checks.append(_doctor_check(
         "adb server", check_adb_server,
-        fix="Run `pc ensure` to restart the adb server"))
+        fix="Run `burner ensure` to restart the adb server"))
     checks.append(_doctor_check(
         "tunnel target", check_tunnel,
         fix="Check config.env ADB_PORT matches the phone's Wireless debugging "
             "screen; run ./tunnel.sh start; ensure Tailscale is connected on the phone"))
     checks.append(_doctor_check(
         "u2 daemon", check_u2_daemon,
-        fix="Run `pc ensure` to restart the u2 daemon (~5s)"))
+        fix="Run `burner ensure` to restart the u2 daemon (~5s)"))
     checks.append(_doctor_check(
         "device state", check_device_state,
         fix="If 'unauthorized', re-run pairing (fresh code from phone). "
-            "If 'offline', run `adb kill-server` then `pc ensure`"))
+            "If 'offline', run `adb kill-server` then `burner ensure`"))
     checks.append(_doctor_check(
         "dump pipeline", check_dump_pipeline,
         fix="Keep the phone screen awake (charger + `svc power stayon true`); "
-            "run `pc ensure` to restart the u2 stack"))
+            "run `burner ensure` to restart the u2 stack"))
 
     # Latency: one cached dump round-trip through the daemon socket.
     t0 = time.time()
@@ -1626,7 +1628,7 @@ def cmd_doctor(args):
             if not c["ok"] and c.get("fix"):
                 print("        fix: {}".format(c["fix"]))
         if not allok:
-            print("run `pc ensure` to heal the tunnel, adb server, and daemons",
+            print("run `burner ensure` to heal the tunnel, adb server, and daemons",
                   file=sys.stderr)
     return 0 if allok else 1
 
@@ -1644,13 +1646,13 @@ PRIVACY POLICY (explicit, from app-automating):
   stored, never the content. Passwords, card numbers, and messages stay on
   the device.
 - Screenshots are never stored in the database.
-- The database is local-only (~/.cache/pc/nav-memory.db), never synced.
+- The database is local-only (~/.cache/burner/nav-memory.db), never synced.
 
 Screens are fingerprinted by STRUCTURE (see screen_fingerprint), not content,
 so a cart with 2 items and the same cart with 3 items are the same node.
 """
 
-NAV_DB = os.path.join(os.path.expanduser("~"), ".cache", "pc", "nav-memory.db")
+NAV_DB = os.path.join(os.path.expanduser("~"), ".cache", "burner", "nav-memory.db")
 
 
 def nav_init():
@@ -1962,11 +1964,11 @@ def cmd_open(args):
 def cmd_amazon_status(args):
     """One-shot: latest Amazon order status from the app's order list.
     Stops at the list (no detail-page drill-in). Each step runs as a fresh
-    pc subprocess — the Amazon WebView only exposes its nodes to a new
+    burner subprocess — the Amazon WebView only exposes its nodes to a new
     u2 session after a scroll, and in-process reuse returns stale trees."""
     import re
     import subprocess
-    pc_bin = os.path.join(ROOT, "bin", "pc")
+    pc_bin = os.path.join(ROOT, "bin", "burner")
 
     def run(*a):
         r = subprocess.run([pc_bin] + [str(x) for x in a],
@@ -2010,7 +2012,7 @@ def cmd_sleep(args):
 
 
 def build_parser():
-    ap = argparse.ArgumentParser(prog="pc", description="phone control CLI")
+    ap = argparse.ArgumentParser(prog="burner", description="phone control CLI")
     ap.add_argument("--json", action="store_true",
                     help="machine-readable JSON on stdout (errors stay human on stderr)")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -2031,7 +2033,7 @@ def build_parser():
 
     p = sub.add_parser("tap", help="tap node by text (or --xy normalized coords)")
     p.add_argument("text", nargs="?", default=None,
-                   help='node text to tap (omit with --xy); "@eN" taps a pc snap handle; '
+                   help='node text to tap (omit with --xy); "@eN" taps a burner snap handle; '
                         '"a || b" tries fallback labels in order')
     p.add_argument("--fuzzy", action="store_true")
     p.add_argument("--index", type=int, default=None,
@@ -2123,15 +2125,15 @@ def build_parser():
     p.set_defaults(fn=cmd_sleep)
 
     p = sub.add_parser("do",
-                       help='run a ;-separated flow in one call, e.g. pc do \'open URL; wait "X" --timeout 20\'')
+                       help='run a ;-separated flow in one call, e.g. burner do \'open URL; wait "X" --timeout 20\'')
     p.add_argument("flow")
     p.set_defaults(fn=cmd_do)
 
-    p = sub.add_parser("recipe", help="run a saved flow from recipes/<name>.pc")
+    p = sub.add_parser("recipe", help="run a saved flow from recipes/<name>.burner")
     p.add_argument("name")
     p.set_defaults(fn=cmd_recipe)
 
-    p = sub.add_parser("record", help="record actions to recipes/<name>.pc")
+    p = sub.add_parser("record", help="record actions to recipes/<name>.burner")
     p.add_argument("name", nargs="?", default=None,
                    help="recipe name (omit with --stop)")
     p.add_argument("--stop", action="store_true",
@@ -2208,8 +2210,17 @@ def cmd_do(args):
     return 0
 
 
+def recipe_path(name):
+    """recipes/<name>.burner, or a recipe saved under the old .pc extension."""
+    path = os.path.join(ROOT, "recipes", name + ".burner")
+    legacy = os.path.join(ROOT, "recipes", name + ".pc")
+    if not os.path.exists(path) and os.path.exists(legacy):
+        return legacy
+    return path
+
+
 def cmd_recipe(args):
-    path = os.path.join(ROOT, "recipes", args.name + ".pc")
+    path = recipe_path(args.name)
     if not os.path.exists(path):
         print("no recipe: {}".format(path), file=sys.stderr)
         return 1
@@ -2224,15 +2235,15 @@ def cmd_recipe(args):
 
 # ------------------------------------------------------- record / replay
 """
-Session recording: `pc record <name>` captures every action command to
-recipes/<name>.pc, which can be replayed with `pc replay <name>`.
+Session recording: `burner record <name>` captures every action command to
+recipes/<name>.burner, which can be replayed with `burner replay <name>`.
 
 Recording captures the actual commands issued (tap, press, type, wait, start,
-open), not just outcomes. The recipe file is a plain text list of pc
+open), not just outcomes. The recipe file is a plain text list of burner
 subcommands, human-readable and editable.
 """
 
-RECORD_STATE = os.path.join(os.path.expanduser("~"), ".cache", "pc", "recording.json")
+RECORD_STATE = os.path.join(os.path.expanduser("~"), ".cache", "burner", "recording.json")
 
 
 def record_active():
@@ -2262,12 +2273,12 @@ def record_log(command_line):
 
 
 def record_command_line(args):
-    """Reconstruct the pc subcommand line from parsed args for recording.
-    Returns the command string (without 'pc' prefix), or None if not recordable."""
+    """Reconstruct the burner subcommand line from parsed args for recording.
+    Returns the command string (without 'burner' prefix), or None if not recordable."""
     # Map of command -> how to reconstruct
-    # We use sys.argv to get the original, stripping the 'pc' prefix
+    # We use sys.argv to get the original, stripping the 'burner' prefix
     try:
-        argv = sys.argv[1:]  # skip 'pc'
+        argv = sys.argv[1:]  # skip 'burner'
         if not argv:
             return None
         # Skip non-action commands
@@ -2283,7 +2294,7 @@ def record_command_line(args):
 
 
 def cmd_record(args):
-    """Start or stop recording a session to recipes/<name>.pc."""
+    """Start or stop recording a session to recipes/<name>.burner."""
     if args.stop:
         name, path = record_active()
         if not name:
@@ -2298,17 +2309,17 @@ def cmd_record(args):
     # Start recording
     name = args.name
     if not name:
-        print("usage: pc record <name> | pc record --stop", file=sys.stderr)
+        print("usage: burner record <name> | burner record --stop", file=sys.stderr)
         return 1
     # Check if already recording
     active_name, _ = record_active()
     if active_name:
-        print("already recording '{}' (stop with `pc record --stop`)".format(active_name),
+        print("already recording '{}' (stop with `burner record --stop`)".format(active_name),
               file=sys.stderr)
         return 1
-    path = os.path.join(ROOT, "recipes", name + ".pc")
-    # Don't overwrite existing without --force
-    if os.path.exists(path) and not args.force:
+    path = os.path.join(ROOT, "recipes", name + ".burner")
+    # Don't overwrite (or shadow a legacy .pc recipe) without --force
+    if os.path.exists(recipe_path(name)) and not args.force:
         print("recipe '{}' exists (use --force to overwrite)".format(name),
               file=sys.stderr)
         return 1
@@ -2321,13 +2332,13 @@ def cmd_record(args):
     os.makedirs(os.path.dirname(RECORD_STATE), exist_ok=True)
     with open(RECORD_STATE, "w") as f:
         json.dump({"name": name, "path": path, "started": time.time()}, f)
-    print("recording to '{}' (stop with `pc record --stop`)".format(path))
+    print("recording to '{}' (stop with `burner record --stop`)".format(path))
     return 0
 
 
 def cmd_replay(args):
-    """Replay a recorded session. Same as `pc recipe`, but with step-by-step output."""
-    path = os.path.join(ROOT, "recipes", args.name + ".pc")
+    """Replay a recorded session. Same as `burner recipe`, but with step-by-step output."""
+    path = recipe_path(args.name)
     if not os.path.exists(path):
         print("no recording: {}".format(path), file=sys.stderr)
         return 1
@@ -2343,16 +2354,16 @@ def cmd_replay(args):
 
 # ------------------------------------------------------- setup wizard
 """
-Guided phone setup: `pc setup` walks a human + agent through pairing a new
+Guided phone setup: `burner setup` walks a human + agent through pairing a new
 burner phone, step by step. Human steps print an instruction and a screenshot
 path; the agent relays them in chat and records completion with
-`pc setup --step <name> --confirm`. Agent steps run automatically.
+`burner setup --step <name> --confirm`. Agent steps run automatically.
 Pairing codes are transient: passed on stdin to `adb pair`, never stored.
 """
 
-SETUP_STATE_PATH = os.path.join(os.path.expanduser("~"), ".cache", "pc",
+SETUP_STATE_PATH = os.path.join(os.path.expanduser("~"), ".cache", "burner",
                                 "setup-state.json")
-SETUP_APK_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "pc")
+SETUP_APK_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "burner")
 SETUP_APK_VERSION = "v0.3.5"
 SETUP_APK_PKG = "com.tpn.adbautoenable"
 SETUP_VPN_APP = "com.tailscale.ipn"
@@ -2451,7 +2462,7 @@ def _setup_popen(cmd):
 def _setup_urlopen(url, timeout=60):
     """Fetch a URL, return bytes. Separate helper so tests can mock."""
     import urllib.request
-    req = urllib.request.Request(url, headers={"User-Agent": "burner-pc-setup"})
+    req = urllib.request.Request(url, headers={"User-Agent": "burner-setup"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
 
@@ -2600,7 +2611,7 @@ def _run_pair(args):
 def _setup_find_apk():
     """Locate an adb-auto-enable APK locally or download v0.3.5. Returns path."""
     candidates = []
-    for base in (WORKSPACE, os.path.expanduser("~/.cache/pc"),
+    for base in (WORKSPACE, os.path.expanduser("~/.cache/burner"),
                  os.path.expanduser("~/workspace")):
         try:
             for f in os.listdir(base):
@@ -2769,7 +2780,7 @@ SETUP_STEPS = [
     {"name": "fix-port", "kind": "agent", "title": "Pin adbd to port 5555",
      "shot": None, "check": _check_fix_port, "run": _run_fix_port,
      "instruction": None},
-    {"name": "verify", "kind": "agent", "title": "Verify with pc doctor",
+    {"name": "verify", "kind": "agent", "title": "Verify with burner doctor",
      "shot": None, "check": _check_verify, "run": _run_verify,
      "instruction": None},
 ]
@@ -2798,7 +2809,7 @@ def _setup_print_human(step):
     if step.get("shot2"):
         print("screenshot: {}".format(step["shot2"]))
     print("When done, tell the agent; it records with: "
-          "pc setup --step {} --confirm".format(step["name"]))
+          "burner setup --step {} --confirm".format(step["name"]))
 
 
 def _setup_ask(prompt, auto_yes):
@@ -2879,7 +2890,24 @@ def cmd_setup(args):
     return 0
 
 
+def migrate_old_cache():
+    """The CLI used to be called `pc`: carry ~/.cache/pc (nav memory, setup
+    state) over to ~/.cache/burner, but only if it is really ours."""
+    old = os.path.join(os.path.expanduser("~"), ".cache", "pc")
+    markers = ("nav-memory.db", "snap.json", "recording.json", "setup-state.json")
+    if os.path.exists(SNAP_DIR) or not os.path.isdir(old):
+        return
+    if not any(os.path.exists(os.path.join(old, m)) for m in markers):
+        return
+    try:
+        os.rename(old, SNAP_DIR)
+    except OSError as e:
+        print("burner: couldn't move {} to {} ({}); move it by hand to keep "
+              "nav memory and setup progress".format(old, SNAP_DIR, e), file=sys.stderr)
+
+
 def main():
+    migrate_old_cache()
     ap = build_parser()
     args = ap.parse_args()
     # Session recording: log action commands to the active recipe file.

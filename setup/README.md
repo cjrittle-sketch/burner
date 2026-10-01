@@ -1,6 +1,6 @@
 # setup/ screenshots
 
-Reference images for `pc setup` human steps and the pairing docs. All are
+Reference images for `burner setup` human steps and the pairing docs. All are
 privacy-scrubbed (cropped/redacted, downscaled) before landing here.
 
 ## Status
