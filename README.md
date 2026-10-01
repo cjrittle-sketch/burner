@@ -12,14 +12,16 @@ home, so it can use the apps you use.
 
 ## What it can do for you
 
-- "Screen my Tinder matches and tell me who's worth a reply."
-- "Keep my Snapchat streaks alive while I'm on vacation."
-- "Spot underpriced flips on Vinted before anyone else sees them."
-- "Download the Airbnb app and find me a cabin for next weekend."
-- "Open Uber Eats and get last Friday's dinner ready to reorder."
-- "Check my Ring app and tell me who came to the door."
-- "Play my chill playlist on the living room speaker."
-- "Turn off the lamps I left on. I'm already at the airport."
+> ### "Use my burner to…
+
+- …screen my Tinder matches and tell me who's worth a reply."
+- …keep my Snapchat streaks alive while I'm on vacation."
+- …spot underpriced flips on Vinted before anyone else sees them."
+- …download the Airbnb app and find me a cabin for next weekend."
+- …get last Friday's Uber Eats dinner ready to reorder."
+- …check my Ring app and tell me who came to the door."
+- …play my chill playlist on the living room speaker."
+- …turn off the lamps I left on. I'm already at the airport."
 
 ## Get started
 
