@@ -8,10 +8,14 @@ have no API, no MCP server, and no web automation path: marketplaces, banking
 apps, social apps, store apps that block bots in the browser.
 
 When the user says "use my burner", "use my burner phone" or "do it on my
-burner", that means this phone: use the `burner` commands below. "Take a
-screenshot of my burner" and "what's on my burner?" both mean what's on its
-screen right now (not which apps are installed): run
-`burner recipe screenshot` and send the saved image itself back to the user.
+burner", that means this phone: use the `burner` commands below.
+
+## Common requests
+
+| The user says | Do this |
+|---|---|
+| "What's on my burner?" | Means the screen right now, not the installed apps. Run `burner recipe screenshot` and send the image back. |
+| "Take a screenshot of my burner" | Same: `burner recipe screenshot`, send the image. |
 
 ## Prerequisites
 
