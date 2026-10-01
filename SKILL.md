@@ -88,8 +88,10 @@ brand first: menus differ (paths below are Pixel, with Samsung noted).
    `setup/setup-03-wireless-debugging.png`.)
 3. **HUMAN REQUIRED:** Tap the words **Wireless debugging** (not the switch)
    to open its screen, tap "Pair device with pairing code", and send the agent
-   a screenshot of that dialog, or type out the code and the numbers under
-   "IP address & Port" exactly as shown. Never ask the user for "the pairing
+   the code and the numbers under "IP address & Port" exactly as shown. If
+   they're chatting on this same phone, they should already be in split
+   screen (see above): have them take a screenshot of the dialog and send
+   that instead. Never ask the user for "the pairing
    port" by name; read the IP, port and code off what they send. The code expires fast
    (about a minute), so send it right after the phone shows it and keep the
    phone in hand. **Turn Tailscale on first** -
