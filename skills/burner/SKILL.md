@@ -26,9 +26,17 @@ Tailscale (or same LAN), and a human once for ~10 minutes to pair.
 
 **HUMAN REQUIRED:** on the phone, enable Developer options, turn on Wireless
 debugging, tap "Pair device with pairing code", and send the agent the IP,
-pairing port, and 6-digit code (it expires fast). After the one-time
-`adb pair`, send the agent the **connection** port from the main Wireless
-debugging screen (`192.168.x.x:PORT`); it goes in `config.env` as `ADB_PORT`.
+pairing port, and 6-digit code (it expires fast; turn Tailscale on first so
+the dialog shows the tailnet IP). After the one-time `adb pair`, the agent
+installs **adb-auto-enable** (open source, `com.tpn.adbautoenable`), grants
+it `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization; then
+**HUMAN REQUIRED:** open the app and finish its one-time self-pairing. From
+then on ADB re-enables on every boot on the fixed port **5555**, so
+`ADB_PORT="5555"` in `config.env` is permanent — reboots need no human action.
+
+Security: port 5555 listens on the phone's WiFi and tailnet interfaces (never
+the internet; ADB is unencrypted, so trusted networks only). Any new computer
+triggers an on-device authorization prompt — never approve one uninitiated.
 
 ## Verify
 
@@ -59,7 +67,8 @@ pc amazon-status | pc doctor
   or `pc dump`, then tap submit only with explicit approval for that specific
   action. Never auto-submit in an unattended flow.
 - Keep the phone on its charger: dumps come back empty if the screen sleeps.
-- If wireless debugging toggles, the connection port changes: update `ADB_PORT`.
+- After a reboot, wait ~60-90s for boot plus ~30s for adb-auto-enable to
+  switch adbd to port 5555, then `pc ensure`.
 - `pc ensure` heals a wedged stack (tunnel, adb, u2 daemon) in ~5s.
 
 See the repo-root `SKILL.md` and `README.md` for the full guide, benchmarks,

@@ -1,11 +1,22 @@
 #!/bin/bash
 # pair.sh - one-time wireless-debugging pairing for a new phone.
+# PREREQUISITE: Tailscale must be ENABLED and connected on the phone BEFORE
+# pairing. After a phone reboot, Tailscale does NOT auto-start — the phone
+# will show its WiFi IP (192.168.x.x) instead of its tailnet IP (100.x.x.x)
+# in the pairing dialog, and the VM cannot reach the WiFi IP reliably.
+# Enable Tailscale on the phone first, then the pairing dialog will show
+# the 100.x.x.x tailnet IP.
+#
 # The phone shows a PAIRING port + 6-digit code under
 # Developer options > Wireless debugging > "Pair device with pairing code".
 # Usage: pair.sh <pairing-ip> <pairing-port>
 # Then paste the 6-digit code when prompted. After this succeeds once,
-# the VM's adb key is authorized and future connects use the separate
-# CONNECTION port in config.env (no more pairing needed).
+# the VM's adb key is authorized. The rest of setup (adb-auto-enable install,
+# WRITE_SECURE_SETTINGS grant, battery exemption, in-app self-pairing) pins
+# adbd to the FIXED port 5555 on every boot — set ADB_PORT="5555" in
+# config.env once and never touch the random wireless-debugging port again.
+# NOTE: Pairing codes expire in ~60-90 seconds. Have the code in hand and
+# run this IMMEDIATELY after the phone displays it.
 set -u
 cd "$(dirname "$0")"
 source ./config.env
@@ -26,7 +37,7 @@ sleep 1
 RC=$?
 kill "$SOCAT_PID" 2>/dev/null
 if [ $RC -eq 0 ]; then
-  echo "paired. Now put the CONNECTION port (main Wireless debugging screen) into config.env as ADB_PORT."
+  echo "paired. adb-auto-enable setup comes next: install the APK, grant WRITE_SECURE_SETTINGS, exempt from battery optimization, finish its in-app self-pairing, then set ADB_PORT=\"5555\" in config.env."
 else
   echo "pairing failed."
 fi

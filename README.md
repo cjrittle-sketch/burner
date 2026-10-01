@@ -70,9 +70,12 @@ Then pair the phone (needs a human once, ~10 minutes):
    battery usage to Unrestricted. Connect to WiFi, plug into a charger.
 2. Enable Developer options, turn on Wireless debugging.
 3. Tap "Pair device with pairing code" and give the agent the IP, pairing
-   port, and 6-digit code (expires fast). After the one-time pair, give the
-   agent the connection port from the main Wireless debugging screen and put
-   it in `config.env` as `ADB_PORT`.
+   port, and 6-digit code (expires fast; turn Tailscale on first so the
+   dialog shows the tailnet IP). After the one-time pair, the agent installs
+   adb-auto-enable (open source, com.tpn.adbautoenable), which re-enables ADB
+   on every boot and pins it to the fixed port 5555 — put `ADB_PORT="5555"`
+   in `config.env` once and never touch the random wireless-debugging port
+   again.
 
 Verify:
 
@@ -163,9 +166,9 @@ paste it.
 
 ## Gotchas
 
-- The wireless debugging port changes whenever you toggle wireless debugging
-  off and on. If the phone goes unreachable, read the new connection port off
-  the phone and update `ADB_PORT` in `config.env`.
+- ADB auto-enables on boot (adb-auto-enable pins it to fixed port 5555).
+  If the phone goes unreachable after a reboot, wait ~60-90s for boot plus
+  ~30s for the app to switch adbd to 5555, then run `pc ensure`.
 - The screen must stay awake or dumps come back empty. Keep the phone on its
   charger; short display timeouts will break long flows.
 - No SIM needed. The phone is WiFi-only; codes arrive by email.

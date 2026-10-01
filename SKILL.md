@@ -43,13 +43,30 @@ Do these on the phone. The agent cannot do them for you.
    Build number 7 times), then turn on **Wireless debugging**.
 3. **HUMAN REQUIRED:** Tap "Pair device with pairing code" and send the agent
    the IP, the pairing port, and the 6-digit code. The code expires fast, so
-   send it right after the phone shows it.
-4. The agent runs the one-time pairing (`adb pair`), then you send it the
-   **connection** port shown on the main Wireless debugging screen (it looks
-   like `192.168.x.x:PORT`; different from the pairing port). The agent puts
-   it in `config.env`.
+   send it right after the phone shows it. **Turn Tailscale on first** —
+   after a reboot it does not auto-start, and the dialog shows the unreachable
+   WiFi IP instead of the tailnet IP.
+4. The agent runs the one-time pairing (`adb pair`), then installs
+   **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
+   https://github.com/mouldybread/adb-auto-enable/releases), grants it
+   `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization.
+   **HUMAN REQUIRED:** open the app on the phone and finish its one-time
+   self-pairing (enter the code it shows; takes about a minute).
+5. From then on the app re-enables ADB on every boot and pins adbd to the
+   fixed port **5555**. Put `ADB_PORT="5555"` in `config.env` once — the
+   random wireless-debugging port is never used again, and reboots need no
+   human action.
 
 Leave the phone plugged in and on WiFi. Done.
+
+## Security notes
+
+- Port 5555 listens on all the phone's interfaces (WiFi and Tailscale), but
+  only to trusted networks — nothing is exposed to the internet. The ADB
+  protocol itself is unencrypted, so only use the phone on networks you trust.
+- Every new computer that connects triggers an on-device "Allow USB
+  debugging?" prompt with a key fingerprint. Never approve one you did not
+  initiate — that prompt is the tripwire.
 
 ## Verify
 
@@ -65,7 +82,7 @@ If `pc doctor` reports green, the agent can drive the phone.
 
 | Symptom | Fix |
 |---|---|
-| Phone unreachable / adb connect fails | Wireless debugging may have toggled off and on, which changes the port. **HUMAN:** read the new connection port from the phone's Wireless debugging screen and update `ADB_PORT` in `config.env`. |
+| Phone unreachable after a reboot / adb connect fails | Wait 60-90s for boot plus ~30s for adb-auto-enable to switch adbd to port 5555, then run `pc ensure`. If it stays down, check the app is still installed and exempt from battery optimization. |
 | `adb unauthorized` | The adb key was revoked. Re-run the pairing flow above (send a fresh pairing code). |
 | u2 daemon dead / commands hang | Run `pc ensure`: it restarts the tunnel, the u2 daemon, and the adb server (~5s). |
 | Dumps come back empty | The screen must stay awake. Keep the phone on its charger; use `pc sleep`-free flows, and do not let the display time out mid-run. |
