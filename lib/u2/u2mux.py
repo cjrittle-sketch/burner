@@ -31,8 +31,7 @@ import time
 # of the tree runs its own daemon. BURNER_WORKSPACE overrides where the shared
 # venv/adb live (default: the tree's parent, i.e. ~/workspace on live).
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-WORKSPACE = (os.environ.get("BURNER_WORKSPACE") or os.environ.get("PC_WORKSPACE")
-             or os.path.dirname(ROOT))
+WORKSPACE = os.environ.get("BURNER_WORKSPACE", os.path.dirname(ROOT))
 VENV_PY = os.path.join(WORKSPACE, ".u2venv", "bin", "python")
 SOCK_PATH = os.path.join(ROOT, "run", "u2-mux.sock")
 PID_PATH = os.path.join(ROOT, "run", "u2-mux.pid")

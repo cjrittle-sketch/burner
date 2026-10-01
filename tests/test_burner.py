@@ -958,17 +958,6 @@ class RegressionTests(OfflineTestCase):
                     rc = pc.cmd_recipe(SimpleNamespace(name="r"))
         self.assertEqual(rc, 1)
 
-    def test_cmd_recipe_reads_legacy_pc_extension(self):
-        with tempfile.TemporaryDirectory() as d:
-            rdir = os.path.join(d, "recipes")
-            os.makedirs(rdir)
-            with open(os.path.join(rdir, "r.pc"), "w") as f:
-                f.write("sleep 0\n")
-            with mock.patch.object(pc, "ROOT", d):
-                with mock.patch.object(pc, "cmd_do", return_value=0) as m:
-                    rc = pc.cmd_recipe(SimpleNamespace(name="r"))
-        self.assertEqual(rc, 0)
-        self.assertEqual(m.call_args[0][0].flow, "sleep 0")
 
     # gmail_cli()
     def test_gmail_cli_default(self):

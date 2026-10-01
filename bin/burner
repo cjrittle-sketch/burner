@@ -23,10 +23,8 @@ import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)  # ~/workspace/phone-control
-# Shared tools live beside the tree (~/workspace); BURNER_WORKSPACE overrides
-# (the old PC_WORKSPACE name still works).
-WORKSPACE = (os.environ.get("BURNER_WORKSPACE") or os.environ.get("PC_WORKSPACE")
-             or os.path.dirname(ROOT))
+# Shared tools live beside the tree (~/workspace); BURNER_WORKSPACE overrides.
+WORKSPACE = os.environ.get("BURNER_WORKSPACE", os.path.dirname(ROOT))
 ADB_BIN = os.path.join(WORKSPACE, ".android-tools", "platform-tools", "adb")
 
 
@@ -130,7 +128,7 @@ def _update_screen_from_dump(root):
 def scrcpy_send(line):
     """Send a command to the scrcpy mux (persistent input channel)."""
     global _scrcpy_send
-    if (os.environ.get("BURNER_SCRCPY") or os.environ.get("PC_SCRCPY")) == "0":
+    if os.environ.get("BURNER_SCRCPY") == "0":
         # Test copies must not spawn a second scrcpy mux next to live's.
         raise RuntimeError("scrcpy disabled (BURNER_SCRCPY=0)")
     if _scrcpy_send is None:
@@ -577,7 +575,7 @@ def wake():
             return
     except Exception:
         pass
-    if (os.environ.get("BURNER_SCRCPY") or os.environ.get("PC_SCRCPY")) == "0":
+    if os.environ.get("BURNER_SCRCPY") == "0":
         return  # test copy: phone is stay-awake on charger; skip the adb keyevent
     adb_or_ensure("shell", "input", "keyevent", "224")
 
@@ -2210,17 +2208,8 @@ def cmd_do(args):
     return 0
 
 
-def recipe_path(name):
-    """recipes/<name>.burner, or a recipe saved under the old .pc extension."""
-    path = os.path.join(ROOT, "recipes", name + ".burner")
-    legacy = os.path.join(ROOT, "recipes", name + ".pc")
-    if not os.path.exists(path) and os.path.exists(legacy):
-        return legacy
-    return path
-
-
 def cmd_recipe(args):
-    path = recipe_path(args.name)
+    path = os.path.join(ROOT, "recipes", args.name + ".burner")
     if not os.path.exists(path):
         print("no recipe: {}".format(path), file=sys.stderr)
         return 1
@@ -2318,8 +2307,8 @@ def cmd_record(args):
               file=sys.stderr)
         return 1
     path = os.path.join(ROOT, "recipes", name + ".burner")
-    # Don't overwrite (or shadow a legacy .pc recipe) without --force
-    if os.path.exists(recipe_path(name)) and not args.force:
+    # Don't overwrite existing without --force
+    if os.path.exists(path) and not args.force:
         print("recipe '{}' exists (use --force to overwrite)".format(name),
               file=sys.stderr)
         return 1
@@ -2338,7 +2327,7 @@ def cmd_record(args):
 
 def cmd_replay(args):
     """Replay a recorded session. Same as `burner recipe`, but with step-by-step output."""
-    path = recipe_path(args.name)
+    path = os.path.join(ROOT, "recipes", args.name + ".burner")
     if not os.path.exists(path):
         print("no recording: {}".format(path), file=sys.stderr)
         return 1
@@ -2890,24 +2879,7 @@ def cmd_setup(args):
     return 0
 
 
-def migrate_old_cache():
-    """The CLI used to be called `pc`: carry ~/.cache/pc (nav memory, setup
-    state) over to ~/.cache/burner, but only if it is really ours."""
-    old = os.path.join(os.path.expanduser("~"), ".cache", "pc")
-    markers = ("nav-memory.db", "snap.json", "recording.json", "setup-state.json")
-    if os.path.exists(SNAP_DIR) or not os.path.isdir(old):
-        return
-    if not any(os.path.exists(os.path.join(old, m)) for m in markers):
-        return
-    try:
-        os.rename(old, SNAP_DIR)
-    except OSError as e:
-        print("burner: couldn't move {} to {} ({}); move it by hand to keep "
-              "nav memory and setup progress".format(old, SNAP_DIR, e), file=sys.stderr)
-
-
 def main():
-    migrate_old_cache()
     ap = build_parser()
     args = ap.parse_args()
     # Session recording: log action commands to the active recipe file.
