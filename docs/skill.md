@@ -14,8 +14,11 @@ apps, social apps, store apps that block bots in the browser.
   agent's side phone, so do not use your daily driver.
 - Tailscale installed on both the VM and the phone (or both on the same LAN).
 - If the agent runs on hosted Muse (not your own hardware): the Muse VM must
-  join your tailnet. The agent runs `tailscale up` and you approve it once via
-  the link it shows. Without this the VM has no route to the phone. Same-LAN
+  join your tailnet. Run `burner setup --step tailnet`: if this computer
+  isn't on the tailnet yet, it prints an approval link. Send that link to
+  the user right away as its own message, wait for them to approve, then
+  re-run the step. A fresh assistant session may be a new computer that
+  needs approving again, even if an earlier one was approved. Without this the VM has no route to the phone. Same-LAN
   setups skip this step.
 - A human available once for ~10 minutes to pair the phone (see below).
 

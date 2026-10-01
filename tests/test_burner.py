@@ -1409,7 +1409,7 @@ class SetupWizardTests(OfflineTestCase):
 
     def test_step_registry_order_and_kinds(self):
         names = [s["name"] for s in pc.SETUP_STEPS]
-        self.assertEqual(names, ["prereqs", "tailscale-phone", "dev-options",
+        self.assertEqual(names, ["prereqs", "tailnet", "tailscale-phone", "dev-options",
                                  "wireless-debug", "pair", "verify",
                                  "tailscale-battery", "stay-awake",
                                  "screen-lock",

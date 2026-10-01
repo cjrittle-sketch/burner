@@ -2473,6 +2473,51 @@ def _check_prereqs():
     return r.returncode == 0
 
 
+def _setup_tailscale_status():
+    try:
+        r = _setup_spawn(["tailscale", "status", "--json"], timeout=15)
+        return json.loads(r.stdout or "{}")
+    except Exception:
+        return None
+
+
+def _check_tailnet():
+    st = _setup_tailscale_status()
+    if st is None:
+        return None  # no Tailscale here (same-LAN setup) or can't tell
+    return st.get("BackendState") == "Running"
+
+
+def _run_tailnet(args):
+    """Join this computer to the user's tailnet, surfacing the approval link."""
+    if _check_tailnet():
+        print("this computer is on your tailnet.")
+        return 0
+    if _setup_tailscale_status() is None:
+        print("Tailscale isn't installed here. Install it, or put this "
+              "computer on the same Wi-Fi as the phone.", file=sys.stderr)
+        return 1
+    _setup_popen(["tailscale", "up"])
+    url = None
+    for _ in range(20):
+        st = _setup_tailscale_status() or {}
+        if st.get("BackendState") == "Running":
+            print("this computer is on your tailnet.")
+            return 0
+        url = st.get("AuthURL")
+        if url:
+            break
+        time.sleep(1)
+    if not url:
+        print("Tailscale didn't give an approval link. Run `tailscale up` "
+              "and send the user the link it prints.", file=sys.stderr)
+        return 1
+    print("APPROVAL NEEDED. Send the user this link as its own message, ask "
+          "them to open it and approve this computer, then re-run this "
+          "step: {}".format(url))
+    return 1
+
+
 def _setup_tailnet_android_online():
     """True if this machine's tailnet shows an Android device online."""
     try:
@@ -2927,6 +2972,9 @@ def _run_verify(args):
 SETUP_STEPS = [
     {"name": "prereqs", "kind": "agent", "title": "Prerequisites",
      "shot": None, "check": _check_prereqs, "run": _run_prereqs,
+     "instruction": None},
+    {"name": "tailnet", "kind": "agent", "title": "This computer on your tailnet",
+     "shot": None, "check": _check_tailnet, "run": _run_tailnet,
      "instruction": None},
     {"name": "tailscale-phone", "kind": "human", "title": "Tailscale on the phone",
      "shot": SETUP_SHOTS.format(1, "tailscale"), "check": _check_tailscale_phone,
