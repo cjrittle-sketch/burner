@@ -71,8 +71,7 @@ command are in [SKILL.md](SKILL.md).
 ## Security notes
 
 - It's your phone on your own Wi-Fi. Only computers signed in to your own
-  Tailscale can reach it. Never open the phone up to the public internet:
-  anyone who reaches it gets full control of the phone.
+  Tailscale can reach it.
 - Sign-in codes get read, typed and forgotten. They're never saved.
 - Your phone's address lives in `config.env` on your computer and is kept out
   of GitHub. Pairing codes are never saved anywhere.
