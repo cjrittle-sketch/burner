@@ -99,7 +99,10 @@ brand first: menus differ (paths below are Pixel, with Samsung noted).
    WiFi IP instead of the tailnet IP.
    (Screenshots: `setup/setup-04-pairing-dialog.png`,
    `setup/setup-05-wireless-debugging-screen.png`.)
-4. The agent runs the one-time pairing (`adb pair`), then installs
+4. The agent runs the one-time pairing (`adb pair`). Before the next part,
+   tell the user you'll download a small free app from GitHub, so if their
+   assistant asks to reach api.github.com or github.com, that's expected.
+   Then the agent installs
    **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
    https://github.com/mouldybread/adb-auto-enable/releases), grants it
    `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization.

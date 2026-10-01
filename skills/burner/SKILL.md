@@ -41,7 +41,9 @@ code and IP & port line as shown, or on the same phone (in split screen) a
 screenshot of the dialog (never
 ask for "the pairing port" by name; the code expires fast; turn Tailscale on first so
 the dialog shows the tailnet IP). After the one-time `adb pair`, the agent
-installs **adb-auto-enable** (open source, `com.tpn.adbautoenable`), grants
+installs **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
+downloaded from GitHub; warn the user their assistant may ask to reach
+api.github.com), grants
 it `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization; then
 **HUMAN REQUIRED:** open the app and finish its one-time self-pairing. From
 then on ADB re-enables on every boot on the fixed port **5555**, so
