@@ -2196,6 +2196,8 @@ def build_parser():
     p.set_defaults(fn=cmd_setup)
 
     p = sub.add_parser("update", help="update burner and its recipes to the latest")
+    p.add_argument("what", nargs="?", choices=["recipes"],
+                   help="'recipes' to refresh only the built-in recipes")
     p.set_defaults(fn=cmd_update)
 
     p = sub.add_parser("uninstall", help="undo the phone changes burner setup made")
@@ -3175,10 +3177,44 @@ def cmd_setup(args):
 INSTALL_URL = "https://useburner.si/install.sh"
 
 
+TARBALL_URL = "https://github.com/useburner/burner/archive/refs/heads/master.tar.gz"
+
+
+def _update_recipes():
+    """Refresh only the built-in recipes from the latest burner release.
+    Recipes you recorded under your own names are left alone."""
+    import io
+    import tarfile
+    try:
+        blob = _setup_urlopen(TARBALL_URL, timeout=120)
+    except Exception as e:
+        print("could not download the latest recipes: {}".format(e),
+              file=sys.stderr)
+        return 1
+    dest = os.path.join(ROOT, "recipes")
+    os.makedirs(dest, exist_ok=True)
+    names = []
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
+        for m in tf.getmembers():
+            parts = m.name.split("/")
+            if (m.isfile() and len(parts) == 3 and parts[1] == "recipes"
+                    and parts[2].endswith(".burner")):
+                with open(os.path.join(dest, parts[2]), "wb") as f:
+                    f.write(tf.extractfile(m).read())
+                names.append(parts[2][:-len(".burner")])
+    if not names:
+        print("no recipes found in the latest release.", file=sys.stderr)
+        return 1
+    print("recipes updated: {}".format(", ".join(sorted(names))))
+    return 0
+
+
 def cmd_update(args):
     """Re-run the web installer over this install. Keeps config.env, the
     phone pairing and your own recorded recipes; built-in recipes and burner
-    itself are refreshed."""
+    itself are refreshed. `burner update recipes` refreshes only recipes."""
+    if getattr(args, "what", None) == "recipes":
+        return _update_recipes()
     env = dict(os.environ, BURNER_DIR=ROOT)
     r = subprocess.run(["bash", "-c", "curl -fsSL {} | bash".format(INSTALL_URL)],
                        env=env)
