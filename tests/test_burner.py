@@ -1411,7 +1411,8 @@ class SetupWizardTests(OfflineTestCase):
         names = [s["name"] for s in pc.SETUP_STEPS]
         self.assertEqual(names, ["prereqs", "tailscale-phone", "dev-options",
                                  "wireless-debug", "pair", "verify",
-                                 "stay-awake", "screen-lock",
+                                 "tailscale-battery", "stay-awake",
+                                 "screen-lock",
                                  "install-adb-auto-enable", "self-pair",
                                  "always-on-vpn", "fix-port"])
         kinds = {s["name"]: s["kind"] for s in pc.SETUP_STEPS}

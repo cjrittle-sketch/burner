@@ -2472,12 +2472,49 @@ def _check_prereqs():
     return r.returncode == 0
 
 
+def _setup_tailnet_android_online():
+    """True if this machine's tailnet shows an Android device online."""
+    try:
+        r = _setup_spawn(["tailscale", "status", "--json"], timeout=15)
+        peers = json.loads(r.stdout or "{}").get("Peer") or {}
+    except Exception:
+        return None
+    return any((p.get("OS") or "").lower() == "android" and p.get("Online")
+               for p in peers.values())
+
+
 def _check_tailscale_phone():
     # The phone is reachable over adb only via Tailscale (or LAN).
     st = _setup_device_state()
     if st == "device":
         return True
+    # Before pairing: if the tailnet already shows an Android phone online,
+    # Tailscale is done on it and the user can skip this step.
+    if _setup_tailnet_android_online():
+        return True
     return None
+
+
+def _check_tailscale_battery():
+    out = _setup_sh("dumpsys", "deviceidle", "whitelist")
+    if out is None:
+        return None
+    return SETUP_VPN_APP in out
+
+
+def _run_tailscale_battery(args):
+    # Same as Settings > Apps > Tailscale > App battery usage > Unrestricted.
+    adb("shell", "dumpsys", "deviceidle", "whitelist", "+" + SETUP_VPN_APP,
+        timeout=15)
+    adb("shell", "cmd", "appops", "set", SETUP_VPN_APP,
+        "RUN_ANY_IN_BACKGROUND", "allow", timeout=15)
+    if not _check_tailscale_battery():
+        print("could not set Tailscale battery usage to Unrestricted.",
+              file=sys.stderr)
+        return 1
+    print("Tailscale battery usage set to Unrestricted, so Android won't "
+          "stop it.")
+    return 0
 
 
 def _check_dev_options():
@@ -2894,12 +2931,9 @@ SETUP_STEPS = [
      "shot": SETUP_SHOTS.format(1, "tailscale"), "check": _check_tailscale_phone,
      "run": None,
      "instruction": (
-         "On the burner phone: install Tailscale from the Play Store, sign in "
-         "to your Tailscale account, and turn it on so it says Connected. "
-         "Then set Tailscale battery usage to Unrestricted so Android does "
-         "not kill it: Settings > Apps > Tailscale > App battery usage > "
-         "Unrestricted (on Samsung: Settings > Apps > Tailscale > Battery > "
-         "Unrestricted).")},
+         "On the burner phone: connect to Wi-Fi, install Tailscale from the "
+         "Play Store, sign in to your Tailscale account, and turn it on so "
+         "it says Connected.")},
     {"name": "dev-options", "kind": "human", "title": "Enable Developer options",
      "shot": SETUP_SHOTS.format(2, "build-number"), "check": _check_dev_options,
      "run": None,
@@ -2937,6 +2971,10 @@ SETUP_STEPS = [
          "send a screenshot of the dialog instead.")},
     {"name": "verify", "kind": "agent", "title": "Verify with burner doctor",
      "shot": None, "check": _check_verify, "run": _run_verify,
+     "instruction": None},
+    {"name": "tailscale-battery", "kind": "agent",
+     "title": "Unrestricted battery for Tailscale", "shot": None,
+     "check": _check_tailscale_battery, "run": _run_tailscale_battery,
      "instruction": None},
     {"name": "stay-awake", "kind": "agent", "title": "Stay awake while charging",
      "shot": None, "check": _check_stay_awake, "run": _run_stay_awake,

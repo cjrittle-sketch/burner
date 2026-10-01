@@ -43,7 +43,8 @@ screenshot of the dialog (never
 ask for "the pairing port" by name; turn Tailscale on first so
 the dialog shows the tailnet IP). After the one-time `adb pair`, the agent
 runs `burner setup --step verify` and gets burner green first. Then it
-finishes the phone with burner itself, nothing for the user to tap: screen
+finishes the phone with burner itself, nothing for the user to tap:
+Tailscale battery Unrestricted (`tailscale-battery`), screen
 stays awake while charging (`stay-awake`), lock screen off (`screen-lock`;
 if there's a PIN only the user can remove it), **adb-auto-enable** installed
 from GitHub and self-paired (warn the user their assistant may ask to reach

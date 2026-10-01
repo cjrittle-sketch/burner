@@ -76,11 +76,12 @@ brand (paths below are Pixel, with Samsung noted), so know the brand first:
 infer it from their device if you can (a phone model in the user agent, or
 something they said), and ask only if you can't.
 
-1. **HUMAN REQUIRED:** Connect the phone to WiFi, plug it into a charger, and
-   install Tailscale from the Play Store. Sign in, leave it connected, and set
-   Tailscale battery usage to Unrestricted so Android does not kill it
-   (Settings > Apps > Tailscale > App battery usage > Unrestricted; on
-   Samsung, Settings > Apps > Tailscale > Battery > Unrestricted).
+1. **HUMAN REQUIRED:** Connect the phone to WiFi, install Tailscale from the
+   Play Store, sign in, and leave it connected. Check first: if
+   `burner setup --list-steps` shows `tailscale-phone` done (your tailnet
+   already has an Android phone online), skip this step and don't mention
+   it. No charger needed during setup; the agent sets Tailscale's battery
+   usage itself later.
    (Screenshot: `setup/setup-01-tailscale.png`.)
 2. **HUMAN REQUIRED:** Enable Developer options, then turn on
    **Wireless debugging**:
@@ -113,6 +114,8 @@ something they said), and ask only if you can't.
    tap except removing a PIN (step 5). Tell them the phone will flip through
    Settings on its own for a bit.
 5. The agent finishes the phone with burner, one `burner setup --step` each:
+   - `tailscale-battery`: Tailscale battery usage set to Unrestricted, so
+     Android doesn't stop it.
    - `stay-awake`: screen stays on while charging, so the phone never
      sleeps mid-task.
    - `screen-lock`: turns off the lock screen so the phone opens straight to
@@ -143,7 +146,8 @@ something they said), and ask only if you can't.
      random wireless-debugging port is never used again, and reboots need
      no human action.
 
-Leave the phone plugged in and on WiFi. Done.
+Last, tell the user to plug the phone into a charger and leave it there, on
+WiFi. It only stays awake while charging. Done.
 
 ## Security notes
 
