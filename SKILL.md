@@ -323,6 +323,10 @@ burner amazon-status
 burner doctor [--json]
     End-to-end health check: tunnel, adb auth, u2 daemon, screen state.
 
+burner update
+    Update burner and its built-in recipes to the latest. Keeps config.env,
+    the phone pairing and recipes you recorded under your own names.
+
 burner uninstall [--yes]
     Undo the phone changes setup made (stay awake, lock screen, always-on
     VPN, helper apps, wireless debugging). Without --yes it only lists them.

@@ -2188,6 +2188,9 @@ def build_parser():
                    help="wireless debugging port (pair step)")
     p.set_defaults(fn=cmd_setup)
 
+    p = sub.add_parser("update", help="update burner and its recipes to the latest")
+    p.set_defaults(fn=cmd_update)
+
     p = sub.add_parser("uninstall", help="undo the phone changes burner setup made")
     p.add_argument("--yes", action="store_true",
                    help="actually do it (without it, only list the changes)")
@@ -2287,7 +2290,7 @@ def record_command_line(args):
         non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
                           "route", "forget", "record", "replay", "recipe", "do",
                           "ensure", "gcode", "vcode", "amazon-status", "setup",
-                          "uninstall"}
+                          "uninstall", "update"}
         if argv[0] in non_recordable:
             return None
         # Reconstruct with proper quoting
@@ -3160,6 +3163,21 @@ def cmd_setup(args):
             _setup_state_save(s["name"])
     print("setup complete.")
     return 0
+
+
+INSTALL_URL = "https://useburner.si/install.sh"
+
+
+def cmd_update(args):
+    """Re-run the web installer over this install. Keeps config.env, the
+    phone pairing and your own recorded recipes; built-in recipes and burner
+    itself are refreshed."""
+    env = dict(os.environ, BURNER_DIR=ROOT)
+    r = subprocess.run(["bash", "-c", "curl -fsSL {} | bash".format(INSTALL_URL)],
+                       env=env)
+    if r.returncode != 0:
+        print("update failed (see above).", file=sys.stderr)
+    return r.returncode
 
 
 UNINSTALL_STEPS = [
