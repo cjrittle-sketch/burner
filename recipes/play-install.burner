@@ -1,0 +1,20 @@
+# Install a free app from the Play Store by package name.
+# Usage: PLAY_PACKAGE=com.example.app burner recipe play-install
+#
+# Deep links straight to the listing, skipping Play Store search (the slow,
+# flaky part).
+open market://details?id=$PLAY_PACKAGE
+# Listing loaded. "Install" also substring-matches "Uninstall", so this passes
+# for installed apps too; the next step tells them apart.
+wait "Install" --timeout 45
+# Already installed: the listing shows "Uninstall" + "Open". This fails and
+# stops the recipe before any tap, which is the correct signal (nothing to do).
+# Without it, tap "Install" would fuzzy-match and hit "Uninstall".
+wait "Uninstall" --absent --timeout 2
+# Paid apps show a price instead of "Install", so the wait above times out and
+# nothing is tapped. Never add a purchase step to this recipe.
+tap "Install"
+# Downloads are slow. "Uninstall" only appears once the install finishes
+# (the button row becomes "Uninstall" + "Open"). Waiting on "Open" instead
+# would substring-match listing text like the description.
+wait "Uninstall" --timeout 600

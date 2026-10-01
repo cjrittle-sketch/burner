@@ -304,7 +304,9 @@ burner do 'open URL; wait "Cart" --timeout 30; tap "Checkout"'
 
 burner recipe <name>
     Run a saved flow from recipes/<name>.burner (same ;-separated format,
-    one step per line, # comments allowed).
+    one step per line, # comments allowed). $VAR in a step expands from the
+    environment; an unset $VAR stops the recipe before it runs.
+    PLAY_PACKAGE=com.example.app burner recipe play-install
 
 burner ensure
     Heal the stack: restart tunnel, reconnect adb, revive the u2 daemon.

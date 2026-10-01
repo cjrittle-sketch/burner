@@ -2218,11 +2218,19 @@ def cmd_recipe(args):
     if not os.path.exists(path):
         print("no recipe: {}".format(path), file=sys.stderr)
         return 1
+    # $VAR / ${VAR} in steps expand from the environment, so one recipe can
+    # take parameters: PLAY_PACKAGE=com.example.app burner recipe play-install
     steps = []
     with open(path) as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith("#"):
+                line = os.path.expandvars(line)
+                unset = re.search(r"\$\{?([A-Za-z_]\w*)", line)
+                if unset:
+                    print("recipe {}: ${} is not set".format(args.name, unset.group(1)),
+                          file=sys.stderr)
+                    return 1
                 steps.append(line)
     return cmd_do(argparse.Namespace(flow="; ".join(steps)))
 
