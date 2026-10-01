@@ -10,9 +10,7 @@ connection.**
 It lets your AI assistant use a spare Android phone that sits in a drawer at
 home, so it can use the apps you use.
 
-## What it can do for you
-
-### Use my burner to…
+## Use my burner to…
 
 ```
 Use my burner to screen my Tinder matches and tell me who's worth a reply.

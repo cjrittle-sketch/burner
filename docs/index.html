@@ -66,7 +66,7 @@
   .term {
     position: relative; text-align: left;
     background: var(--code-bg); color: var(--code-ink);
-    border-radius: 8px; padding: 16px 92px 16px 18px;
+    border-radius: 8px; padding: 16px 60px 16px 18px;
     font: 13px/1.7 var(--mono);
     overflow-x: auto; white-space: pre;
   }
@@ -77,7 +77,8 @@
     position: absolute; top: 10px; right: 10px;
     background: var(--burn); color: var(--ink);
     border: 0; border-radius: 6px;
-    font: 700 12px var(--sans); padding: 6px 12px; cursor: pointer;
+    font: 700 12px var(--sans); padding: 7px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
   }
   .copy:hover { background: #FF8A4C; }
   .copy:focus-visible { outline: 2px solid var(--code-ink); outline-offset: 2px; }
@@ -127,21 +128,20 @@
   <h1>Give your AI assistant a physical side phone.</h1>
   <p class="sub">burner runs on a real phone, with real apps, real bluetooth and your real home connection.</p>
   <p class="lead">Paste this to your AI assistant:</p>
-  <div class="term msg">Set up burner for me. Read the guide at <a href="https://useburner.si/skill.md">https://useburner.si/skill.md</a> and do everything in it. Walk me through the parts that need me.<button class="copy" type="button" data-copy="Set up burner for me. Read the guide at https://useburner.si/skill.md and do everything in it. Walk me through the parts that need me.">Copy</button></div>
+  <div class="term msg">Set up burner for me. Read the guide at <a href="https://useburner.si/skill.md">https://useburner.si/skill.md</a> and do everything in it. Walk me through the parts that need me.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Set up burner for me. Read the guide at https://useburner.si/skill.md and do everything in it. Walk me through the parts that need me."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
 </div>
 
 <section id="what">
-  <h2>What it can do for you</h2>
   <p class="use-lead">Use my burner to&hellip;</p>
   <ul class="uses">
-    <li class="term msg">&hellip;screen my Tinder matches and tell me who&rsquo;s worth a reply.<button class="copy" type="button" data-copy="Use my burner to screen my Tinder matches and tell me who&#x27;s worth a reply.">Copy</button></li>
-    <li class="term msg">&hellip;keep my Snapchat streaks alive while I&rsquo;m on vacation.<button class="copy" type="button" data-copy="Use my burner to keep my Snapchat streaks alive while I&#x27;m on vacation.">Copy</button></li>
-    <li class="term msg">&hellip;spot underpriced flips on Vinted before anyone else sees them.<button class="copy" type="button" data-copy="Use my burner to spot underpriced flips on Vinted before anyone else sees them.">Copy</button></li>
-    <li class="term msg">&hellip;download the Airbnb app and find me a cabin for next weekend.<button class="copy" type="button" data-copy="Use my burner to download the Airbnb app and find me a cabin for next weekend.">Copy</button></li>
-    <li class="term msg">&hellip;get last Friday&rsquo;s Uber Eats dinner ready to reorder.<button class="copy" type="button" data-copy="Use my burner to get last Friday&#x27;s Uber Eats dinner ready to reorder.">Copy</button></li>
-    <li class="term msg">&hellip;check my Ring app and tell me who came to the door.<button class="copy" type="button" data-copy="Use my burner to check my Ring app and tell me who came to the door.">Copy</button></li>
-    <li class="term msg">&hellip;play my chill playlist on the living room speaker.<button class="copy" type="button" data-copy="Use my burner to play my chill playlist on the living room speaker.">Copy</button></li>
-    <li class="term msg">&hellip;turn off the lamps I left on. I&rsquo;m already at the airport.<button class="copy" type="button" data-copy="Use my burner to turn off the lamps I left on. I&#x27;m already at the airport.">Copy</button></li>
+    <li class="term msg">&hellip;screen my Tinder matches and tell me who&rsquo;s worth a reply.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to screen my Tinder matches and tell me who&#x27;s worth a reply."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
+    <li class="term msg">&hellip;keep my Snapchat streaks alive while I&rsquo;m on vacation.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to keep my Snapchat streaks alive while I&#x27;m on vacation."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
+    <li class="term msg">&hellip;spot underpriced flips on Vinted before anyone else sees them.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to spot underpriced flips on Vinted before anyone else sees them."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
+    <li class="term msg">&hellip;download the Airbnb app and find me a cabin for next weekend.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to download the Airbnb app and find me a cabin for next weekend."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
+    <li class="term msg">&hellip;get last Friday&rsquo;s Uber Eats dinner ready to reorder.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to get last Friday&#x27;s Uber Eats dinner ready to reorder."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
+    <li class="term msg">&hellip;check my Ring app and tell me who came to the door.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to check my Ring app and tell me who came to the door."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
+    <li class="term msg">&hellip;play my chill playlist on the living room speaker.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to play my chill playlist on the living room speaker."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
+    <li class="term msg">&hellip;turn off the lamps I left on. I&rsquo;m already at the airport.<button class="copy" type="button" aria-label="Copy prompt" title="Copy" data-copy="Use my burner to turn off the lamps I left on. I&#x27;m already at the airport."><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></li>
   </ul>
 </section>
 
@@ -192,9 +192,14 @@
 </div>
 <script>
   document.querySelectorAll('.copy').forEach(function (b) {
+    var icon = b.innerHTML;
     b.addEventListener('click', function () {
       var t = b.getAttribute('data-copy');
-      var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); };
+      var done = function () {
+        b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+        b.setAttribute('aria-label', 'Copied');
+        setTimeout(function () { b.innerHTML = icon; b.setAttribute('aria-label', 'Copy prompt'); }, 1500);
+      };
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(t).then(done, function () {});
       } else {
