@@ -653,7 +653,10 @@ class UnicodeTests(OfflineTestCase):
 
     def test_broadcast_uses_es_msg(self):
         # Real broadcast_adbkeyboard_text, mocked adb: verifies the exact
-        # broadcast args (--es msg) with unicode intact.
+        # broadcast args (--es msg) with unicode intact. The message is
+        # single-quoted for the device shell: `adb shell` joins args with
+        # spaces and re-parses them on-device, so an unquoted message with
+        # spaces would be split and the text silently lost.
         self.allow("get_current_ime", return_value="com.example/.Ime")
         self.allow("set_ime")
         m_adb = self.allow("adb")
@@ -663,7 +666,17 @@ class UnicodeTests(OfflineTestCase):
         self.assertEqual(
             m_adb.call_args[0],
             ("shell", "am", "broadcast", "-a", "ADB_INPUT_TEXT",
-             "--es", "msg", "héllo 🎉"))
+             "--es", "msg", "'héllo 🎉'"))
+
+    def test_broadcast_quotes_single_quotes(self):
+        # Embedded single quotes are escaped so the device shell still
+        # sees one argument.
+        m_adb = self.allow("adb")
+        m_adb.return_value = SimpleNamespace(returncode=0, stdout="",
+                                             stderr="")
+        pc.broadcast_adbkeyboard_text("it's")
+        self.assertEqual(
+            m_adb.call_args[0][-1], "'it'\\''s'")
 
     def test_type_via_adbkeyboard_restores_ime_on_exception(self):
         self.allow("get_current_ime", return_value="com.example/.Ime")

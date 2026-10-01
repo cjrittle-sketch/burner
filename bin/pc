@@ -729,13 +729,24 @@ def set_ime(ime_id):
     return r.returncode == 0
 
 
+def _sh_quote(s):
+    """Single-quote a string for the device shell.
+
+    `adb shell` joins its args with spaces and re-parses them on-device,
+    so any message containing spaces must be quoted or it gets split
+    (the broadcast then silently types nothing)."""
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
 def broadcast_adbkeyboard_text(text):
     """Send text through the ADBKeyboard IME broadcast.
 
-    Uses subprocess list args (via adb()) so no shell quoting is involved —
-    arbitrary unicode passes through intact."""
+    Uses subprocess list args (via adb()) so no *local* shell quoting is
+    involved — but the message itself is quoted for the *device* shell,
+    which re-splits `adb shell` args. Arbitrary unicode passes through
+    intact inside single quotes."""
     r = adb("shell", "am", "broadcast", "-a", "ADB_INPUT_TEXT",
-            "--es", "msg", text)
+            "--es", "msg", _sh_quote(text))
     return r.returncode == 0
 
 
@@ -746,16 +757,27 @@ def type_via_adbkeyboard(text, field_xy=None, clear=False, clear_keys=20):
     restores the previous IME. Prints the route used. Small adb wrappers
     (get_current_ime/set_ime/broadcast_adbkeyboard_text) keep this mockable."""
     prev = get_current_ime()
+    # Focus the field BEFORE switching IMEs: tapping while the IME switch
+    # is in flight breaks ADBKeyboard's input connection and the broadcast
+    # is silently dropped (seen 2026-09-30).
+    if field_xy is not None and field_xy[0] is not None:
+        tap_center(*field_xy)
+        time.sleep(0.6)
     set_ime(ADBKEYBOARD_IME)
+    # The IME switch needs a moment to bind to the focused field; without
+    # this the ADB_INPUT_TEXT broadcast lands on a null InputConnection and
+    # the text is silently dropped (seen 2026-09-30).
+    time.sleep(1.0)
     try:
-        if field_xy is not None and field_xy[0] is not None:
-            tap_center(*field_xy)
-            time.sleep(0.6)
         if clear:
             for _ in range(clear_keys):
                 adb_or_ensure("shell", "input", "keyevent", "67")
             time.sleep(0.5)
         broadcast_adbkeyboard_text(text)
+        # The broadcast is processed async by the IME; restoring the
+        # previous IME immediately can tear down ADBKeyboard's
+        # InputConnection before it commits the text (seen 2026-09-30).
+        time.sleep(0.8)
     finally:
         if prev:
             set_ime(prev)
