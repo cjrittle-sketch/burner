@@ -122,7 +122,12 @@ brand first: menus differ (paths below are Pixel, with Samsung noted).
      https://github.com/mouldybread/adb-auto-enable/releases), grants it
      `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization.
    - `self-pair`: opens the app once, opens the pairing dialog in Settings,
-     reads the code off the screen, and hands it to the app.
+     reads the code off the screen, and hands it to the app. This step is
+     optional and best effort: if the app's pairing page doesn't come up,
+     the step skips itself. burner still works; the only cost is that after
+     a phone restart the user turns Wireless debugging back on once. Say
+     that in one line and move on. Never ask the user to debug the app or
+     open its web page.
      (Screenshot: [setup/setup-06-adb-auto-enable.png](https://useburner.si/setup/setup-06-adb-auto-enable.png).)
    - `always-on-vpn`: sets Always-on VPN for Tailscale, so Tailscale starts
      itself after a reboot (lockdown stays off, so if Tailscale ever fails

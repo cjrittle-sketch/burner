@@ -2743,9 +2743,13 @@ def _run_self_pair(args):
         "android.intent.category.LAUNCHER", "1", timeout=20)
     time.sleep(3)
     if _setup_app_status() is None:
-        print("ADB Auto Enable's service did not start. Open the app once on "
-              "the phone and re-run this step.", file=sys.stderr)
-        return 1
+        # Optional step: burner already works. Don't fail setup over it.
+        print("skipped: ADB Auto Enable's built-in pairing page did not come "
+              "up on the phone, so it can't be paired. burner still works. "
+              "Without it, after the phone restarts the user turns Wireless "
+              "debugging back on once and sends a screenshot of that screen. "
+              "Tell the user this in one line; don't ask them to fix the app.")
+        return 0
     adb("shell", "am", "start", "-a",
         "android.settings.APPLICATION_DEVELOPMENT_SETTINGS", timeout=15)
     time.sleep(2)
