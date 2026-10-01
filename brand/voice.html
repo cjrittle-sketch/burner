@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>burner Voice Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700..800&family=Atkinson+Hyperlegible+Next:wght@400;650&family=Martian+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column on Paper, like the site; the >_ wink chip marks every line that carries the brand's personality. */
+:root {
+  --paper: #F4F5F8; --surface: #FFFFFF; --ink: #1B1D22; --muted: #4A505C; --wire: #9AA0AD;
+  --rule: #D6DAE1; --mist: #E6E8EC; --burn: #FF6A13; --accent: #B93E00;
+  --chip-bg: #1B1D22; --chip-ink: #FF6A13;
+  --good: #127A6C; --bad: #C8174A; --good-bg: #E3F2EF; --bad-bg: #FBE7EC;
+  --display: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sans: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #15171B; --surface: #1F2228; --ink: #E6E8EC; --muted: #AEB3BE; --wire: #6D7380;
+  --rule: #33373F; --mist: #2A2D34; --accent: #FF8A45; --chip-bg: #0D0E11;
+  --good: #3FB7A6; --bad: #FF4D7A; --good-bg: #17302C; --bad-bg: #35161F; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #15171B; --surface: #1F2228; --ink: #E6E8EC; --muted: #AEB3BE; --wire: #6D7380;
+  --rule: #33373F; --mist: #2A2D34; --accent: #FF8A45; --chip-bg: #0D0E11;
+  --good: #3FB7A6; --bad: #FF4D7A; --good-bg: #17302C; --bad-bg: #35161F; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; -webkit-font-smoothing: antialiased; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.6; padding-inline: 20px; padding-block: 0 64px; }
+main { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.12; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.3rem, 7vw, 3.6rem); font-weight: 800; }
+h2 { font-size: 1.85rem; font-weight: 800; }
+h3 { font-size: 1.2rem; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--accent); }
+section { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 16px; }
+.label { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: 1.15rem; color: var(--muted); max-width: 62ch; }
+.prose { max-width: 65ch; display: flex; flex-direction: column; gap: 12px; }
+.wink { display: inline-flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 500; font-size: 0.78rem;
+  background: var(--chip-bg); color: var(--chip-ink); border-radius: 6px; padding: 1px 6px; line-height: 1.5; vertical-align: 0.1em; }
+
+header { padding-block: 48px 8px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid var(--rule); padding-bottom: 32px; }
+header .brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 800; font-size: 1.3rem; }
+nav { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.95rem; }
+nav a { color: var(--ink); text-decoration-color: var(--rule); text-underline-offset: 4px; }
+nav a:hover { color: var(--accent); }
+
+.facts { display: grid; grid-template-columns: 9rem 1fr; gap: 10px 20px; margin: 0; }
+.facts dt { font-family: var(--mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding-top: 4px; }
+.facts dd { margin: 0; min-width: 0; }
+
+.words { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.wordbox { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 0.88rem; padding: 2px 9px; border-radius: 999px; background: var(--mist); }
+.tag.no { text-decoration: line-through; text-decoration-color: var(--bad); color: var(--muted); }
+
+.refs { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--rule); }
+.ref { display: grid; grid-template-columns: 10rem 1fr; gap: 6px 20px; padding-block: 16px; border-bottom: 1px solid var(--rule); }
+.ref h3 { font-size: 1.05rem; }
+.ref p { min-width: 0; }
+.ref .leave { color: var(--muted); font-size: 0.95rem; }
+
+.traits { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.trait { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.trait .not { font-size: 0.92rem; color: var(--muted); }
+.trait blockquote { margin: 0; font-size: 0.98rem; border-left: 3px solid var(--burn); padding-left: 12px; }
+
+.dial { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.dial th, .dial td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.dial th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.meter { font-family: var(--mono); color: var(--accent); letter-spacing: 2px; white-space: nowrap; }
+.scroll { overflow-x: auto; }
+
+.dodont { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.col { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.col h3 { padding-bottom: 8px; }
+.col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.col li { padding: 10px 0 10px 28px; border-top: 1px solid var(--rule); position: relative; font-size: 0.97rem; }
+.col li::before { position: absolute; left: 2px; top: 10px; font-family: var(--mono); font-weight: 500; }
+.col.do li::before { content: "+"; color: var(--good); }
+.col.dont li::before { content: "×"; color: var(--bad); }
+
+.swap { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.swap td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+.swap td:first-child { color: var(--bad); text-decoration: line-through; text-decoration-thickness: 1px; white-space: nowrap; }
+.swap td:nth-child(2) { color: var(--good); font-weight: 650; }
+.swap td:last-child { color: var(--muted); }
+
+.rewrites { display: flex; flex-direction: column; gap: 14px; }
+.rw { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.rw > div { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rw .before { background: var(--bad-bg); }
+.rw .after { background: var(--good-bg); }
+.rw .why { grid-column: 1 / -1; font-size: 0.9rem; color: var(--muted); border-top: 1px solid var(--rule); }
+
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { font: 650 0.95rem var(--sans); color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 999px; padding: 6px 16px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.tabs button:focus-visible, .copy:focus-visible, textarea:focus-visible, .check input:focus-visible { outline: 2px solid var(--burn); outline-offset: 2px; }
+.samples { display: flex; flex-direction: column; gap: 14px; }
+.sample { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sample .where { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sample .text { white-space: pre-line; }
+.sample .note { font-size: 0.88rem; color: var(--muted); }
+.copy { font: 500 0.7rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: none; border: 1px solid var(--rule); border-radius: 6px; padding: 3px 8px; cursor: pointer; flex-shrink: 0; }
+.copy:hover { color: var(--ink); border-color: var(--wire); }
+.email { gap: 0; padding: 0; overflow: hidden; }
+.email .hdr { padding: 12px 18px; border-bottom: 1px solid var(--rule); background: var(--mist); display: grid; grid-template-columns: 5.5rem 1fr auto; gap: 2px 10px; font-size: 0.93rem; }
+.email .hdr span:nth-child(odd) { font-family: var(--mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding-top: 4px; }
+.email .body { padding: 16px 18px; white-space: pre-line; }
+
+.checklist { display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+.check { display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--rule); cursor: pointer; }
+.check input { width: 18px; height: 18px; margin-top: 4px; accent-color: var(--burn); }
+.check small { display: block; color: var(--muted); font-size: 0.9rem; }
+.check:has(input:checked) strong { text-decoration: line-through; text-decoration-color: var(--wire); }
+.tester { display: flex; flex-direction: column; gap: 10px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; }
+textarea { width: 100%; min-height: 120px; font: 1rem/1.5 var(--sans); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; resize: vertical; }
+.findings { display: flex; flex-direction: column; gap: 6px; font-size: 0.95rem; }
+.finding { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.finding b { color: var(--bad); }
+.ok { color: var(--good); font-weight: 650; }
+footer { color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--rule); padding-top: 20px; }
+
+@media (max-width: 640px) {
+  body { font-size: 16px; padding-inline: 16px; }
+  .words, .traits, .dodont, .rw { grid-template-columns: 1fr; }
+  .facts, .ref { grid-template-columns: 1fr; gap: 4px; }
+  .facts dd { margin-bottom: 10px; }
+  .email .hdr { grid-template-columns: 4.5rem 1fr auto; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<main>
+<header>
+  <div class="brand"><span class="wink" aria-hidden="true">&gt;_</span> burner</div>
+  <h1>How burner sounds</h1>
+  <p class="lede">One voice for the site, socials, emails and support replies. Plain, cheeky, specific, and always clear that you're the one in charge. Built from the copy live on useburner.si today.</p>
+  <nav aria-label="Sections">
+    <a href="#positioning">Positioning</a><a href="#audience">Audience words</a><a href="#refs">References</a><a href="#traits">Voice traits</a><a href="#dial">Tone by channel</a><a href="#dodont">Do and don't</a><a href="#swap">Words to swap</a><a href="#rewrites">Site rewrites</a><a href="#samples">Sample lines</a><a href="#checklist">Checklist</a><a href="system.html">Color and type →</a>
+  </nav>
+</header>
+
+<section id="positioning">
+  <span class="label">Where we stand</span>
+  <h2>Positioning</h2>
+  <dl class="facts">
+    <dt>Tagline</dt><dd><strong>Give your AI assistant a physical side phone.</strong></dd>
+    <dt>In one breath</dt><dd>burner lets your AI assistant use a spare Android phone that sits in a drawer at home, so it can do the things in your apps that it couldn't do before.</dd>
+    <dt>Who it's for</dt><dd>People who already lean on an AI assistant and keep hitting the wall where the real stuff lives: dating apps, Snapchat, Vinted, Marketplace, banking and store apps that have no proper website or shut out bots.</dd>
+    <dt>Why believe it</dt><dd>It's a real phone on your own home Wi-Fi, so to your apps it looks like you at home, not a data center. There's no burner account and no burner server. It's free and open source, and nothing gets bought, sent or posted without your yes.</dd>
+    <dt>Personality</dt><dd>The logo's <span class="wink">&gt;_</span> wink. A little mischievous about the everyday chores it takes off your hands, never shady about how.</dd>
+  </dl>
+</section>
+
+<section id="audience">
+  <span class="label">Talk like they talk</span>
+  <h2>Your audience's language</h2>
+  <p class="prose">The six "What it can do for you" quotes on the site are the best copy burner has. They work because they're in the customer's own words: an app name, a chore, a result. Borrow from that list, not from the README.</p>
+  <div class="words">
+    <div class="wordbox">
+      <h3>Words they use</h3>
+      <div class="tags">
+        <span class="tag">my old phone</span><span class="tag">spare phone</span><span class="tag">in a drawer</span><span class="tag">plug it in</span><span class="tag">my apps</span><span class="tag">my AI assistant</span><span class="tag">ChatGPT / Claude</span><span class="tag">streaks</span><span class="tag">matches</span><span class="tag">flips</span><span class="tag">lowball</span><span class="tag">my usual</span><span class="tag">did my paycheck land</span><span class="tag">it never works in my browser</span><span class="tag">set it up once</span><span class="tag">is it safe</span>
+      </div>
+    </div>
+    <div class="wordbox">
+      <h3>Words they don't</h3>
+      <div class="tags">
+        <span class="tag no">agent</span><span class="tag no">AI agent</span><span class="tag no">ADB</span><span class="tag no">CLI</span><span class="tag no">UI tree</span><span class="tag no">tunnel</span><span class="tag no">traffic</span><span class="tag no">exit node</span><span class="tag no">control link</span><span class="tag no">daemon</span><span class="tag no">automation</span><span class="tag no">endpoint</span><span class="tag no">tailnet</span><span class="tag no">client</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="refs">
+  <span class="label">Assumed, swap freely</span>
+  <h2>Three brands to learn from</h2>
+  <p class="prose">You haven't named brands you admire yet, so these three are my picks for what burner needs. Tell me yours and I'll rework this section.</p>
+  <div class="refs">
+    <div class="ref"><h3>Monzo</h3><p><strong>Borrow:</strong> talking about money and privacy like a calm friend. Short answers that start with yes or no, then the reason.<br><span class="leave">Leave: the banking-app softness. burner can be funnier.</span></p></div>
+    <div class="ref"><h3>Mailchimp's style guide</h3><p><strong>Borrow:</strong> the rule that the voice stays the same while the tone shifts with the moment. Plain words, no jargon, humor only when the reader is relaxed.<br><span class="leave">Leave: the marketing-software vocabulary.</span></p></div>
+    <div class="ref"><h3>Duolingo on social</h3><p><strong>Borrow:</strong> a mascot with a face and a running joke. Our wink can be that character.<br><span class="leave">Leave: the chaos. One wink, not a meltdown.</span></p></div>
+  </div>
+</section>
+
+<section id="traits">
+  <span class="label">The voice</span>
+  <h2>Four voice traits</h2>
+  <div class="traits">
+    <div class="trait"><h3>Plain-spoken</h3><p>Everyday words, short sentences, contractions. If your mum wouldn't say it, rewrite it.</p><p class="not">Not dumbed down. Not techy.</p><blockquote>Plug the phone in, leave it in a drawer, and never touch it again.</blockquote></div>
+    <div class="trait"><h3>Cheeky, with a wink</h3><p>Humor comes from real life: streaks, lowballing, the store app that never works. At most one wink per piece.</p><p class="not">Not sly about rules. Not snarky at users.</p><blockquote>Keep my Snapchat streaks alive while I'm on vacation.</blockquote></div>
+    <div class="trait"><h3>Specific</h3><p>Name the app, the task, the number. "10 minutes, once" beats "quick setup".</p><p class="not">Not vague. Not hype.</p><blockquote>Message that Marketplace seller and offer 20 percent less.</blockquote></div>
+    <div class="trait"><h3>Straight about control</h3><p>Answer the worry first. It's your phone, at home, and nothing happens without your yes.</p><p class="not">Not defensive. Not legalese.</p><blockquote>Never without your explicit okay. Every purchase, message, or post waits for your yes.</blockquote></div>
+  </div>
+</section>
+
+<section id="dial">
+  <span class="label">Same voice, different volume</span>
+  <h2>Tone by channel</h2>
+  <div class="scroll">
+  <table class="dial">
+    <thead><tr><th>Channel</th><th>Wink</th><th>How it should feel</th></tr></thead>
+    <tbody>
+      <tr><td>Social posts</td><td class="meter">●●●○</td><td>The most playful. Lead with a relatable chore, land on the wink.</td></tr>
+      <tr><td>Website</td><td class="meter">●●○○</td><td>Calm and clear. The personality lives in the example quotes, not the headings.</td></tr>
+      <tr><td>Email</td><td class="meter">●○○○</td><td>Warm and useful. One job per email, one link.</td></tr>
+      <tr><td>FAQ, privacy, money, errors</td><td class="meter">○○○○</td><td>No jokes. Yes or no first, then one or two plain sentences.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section id="dodont">
+  <span class="label">Rules</span>
+  <h2>Do and don't</h2>
+  <div class="dodont">
+    <div class="col do"><h3>Do</h3><ul>
+      <li>Say "AI assistant" every time. Never "agent", "your agent" or "AI agent".</li>
+      <li>Write "burner" in lowercase, even at the start of a sentence.</li>
+      <li>Name real apps and real chores.</li>
+      <li>Start FAQ answers with Yes, No or the fact.</li>
+      <li>Mention "your yes" wherever money, messages or posts come up.</li>
+      <li>Say it runs on your own phone at home, on your Wi-Fi.</li>
+      <li>Say it "uses your location like any phone would".</li>
+      <li>Use digits for numbers: 10 minutes, 20 percent.</li>
+      <li>Keep the wink to one per piece. The only emoji is 😉.</li>
+    </ul></div>
+    <div class="col dont"><h3>Don't</h3><ul>
+      <li>Explain how it works under the hood on consumer pages.</li>
+      <li>Use terminal, shell or command framing, or code-looking jokes.</li>
+      <li>Say it "shares your location".</li>
+      <li>Promise it's "undetectable" or that it gets past or tricks apps.</li>
+      <li>Play up the spy or crime side of "burner".</li>
+      <li>Use hype: revolutionary, seamless, unlock, supercharge, AI-powered.</li>
+      <li>Stack exclamation marks or use sparkle emoji.</li>
+      <li>Make fun of people who don't get it.</li>
+      <li>Repeat the same reassurance three times on one page.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="swap">
+  <span class="label">Quick fixes</span>
+  <h2>Words to swap</h2>
+  <div class="scroll">
+  <table class="swap"><tbody>
+    <tr><td>agent, your agent, AI agent</td><td>your AI assistant</td><td>What people call ChatGPT or Claude. Keep "AI" in, even on second mention.</td></tr>
+    <tr><td>ADB, tunnel, Tailscale setup</td><td>setup (your AI assistant walks you through it)</td><td>They never need to know the parts.</td></tr>
+    <tr><td>traffic, exit node, IP</td><td>your home Wi-Fi</td><td>The benefit, not the plumbing.</td></tr>
+    <tr><td>control link</td><td>(cut it)</td><td>Your AI assistant just uses the phone.</td></tr>
+    <tr><td>shares your location</td><td>uses your location like any phone would</td><td>Normal, not alarming.</td></tr>
+    <tr><td>undetectable, bypass, evade</td><td>looks like you at home</td><td>True, and not shady.</td></tr>
+    <tr><td>automation, bot</td><td>your AI assistant does it for you</td><td>People hire help, not bots.</td></tr>
+    <tr><td>device</td><td>phone</td><td>Say the actual thing.</td></tr>
+    <tr><td>seamless, effortless</td><td>10 minutes, once</td><td>Specific beats adjectives.</td></tr>
+  </tbody></table>
+  </div>
+</section>
+
+<section id="rewrites">
+  <span class="label">Applied to the live site</span>
+  <h2>Rewrites of current copy</h2>
+  <p class="prose">Most of useburner.si is already on voice. These are the lines that drift.</p>
+  <div class="rewrites">
+    <div class="rw"><div class="before"><span class="label">Meta description</span><p>burner gives your AI agent its own Android phone, so it can use the apps you use.</p></div><div class="after"><span class="label">Rewrite</span><p>Give your AI assistant a spare Android phone at home, so it can use the apps you use. Free, no account.</p></div><div class="why">This is what shows in Google results, so it should match the tagline and say "AI assistant".</div></div>
+    <div class="rw"><div class="before"><span class="label">Under the setup prompt</span><p>Your agent reads the guide and handles the rest.</p></div><div class="after"><span class="label">Rewrite</span><p>Your AI assistant reads the guide and does the rest.</p></div><div class="why">"Agent" appears three times on the page. Swap all three for "AI assistant".</div></div>
+    <div class="rw"><div class="before"><span class="label">FAQ: away from home</span><p>…and your agent reaches it from wherever you are.</p></div><div class="after"><span class="label">Rewrite</span><p>Yes. The phone stays plugged in at home, and your AI assistant can use it from wherever you are.</p></div><div class="why">"Reaches it" hints at networking. "Use it" is what people care about.</div></div>
+    <div class="rw"><div class="before"><span class="label">Setup and two FAQs</span><p>Plug the phone in, leave it in a drawer, and never touch it again. (three times)</p></div><div class="after"><span class="label">Rewrite</span><p>Keep the full line in Setup. In the FAQs, say "About 10 minutes, once." and "It comes back on its own."</p></div><div class="why">A great line loses its punch when it repeats. Use it once, where it lands hardest.</div></div>
+    <div class="rw"><div class="before"><span class="label">README, if quoted anywhere public</span><p>A spare phone on your network is a legit client those apps cannot tell apart from you holding it.</p></div><div class="after"><span class="label">Rewrite</span><p>It's a real phone on your home Wi-Fi, so to your apps it looks like you on the couch.</p></div><div class="why">Same fact, without "client" or the get-past-the-app tone.</div></div>
+  </div>
+</section>
+
+<section id="samples">
+  <span class="label">Ready to use</span>
+  <h2>Sample lines</h2>
+  <div class="tabs" role="tablist" aria-label="Channel">
+    <button role="tab" id="tab-web" aria-selected="true" aria-controls="p-web">Website</button>
+    <button role="tab" id="tab-social" aria-selected="false" aria-controls="p-social">Social</button>
+    <button role="tab" id="tab-email" aria-selected="false" aria-controls="p-email">Email</button>
+  </div>
+
+  <div class="samples" id="p-web" role="tabpanel" aria-labelledby="tab-web">
+    <div class="sample"><div class="where"><span class="label">Hero subhead</span><button class="copy">Copy</button></div><p class="text">That old Android in your drawer? Your AI assistant can use it now.</p></div>
+    <div class="sample"><div class="where"><span class="label">Hero subhead, alt</span><button class="copy">Copy</button></div><p class="text">Your AI assistant can write a cover letter. Now it can also check if your paycheck landed.</p></div>
+    <div class="sample"><div class="where"><span class="label">Why a phone (new section)</span><button class="copy">Copy</button></div><p class="text">Lots of apps only really work on a phone. burner gives your AI assistant one, on your home Wi-Fi, so to your apps it looks like you at home.</p></div>
+    <div class="sample"><div class="where"><span class="label">FAQ: Do I need an account?</span><button class="copy">Copy</button></div><p class="text">No. There's no burner account and no burner server. It's your phone, your Wi-Fi and your AI assistant.</p></div>
+    <div class="sample"><div class="where"><span class="label">FAQ: Where will my apps think I am?</span><button class="copy">Copy</button></div><p class="text">At home. It uses your location like any phone would.</p></div>
+    <div class="sample"><div class="where"><span class="label">FAQ: What phone do I need?</span><button class="copy">Copy</button></div><p class="text">Any spare Android phone. If it turns on and connects to Wi-Fi, it'll do.</p></div>
+    <div class="sample"><div class="where"><span class="label">404 page <span class="wink">&gt;_</span></span><button class="copy">Copy</button></div><p class="text">This page went in the drawer and never came back. Head home.</p></div>
+  </div>
+
+  <div class="samples" id="p-social" role="tabpanel" aria-labelledby="tab-social" hidden>
+    <div class="sample"><div class="where"><span class="label">Launch post</span><button class="copy">Copy</button></div><p class="text">Your old phone has a new job.
+burner lets your AI assistant use a spare Android phone at home, so it can do the stuff that only works in apps.
+Free. No account. 10 minutes to set up, once.
+useburner.si</p></div>
+    <div class="sample"><div class="where"><span class="label">Use-case post <span class="wink">&gt;_</span></span><button class="copy">Copy</button></div><p class="text">You: on a beach, phone off.
+Your Snapchat streak: still alive. 😉</p></div>
+    <div class="sample"><div class="where"><span class="label">Use-case post</span><button class="copy">Copy</button></div><p class="text">"Spot underpriced flips on Vinted before anyone else sees them."
+That's a real thing you can ask your AI assistant now.</p></div>
+    <div class="sample"><div class="where"><span class="label">Trust post</span><button class="copy">Copy</button></div><p class="text">Your AI assistant can message, buy and post from your burner.
+It just can't do any of it without your yes.</p></div>
+    <div class="sample"><div class="where"><span class="label">Reply to "like a burner phone in the movies?" <span class="wink">&gt;_</span></span><button class="copy">Copy</button></div><p class="text">Less heist, more errands.</p></div>
+    <div class="sample"><div class="where"><span class="label">Thread opener</span><button class="copy">Copy</button></div><p class="text">5 things people ask their AI assistant to do on their burner 🧵</p><p class="note">Fill the thread with the site's real use-case quotes, one per post.</p></div>
+  </div>
+
+  <div class="samples" id="p-email" role="tabpanel" aria-labelledby="tab-email" hidden>
+    <div class="sample email"><div class="hdr"><span>Subject</span><span>Your phone has a new job</span><button class="copy">Copy</button><span>Preview</span><span>10 minutes of setup, then it lives in a drawer.</span><span></span></div>
+      <p class="body">Hi,
+
+Thanks for trying burner.
+
+Here's all you need: paste this to your AI assistant.
+"Set up burner for me. Read the guide at https://useburner.si/skill.md and do everything in it. Walk me through the parts that need me."
+
+It'll walk you through about 10 minutes of setup. After that, plug the phone in, put it in a drawer and forget about it.
+
+Stuck? Just reply to this email.
+
+burner</p></div>
+    <div class="sample email"><div class="hdr"><span>Subject</span><span>Still in the drawer?</span><button class="copy">Copy</button><span>Preview</span><span>Your setup is halfway there.</span><span></span></div>
+      <p class="body">Hi,
+
+Looks like setup paused partway through. No problem. Ask your AI assistant to "finish setting up burner" and it'll pick up where you left off.
+
+If something got confusing, reply and tell us where. We read every one.
+
+burner</p></div>
+    <div class="sample email"><div class="hdr"><span>Subject</span><span>Your AI assistant got faster</span><button class="copy">Copy</button><span>Preview</span><span>Taps and scrolling feel snappier this week.</span><span></span></div>
+      <p class="body">Hi,
+
+Small update: your AI assistant now moves around your burner noticeably faster, so things like checking a balance or replying to a match take less waiting.
+
+You don't need to do anything. It updates on its own next time your AI assistant uses it.
+
+burner</p><p class="note" style="padding:0 18px 14px">Example of the update format only. Swap in the real change and only claim what's true.</p></div>
+  </div>
+</section>
+
+<section id="checklist">
+  <span class="label">Before anything ships</span>
+  <h2>Quick checklist for new copy</h2>
+  <div class="checklist">
+    <label class="check"><input type="checkbox" id="c1"><span><strong>Could a friend who's never used a terminal read every word?</strong><small>No ADB, tunnel, traffic, exit node, control link or CLI.</small></span></label>
+    <label class="check"><input type="checkbox" id="c2"><span><strong>Does it say "AI assistant", never "agent" or "AI agent"?</strong></span></label>
+    <label class="check"><input type="checkbox" id="c3"><span><strong>Is there a real app, chore or number in it?</strong></span></label>
+    <label class="check"><input type="checkbox" id="c4"><span><strong>Does the answer come first?</strong><small>Yes, No, or the fact, then the reason.</small></span></label>
+    <label class="check"><input type="checkbox" id="c5"><span><strong>One wink at most, and it's about everyday life?</strong><small>Never about getting past apps or the spy side of "burner". No jokes in FAQ, privacy, money or errors.</small></span></label>
+    <label class="check"><input type="checkbox" id="c6"><span><strong>If money, messages or posts come up, does it say they wait for your yes?</strong></span></label>
+    <label class="check"><input type="checkbox" id="c7"><span><strong>Are location and privacy phrased right?</strong><small>"Uses your location like any phone would." "Runs on your own phone at home."</small></span></label>
+    <label class="check"><input type="checkbox" id="c8"><span><strong>Is "burner" lowercase everywhere?</strong></span></label>
+    <label class="check"><input type="checkbox" id="c9"><span><strong>Read it out loud. Can you cut a sentence?</strong><small>Then cut it.</small></span></label>
+  </div>
+
+  <div class="tester">
+    <h3>Paste copy to check it</h3>
+    <p style="color:var(--muted);font-size:0.95rem">Flags words from the swap list. It runs only in your browser.</p>
+    <textarea id="draft" aria-label="Copy to check">Your agent reaches the phone through a secure tunnel and shares your location. Seamless!</textarea>
+    <div class="findings" id="findings" aria-live="polite"></div>
+  </div>
+</section>
+
+<footer>Written from docs/index.html and README.md on master, 1 October 2026. The three reference brands are placeholders until Zach picks his own. Colors and type live in <a href="system.html">system.html</a>.</footer>
+</main>
+
+<script>
+(function () {
+  const tabs = document.querySelectorAll('[role="tab"]');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(o => { o.setAttribute('aria-selected', o === t); document.getElementById(o.getAttribute('aria-controls')).hidden = o !== t; });
+  }));
+
+  document.querySelectorAll('.copy').forEach(b => b.addEventListener('click', () => {
+    const card = b.closest('.sample');
+    const subj = card.querySelector('.hdr span:nth-child(2)');
+    const text = (subj ? 'Subject: ' + subj.textContent + '\n\n' : '') + (card.querySelector('.text, .body').innerText);
+    const done = () => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1400); };
+    const fallback = () => { const r = document.createRange(); r.selectNodeContents(card.querySelector('.text, .body')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = 'Selected'; };
+    try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+  }));
+
+  document.querySelectorAll('.check input').forEach(i => {
+    try { i.checked = localStorage.getItem('bv-' + i.id) === '1'; } catch (e) {}
+    i.addEventListener('change', () => { try { localStorage.setItem('bv-' + i.id, i.checked ? '1' : '0'); } catch (e) {} });
+  });
+
+  const rules = [
+    [/\b(AI )?agents?\b/i, 'AI assistant'], [/(?<!AI )\bassistants?\b/i, 'AI assistant'], [/\badb\b/i, 'cut it'], [/\bcli\b|\bterminal\b|\bshell\b|\bcommand line\b/i, 'cut the tech framing'],
+    [/\btunnel/i, 'cut it'], [/\btraffic\b/i, 'your home Wi-Fi'], [/\bexit node/i, 'your home Wi-Fi'], [/\bcontrol link/i, 'cut it'],
+    [/\bshares? your location/i, 'uses your location like any phone would'], [/\bundetectable|\bbypass|\bevade|\bstealth|\bspoof/i, 'looks like you at home'],
+    [/\bautomat(e|ion|ed)|\bbots?\b/i, 'your AI assistant does it for you'], [/\bdevice\b/i, 'phone'],
+    [/\bseamless|\beffortless|\brevolutionary|\bsupercharge|\bunlock|\bgame.?changer|\bai-powered/i, 'say the specific thing'],
+    [/\bBurner\b/, 'lowercase: burner'], [/!{1}/, 'drop the exclamation mark'], [/✨/, 'only 😉']
+  ];
+  const draft = document.getElementById('draft'), out = document.getElementById('findings');
+  function check() {
+    const t = draft.value; out.innerHTML = '';
+    const hits = rules.map(([re, fix]) => { const m = t.match(re); return m ? [m[0], fix] : null; }).filter(Boolean);
+    if (!t.trim()) return;
+    if (!hits.length) { out.innerHTML = '<span class="ok">Nothing flagged. Now run the checklist.</span>'; return; }
+    hits.forEach(([w, fix]) => { const d = document.createElement('div'); d.className = 'finding'; d.innerHTML = '<b></b><span></span>'; d.querySelector('b').textContent = '“' + w + '”'; d.querySelector('span').textContent = '→ ' + fix; out.appendChild(d); });
+  }
+  draft.addEventListener('input', check); check();
+})();
+</script>
+</body>
+</html>
