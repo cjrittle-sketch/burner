@@ -17,6 +17,19 @@ apps, social apps, store apps that block bots in the browser.
   setups skip this step.
 - A human available once for ~10 minutes to pair the phone (see below).
 
+## First, ask where the user is
+
+Ask which device they are talking to you from, then follow that path:
+
+- **From the spare phone itself:** that phone is the burner phone. Skip any
+  "find a spare phone" advice and do the human steps below on the phone they
+  are holding. For pairing (step 3), have them put Settings and this chat
+  side by side in split screen, so the pairing dialog stays open while they
+  send you the code. Leaving the dialog cancels the code.
+- **From a computer or their everyday phone:** they need the spare phone in
+  hand for the human steps below. If they don't have one yet, stop and tell
+  them what to get.
+
 ## Install
 
 ```bash
