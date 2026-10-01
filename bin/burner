@@ -2362,7 +2362,8 @@ SETUP_APK_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "burner")
 SETUP_APK_VERSION = "v0.3.5"
 SETUP_APK_PKG = "com.tpn.adbautoenable"
 SETUP_VPN_APP = "com.tailscale.ipn"
-SETUP_SHOTS = "setup/setup-{:02d}-{}.png"
+# Full URLs so chat apps can show them; the files also live in setup/.
+SETUP_SHOTS = "https://useburner.si/setup/setup-{:02d}-{}.png"
 
 
 def _setup_sh(*args, timeout=15):

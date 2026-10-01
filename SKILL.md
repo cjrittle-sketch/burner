@@ -78,7 +78,9 @@ the time limit unless a code has already expired.
 Do these on the phone. The agent cannot do them for you.
 
 Walk the user through them one at a time, as part of setup: say what to tap,
-link the screenshot, and wait for them to say it's done before the next
+show its screenshot as an image from https://useburner.si/setup/ (for
+example `![](https://useburner.si/setup/setup-01-tailscale.png)`), never a
+local file path, and wait for them to say it's done before the next
 step. Never hand them a list to do "meanwhile" while you install. Give the
 full Settings path for every tap, never just a screen name. Menus differ by
 brand (paths below are Pixel, with Samsung noted), so know the brand first:
