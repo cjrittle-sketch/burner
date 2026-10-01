@@ -119,10 +119,20 @@ something they said), and ask only if you can't.
      Settings for "Wireless debugging".
 3. **HUMAN REQUIRED:** Tap the words **Wireless debugging** (not the switch)
    to open its screen, tap "Pair device with pairing code", and send the agent
-   the code and the numbers under "IP address & Port" exactly as shown. If
-   they're chatting on this same phone, they should already be in split
-   screen (see above): have them take a screenshot of the dialog and send
-   that instead. Read the IP, port and code off what they send, rather
+   the code and the numbers under "IP address & Port" exactly as shown.
+
+   **If they're chatting on the burner phone itself, this is where people
+   get stuck.** The pairing code only works while its dialog stays open.
+   Closing it, tapping outside it, going Back, or switching to the chat app
+   turns pairing off and the code stops working. So before they tap "Pair
+   device with pairing code", tell them this in plain words and get them
+   into split screen first, Settings in one half and this chat in the other
+   (steps in "First, work out where the user is"). Once the dialog is open,
+   they leave it alone, take a screenshot, and send it from the chat half.
+   If the dialog closes, it's fine: tap "Pair device with pairing code"
+   again for a new code.
+
+   Read the IP, port and code off what they send, rather
    than asking for each value separately. **Turn Tailscale on first** -
    after a reboot it does not auto-start, and the dialog shows the unreachable
    WiFi IP instead of the tailnet IP.
