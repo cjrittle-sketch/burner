@@ -1,8 +1,8 @@
 # burner
 
-> give your AI assistant a physical side phone.
+> Give your AI assistant a physical side phone.
 
-burner hands an AI agent a real, dedicated Android phone it can see and touch:
+burner hands an AI assistant a real, dedicated Android phone it can see and touch:
 read the screen as a UI tree, tap, type, open deep links, take screenshots, and
 pull email verification codes. One CLI: `pc`. Use it for apps with no API, no
 MCP server, and bot-blocking web flows (marketplaces, banking, social, store

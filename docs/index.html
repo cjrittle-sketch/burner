@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>burner · give your AI assistant a physical side phone</title>
-<meta name="description" content="burner gives your AI agent its own Android phone, so it can use the apps you use.">
+<meta name="description" content="Give your AI assistant a spare Android phone at home, so it can use the apps you use. Free, no account.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="alternate" type="text/markdown" href="/skill.md" title="burner skill for agents">
+<link rel="alternate" type="text/markdown" href="/skill.md" title="burner setup guide for your AI assistant">
 <meta property="og:title" content="burner">
 <meta property="og:description" content="Give your AI assistant a physical side phone.">
 <meta property="og:url" content="https://useburner.si/">
@@ -125,7 +125,7 @@
   <h1>Give your AI assistant a physical side phone.</h1>
   <p class="lead">Paste this to your AI assistant:</p>
   <div class="term msg">Set up burner for me. Read the guide at <a href="https://useburner.si/skill.md">https://useburner.si/skill.md</a> and do everything in it. Walk me through the parts that need me.<button class="copy" type="button" data-copy="Set up burner for me. Read the guide at https://useburner.si/skill.md and do everything in it. Walk me through the parts that need me.">Copy</button></div>
-  <p class="note">Your agent reads the guide and handles the rest.</p>
+  <p class="note">Your AI assistant reads the guide and does the rest.</p>
 </div>
 
 <section id="what">
@@ -143,7 +143,7 @@
 <section id="setup">
   <h2>Setup</h2>
   <p>Setup takes about 10 minutes, once. After that, plug the phone in, leave it in a drawer, and never touch it again.</p>
-  <p class="muted">Your agent walks you through setup. Any spare Android phone works.</p>
+  <p class="muted">Your AI assistant walks you through setup. Any spare Android phone works.</p>
 </section>
 
 <section id="faq" style="padding-bottom:8px">
@@ -154,23 +154,27 @@
   </details>
   <details>
     <summary>Does it work when I&rsquo;m away from home?</summary>
-    <div class="panel"><p>Yes. The phone just sits in a drawer at home, plugged in, and your agent reaches it from wherever you are.</p></div>
+    <div class="panel"><p>Yes. The phone stays plugged in at home, and your AI assistant can use it from wherever you are.</p></div>
   </details>
   <details>
     <summary>What do I have to do to set it up?</summary>
-    <div class="panel"><p>About 10 minutes, once. Your agent walks you through every step. Then plug the phone in, leave it in a drawer, and never touch it again.</p></div>
+    <div class="panel"><p>About 10 minutes, once. Your AI assistant walks you through every step.</p></div>
   </details>
   <details>
     <summary>Is my stuff private?</summary>
-    <div class="panel"><p>Yes. It runs on your own phone at home, not in someone else&rsquo;s data center. Sign-in codes come from your email and are never stored.</p></div>
+    <div class="panel"><p>Yes. It runs on your own phone, on your own Wi-Fi at home, not in someone else&rsquo;s data center. There&rsquo;s no burner account and no burner server, so once it&rsquo;s set up nothing you do ever passes through us. Only you and your AI assistant can reach the phone. Sign-in codes come from your email and are never stored.</p></div>
+  </details>
+  <details>
+    <summary>Will apps see it as coming from my home?</summary>
+    <div class="panel"><p>Yes. The phone uses your own Wi-Fi, so apps see a regular phone at your house, not a computer in some faraway data center. It also uses your location like any phone would, so nearby stores, delivery, and local listings match where you live.</p></div>
   </details>
   <details>
     <summary>What if the phone restarts?</summary>
-    <div class="panel"><p>It comes back on its own. It stays in the drawer, and you never touch it.</p></div>
+    <div class="panel"><p>It comes back on its own. You don&rsquo;t need to do anything.</p></div>
   </details>
   <details>
-    <summary>Does it cost anything?</summary>
-    <div class="panel"><p>No. burner is free and open source, and the one other app it uses, Tailscale, is free for personal use. For a normal setup at home, there&rsquo;s nothing to pay for.</p></div>
+    <summary>Do I need to pay or sign up?</summary>
+    <div class="panel"><p>No. burner is free and open source, and there&rsquo;s no burner account or burner server. The one other app it uses, Tailscale, is free for personal use, so a normal setup at home costs nothing.</p></div>
   </details>
 </section>
 </main>
@@ -197,37 +201,54 @@
     });
   });
 
-  // Ease the questions open and closed instead of snapping.
+  // Ease the questions open and closed instead of snapping, one open at a time.
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var questions = [];
   document.querySelectorAll('details').forEach(function (d) {
     var summary = d.querySelector('summary');
     var panel = d.querySelector('.panel');
     if (!summary || !panel) return;
     var anim = null, closing = false;
-    summary.addEventListener('click', function (e) {
-      if (reduceMotion.matches || !d.animate) return;
-      e.preventDefault();
-      var start = d.offsetHeight;
-      if (anim) anim.cancel();
-      d.style.overflow = 'hidden';
-      var end;
-      if (!d.open || closing) {
-        closing = false;
-        d.open = true;
-        d.classList.remove('closing');
-        end = d.offsetHeight;
-      } else {
-        closing = true;
-        d.classList.add('closing');
-        end = d.offsetHeight - panel.offsetHeight;
+    var q = {
+      isOpen: function () { return d.open && !closing; },
+      set: function (open) {
+        if (open === q.isOpen()) return;
+        if (reduceMotion.matches || !d.animate) {
+          if (anim) anim.cancel();
+          anim = null; closing = false;
+          d.classList.remove('closing'); d.style.overflow = '';
+          d.open = open;
+          return;
+        }
+        var start = d.offsetHeight;
+        if (anim) anim.cancel();
+        d.style.overflow = 'hidden';
+        var end;
+        if (open) {
+          closing = false;
+          d.open = true;
+          d.classList.remove('closing');
+          end = d.offsetHeight;
+        } else {
+          closing = true;
+          d.classList.add('closing');
+          end = d.offsetHeight - panel.offsetHeight;
+        }
+        var a = anim = d.animate({ height: [start + 'px', end + 'px'] }, { duration: 300, easing: 'cubic-bezier(.2, .7, .2, 1)' });
+        a.onfinish = function () {
+          if (a !== anim) return;
+          if (closing) { d.open = false; closing = false; d.classList.remove('closing'); }
+          anim = null;
+          d.style.overflow = '';
+        };
       }
-      var a = anim = d.animate({ height: [start + 'px', end + 'px'] }, { duration: 300, easing: 'cubic-bezier(.2, .7, .2, 1)' });
-      a.onfinish = function () {
-        if (a !== anim) return;
-        if (closing) { d.open = false; closing = false; d.classList.remove('closing'); }
-        anim = null;
-        d.style.overflow = '';
-      };
+    };
+    questions.push(q);
+    summary.addEventListener('click', function (e) {
+      e.preventDefault();
+      var open = !q.isOpen();
+      if (open) questions.forEach(function (o) { if (o !== q) o.set(false); });
+      q.set(open);
     });
   });
 </script>
