@@ -359,19 +359,55 @@ def _covers_screen(node, w, h):
     return area >= 0.95 * w * h
 
 
+_OVERLAY_CLASS_HINTS = ("dialog", "bottomsheet", "popup", "dropdown",
+                        "spinner", "menu")
+_CONTAINER_CLASSES = ("viewgroup", "framelayout", "linearlayout",
+                      "relativelayout", "coordinatorlayout", "constraintlayout",
+                      "cardview", "recyclerview", "scrollview", "listview",
+                      "gridview")
+
+
+def _looks_like_overlay(node, w, h):
+    """True if the node looks like a floating overlay (dialog, popup) rather
+    than ordinary content or a layout container.
+
+    A --xy tap that lands on a normal widget (button, text field) or an
+    edge-to-edge layout container (toolbar, nav bar) is exactly what the
+    user asked for — refusing it is a false positive (seen live: the Amazon
+    search toolbar "covered" a tap on the search field, and the search
+    field itself was then flagged as floating). Only a floating *container*
+    — the box of a dialog/popup, not its buttons or text — counts as a
+    blocker, plus any node whose class name says dialog/sheet/popup/menu.
+    Pure function: no adb, unit-testable."""
+    cls = (node.get("class") or "").lower()
+    short = cls.split(".")[-1]
+    if any(k in cls for k in _OVERLAY_CLASS_HINTS):
+        return True
+    r = _bounds_rect(node.get("bounds"))
+    if not r or w <= 0 or h <= 0:
+        return False
+    if short not in _CONTAINER_CLASSES:
+        return False
+    x1, y1, x2, y2 = r
+    # A real dialog/popup is a modest floating box; a layout container
+    # spans most of the screen width (toolbar, nav bar, list rows).
+    return (x2 - x1) < 0.85 * w and (y2 - y1) < 0.85 * h
+
+
 def topmost_occluder(nodes, x, y, w, h):
-    """Topmost node covering (x, y) that isn't a full-screen container.
+    """Topmost node covering (x, y) that looks like a floating overlay.
 
     For --xy taps there is no named target: the tap lands on the topmost
     node at the point. Full-screen window/root containers are the expected
-    background, not obstructions — only a smaller overlay (dialog, popup,
-    banner) counts as blocking. Returns the blocker node or None.
-    Pure function: no adb, unit-testable."""
+    background, and ordinary edge-to-edge layout containers (toolbars, nav
+    bars) are the tap's natural landing spot — neither counts as blocking.
+    Only a floating overlay (dialog, popup) that would steal the tap does.
+    Returns the blocker node or None. Pure function: no adb, unit-testable."""
     cover = None
     for n in nodes:  # document order; later = on top, so last match wins
         r = _bounds_rect(n.get("bounds"))
         if r and r[0] <= x <= r[2] and r[1] <= y <= r[3]:
-            if not _covers_screen(n, w, h):
+            if not _covers_screen(n, w, h) and _looks_like_overlay(n, w, h):
                 cover = n
     return cover
 

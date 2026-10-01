@@ -64,6 +64,14 @@ OVERLAY_XML = """<hierarchy rotation="0">
   </node>
 </hierarchy>"""
 
+TOOLBAR_XML = """<hierarchy rotation="0">
+  <node text="" class="android.widget.FrameLayout" bounds="[0,0][1080,2400]" clickable="false" enabled="true" focused="false" checked="false">
+    <node text="" class="android.view.ViewGroup" bounds="[0,0][1080,200]" clickable="false" enabled="true" focused="false" checked="false">
+      <node text="Search" class="android.widget.EditText" bounds="[100,40][980,160]" clickable="true" enabled="true" focused="false" checked="false"/>
+    </node>
+  </node>
+</hierarchy>"""
+
 
 def _wnode(text="", desc="", cls="android.widget.TextView", clickable=False,
            enabled=True, bounds="[0,0][10,10]", center=(5, 5)):
@@ -588,6 +596,35 @@ class JsonOutputTests(OfflineTestCase):
                          % (out.getvalue(), err.getvalue()))
         data = json.loads(out.getvalue())
         self.assertTrue(data["ok"])
+
+    def test_tap_xy_toolbar_container_not_blocking(self):
+        # Live false positive (2026-09-30): the Amazon search toolbar
+        # container covered the tap point and the --xy tap was refused.
+        # An edge-to-edge layout container is the tap's natural landing
+        # spot, not an obstruction: tap proceeds.
+        self._tap_mocks(TOOLBAR_XML)
+        args = self.parse(["tap", "--xy", "0.5,0.04", "--json"])
+        with self.cap() as (out, err):
+            rc = pc.cmd_tap(args)
+        self.assertEqual(rc, 0, "stdout=%r stderr=%r"
+                         % (out.getvalue(), err.getvalue()))
+        data = json.loads(out.getvalue())
+        self.assertTrue(data["ok"])
+
+    def test_looks_like_overlay(self):
+        w, h = 1080, 2400
+        dialog = {"class": "android.widget.FrameLayout",
+                  "bounds": "[500,1100][600,1300]"}   # floating box
+        toolbar = {"class": "android.view.ViewGroup",
+                   "bounds": "[0,0][1080,200]"}       # edge-to-edge
+        sheet_cls = {"class": "android.widget.BottomSheet",
+                     "bounds": "[0,1800][1080,2400]"}  # class says sheet
+        fullscreen = {"class": "android.widget.FrameLayout",
+                      "bounds": "[0,0][1080,2400]"}
+        self.assertTrue(pc._looks_like_overlay(dialog, w, h))
+        self.assertFalse(pc._looks_like_overlay(toolbar, w, h))
+        self.assertTrue(pc._looks_like_overlay(sheet_cls, w, h))
+        self.assertFalse(pc._looks_like_overlay(fullscreen, w, h))
 
     def test_json_wait_timeout_errors_to_stderr(self):
         self.allow("u2sock", return_value=pc.U2_NOT_FOUND)
