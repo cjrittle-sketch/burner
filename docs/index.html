@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>burner · give your AI a physical side phone</title>
+<meta name="description" content="burner gives your AI agent its own Android phone, so it can use the apps you use.">
+<link rel="icon" href="/logo.png?v=12">
+<link rel="alternate" type="text/markdown" href="/skill.md" title="burner skill for agents">
+<meta property="og:title" content="burner">
+<meta property="og:description" content="Give your AI a physical side phone.">
+<meta property="og:url" content="https://useburner.si/">
+<style>
+  :root {
+    --paper: #f6f1e7;
+    --ink: #2a2420;
+    --muted: #857b70;
+    --rule: #e2d9ca;
+    --accent: #b5532a;
+    --code-bg: #2a2420;
+    --code-ink: #efe7da;
+    --serif: "Didot", "Bodoni 72", "Bodoni MT", "Playfair Display", "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--accent); }
+  .wrap { max-width: 600px; margin: 0 auto; padding: 0 24px; }
+
+  header.top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 28px 0;
+  }
+  .wordmark { font-family: var(--serif); font-size: 26px; letter-spacing: -0.01em; text-decoration: none; display: inline-flex; align-items: center; }
+  .wordmark img { width: 28px; height: 28px; background: transparent; border: 0; border-radius: 0; box-shadow: none; display: block; margin-right: 10px; }
+
+  .hero { text-align: center; padding: 72px 0 56px; }
+  .mark { display: block; width: 150px; height: 150px; margin: 0 auto 28px; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+  h1 {
+    font-family: var(--serif); font-weight: 400;
+    font-size: clamp(38px, 8vw, 56px); line-height: 1.08; letter-spacing: -0.015em;
+    margin: 0 0 20px;
+  }
+  .sub { color: var(--muted); font-size: 17px; margin: 0 auto 36px; max-width: 470px; }
+  .lead { font-size: 15px; margin: 0 0 12px; }
+
+  .term {
+    position: relative; text-align: left;
+    background: var(--code-bg); color: var(--code-ink);
+    border-radius: 8px; padding: 16px 92px 16px 18px;
+    font: 14px/1.55 var(--mono);
+    overflow-x: auto; white-space: pre;
+  }
+  .term.msg { white-space: normal; overflow-wrap: anywhere; }
+  .term a { color: var(--code-ink); text-decoration-color: #5a4f46; }
+  .term a:hover { text-decoration-color: var(--accent); }
+  .copy {
+    position: absolute; top: 10px; right: 10px;
+    background: transparent; color: var(--code-ink);
+    border: 1px solid #5a4f46; border-radius: 6px;
+    font: 12px var(--sans); padding: 5px 10px; cursor: pointer;
+  }
+  .copy:hover { border-color: var(--accent); }
+  .note { color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+  section { border-top: 1px solid var(--rule); padding: 44px 0; }
+  h2 { font-family: var(--serif); font-weight: 400; font-size: 28px; margin: 0 0 16px; letter-spacing: -0.01em; }
+  p { margin: 0 0 14px; }
+  .muted { color: var(--muted); }
+  ul.plain { list-style: none; padding: 0; margin: 0; }
+  ul.plain li { padding: 12px 0; border-top: 1px solid var(--rule); }
+
+  details { border-top: 1px solid var(--rule); }
+  summary {
+    list-style: none; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 0; font-size: 17px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::after {
+    content: ""; width: 8px; height: 8px; margin-right: 4px;
+    border-right: 1.5px solid var(--accent); border-bottom: 1.5px solid var(--accent);
+    transform: rotate(45deg); transition: transform .2s ease;
+  }
+  details[open] summary::after { transform: rotate(-135deg); }
+  .panel { padding: 0 0 26px; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+    padding: 28px 0 56px; color: var(--muted); font-size: 14px;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <a class="wordmark" href="/"><img src="/logo.png?v=12" alt="" width="28" height="28">burner</a>
+</header>
+
+<main>
+<div class="hero">
+  <img class="mark" src="/logo.png?v=12" alt="burner logo" width="150" height="150">
+  <h1>Give your AI a physical side phone.</h1>
+  <p class="sub">burner gives your AI agent its own Android phone, so it can use the apps you use.</p>
+  <p class="lead">Paste this to your AI assistant:</p>
+  <div class="term msg">Set up burner for me. Read the guide at <a href="https://useburner.si/skill.md">https://useburner.si/skill.md</a> and do everything in it. Walk me through the parts that need me.<button class="copy" type="button" data-copy="Set up burner for me. Read the guide at https://useburner.si/skill.md and do everything in it. Walk me through the parts that need me.">Copy</button></div>
+  <p class="note">Your agent reads the guide and handles the rest.</p>
+</div>
+
+<section id="what">
+  <h2>What it can do for you</h2>
+  <ul class="plain">
+    <li>&ldquo;Screen my Tinder matches and tell me who&rsquo;s worth a reply.&rdquo;</li>
+    <li>&ldquo;Keep my Snapchat streaks alive while I&rsquo;m on vacation.&rdquo;</li>
+    <li>&ldquo;Spot underpriced flips on Vinted before anyone else sees them.&rdquo;</li>
+    <li>&ldquo;Check whether my paycheck landed and tell me the balance.&rdquo;</li>
+    <li>&ldquo;Message that Marketplace seller and offer 20 percent less.&rdquo;</li>
+    <li>&ldquo;Order my usual from the store app that never works in my browser.&rdquo;</li>
+  </ul>
+</section>
+
+<section id="setup">
+  <h2>Setup</h2>
+  <p>Setup takes about 10 minutes, once. After that, plug the phone in, leave it in a drawer, and never touch it again.</p>
+  <p class="muted">Your agent walks you through setup. Any spare Android phone works.</p>
+</section>
+
+<section id="faq" style="padding-bottom:8px">
+  <h2>Questions</h2>
+  <details>
+    <summary>Will it buy things on its own?</summary>
+    <div class="panel"><p>Never without your explicit okay. Every purchase, message, or post waits for your yes.</p></div>
+  </details>
+  <details>
+    <summary>Does it work when I&rsquo;m away from home?</summary>
+    <div class="panel"><p>Yes. The phone just sits in a drawer at home, plugged in, and your agent reaches it from wherever you are.</p></div>
+  </details>
+  <details>
+    <summary>What do I have to do to set it up?</summary>
+    <div class="panel"><p>About 10 minutes, once. Your agent walks you through every step. Then plug the phone in, leave it in a drawer, and never touch it again.</p></div>
+  </details>
+  <details>
+    <summary>Is my stuff private?</summary>
+    <div class="panel"><p>Yes. It runs on your own phone at home, not in someone else&rsquo;s data center. Sign-in codes come from your email and are never stored.</p></div>
+  </details>
+  <details>
+    <summary>What if the phone restarts?</summary>
+    <div class="panel"><p>It comes back on its own. It stays in the drawer, and you never touch it.</p></div>
+  </details>
+  <details>
+    <summary>Does it cost anything?</summary>
+    <div class="panel"><p>No. burner is free and open source, and the one other app it uses, Tailscale, is free for personal use. For a normal setup at home, there&rsquo;s nothing to pay for.</p></div>
+  </details>
+</section>
+</main>
+
+<footer>
+  <span>MIT · author Muse · © 2026</span>
+  <span><a href="https://github.com/useburner/burner">Source</a> · <a href="mailto:dev@useburner.si">dev@useburner.si</a></span>
+</footer>
+
+</div>
+<script>
+  document.querySelectorAll('.copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.getAttribute('data-copy');
+      var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(t).then(done, function () {});
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = t; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    });
+  });
+</script>
+</body>
+</html>

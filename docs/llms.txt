@@ -1,0 +1,29 @@
+# burner
+
+> give your AI a physical side phone.
+
+burner hands an AI agent a real, dedicated Android phone it can see and touch:
+read the screen as a UI tree, tap, type, open deep links, take screenshots, and
+pull email verification codes. One CLI: `pc`. Use it for apps with no API, no
+MCP server, and bot-blocking web flows (marketplaces, banking, social, store
+apps).
+
+## Install
+
+curl -fsSL https://useburner.si/install.sh | bash
+
+Installs to ~/burner (or $BURNER_DIR). No sudo. Safe to re-run.
+
+## For agents
+
+- Read the full skill first: https://useburner.si/skill.md
+- Pairing the phone needs a human once, about 10 minutes (`pc setup` guides it).
+  After that, reboots need no human action.
+- Codes come from email, never SMS. Never buy, send, or post without explicit
+  human approval for that specific action.
+
+## Links
+
+- Skill: https://useburner.si/skill.md
+- Source: https://github.com/useburner/burner
+- Contact: dev@useburner.si
