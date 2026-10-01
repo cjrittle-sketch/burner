@@ -60,6 +60,10 @@ pairing codes expire in about a minute.
 
 Do these on the phone. The agent cannot do them for you.
 
+Walk the user through them one at a time, as part of setup: say what to tap,
+link the screenshot, and wait for them to say it's done before the next
+step. Never hand them a list to do "meanwhile" while you install.
+
 1. **HUMAN REQUIRED:** Connect the phone to WiFi, plug it into a charger, and
    install Tailscale from the Play Store. Sign in, leave it connected, and set
    Tailscale battery usage to Unrestricted so Android does not kill it.
