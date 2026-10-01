@@ -41,18 +41,13 @@ code and IP & port line as shown, or on the same phone (in split screen) a
 screenshot of the dialog (never
 ask for "the pairing port" by name; the code expires fast; turn Tailscale on first so
 the dialog shows the tailnet IP). After the one-time `adb pair`, the agent
-installs **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
-downloaded from GitHub; warn the user their assistant may ask to reach
-api.github.com), grants
-it `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization; then
-does the app's one-time self-pairing itself (`burner setup --step self-pair`;
-the phone flips through Settings on its own, nothing to tap). From
-then on ADB re-enables on every boot on the fixed port **5555**, so
-`ADB_PORT="5555"` in `config.env` is permanent - reboots need no human action.
-The agent also sets Always-on VPN for Tailscale
-(`adb shell settings put secure always_on_vpn_app com.tailscale.ipn`, lockdown
-left off) so Tailscale auto-starts after reboot; without it the phone is
-unreachable until a human opens the app.
+runs `burner setup --step verify` and gets burner green first. Then it
+finishes the phone with burner itself, nothing for the user to tap: screen
+stays awake while charging (`stay-awake`), lock screen off (`screen-lock`;
+if there's a PIN only the user can remove it), **adb-auto-enable** installed
+from GitHub and self-paired (warn the user their assistant may ask to reach
+api.github.com), Always-on VPN for Tailscale (lockdown off), and adbd pinned
+to port **5555** (`fix-port`). After that, reboots need no human action.
 
 Security: port 5555 listens on the phone's WiFi and tailnet interfaces (never
 the internet; ADB is unencrypted, so trusted networks only). Any new computer

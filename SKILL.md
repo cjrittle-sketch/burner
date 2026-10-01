@@ -99,35 +99,37 @@ brand first: menus differ (paths below are Pixel, with Samsung noted).
    WiFi IP instead of the tailnet IP.
    (Screenshots: `setup/setup-04-pairing-dialog.png`,
    `setup/setup-05-wireless-debugging-screen.png`.)
-4. The agent runs the one-time pairing (`adb pair`). Before the next part,
-   tell the user you'll download a small free app from GitHub, so if their
-   assistant asks to reach api.github.com or github.com, that's expected.
-   Then the agent installs
-   **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
-   https://github.com/mouldybread/adb-auto-enable/releases), grants it
-   `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization.
-   Then it does the app's one-time self-pairing itself with
-   `burner setup --step self-pair`: it opens the app once, opens the pairing
-   dialog in Settings, reads the code off the screen, and hands it to the
-   app. Nothing for the user to tap; tell them the phone will flip through
-   Settings on its own for a few seconds.
-   (Screenshot: `setup/setup-06-adb-auto-enable.png`.)
-5. From then on the app re-enables ADB on every boot and pins adbd to the
-   fixed port **5555**. Put `ADB_PORT="5555"` in `config.env` once - the
-   random wireless-debugging port is never used again, and reboots need no
-   human action.
-6. The agent sets Always-on VPN for Tailscale over adb, so Tailscale
-   auto-starts after reboot (without it the phone is unreachable until a
-   human opens the app manually):
-
-   ```bash
-   adb -s <device> shell settings put secure always_on_vpn_app com.tailscale.ipn
-   ```
-
-   Leave lockdown off (default): if Tailscale ever fails, the phone still
-   has normal internet. Verify with
-   `settings get secure always_on_vpn_app` returning `com.tailscale.ipn`.
-   (Screenshot: `setup/setup-07-vpn-settings.png`.)
+4. The agent runs the one-time pairing (`adb pair`), then
+   `burner setup --step verify` (`burner doctor`). **burner must be green
+   before anything else**: the remaining steps are niceties, and the agent
+   does them itself with burner, so there is nothing more for the user to
+   tap except removing a PIN (step 5). Tell them the phone will flip through
+   Settings on its own for a bit.
+5. The agent finishes the phone with burner, one `burner setup --step` each:
+   - `stay-awake`: screen stays on while charging, so the phone never
+     sleeps mid-task.
+   - `screen-lock`: turns off the lock screen so the phone opens straight to
+     the home screen after a restart. If the phone has a PIN, pattern or
+     password, burner can't remove it (it needs their PIN): ask the user to
+     do it in Settings > Security & privacy > Device unlock > Screen lock >
+     None (Samsung: Settings > Lock screen > Screen lock type > None).
+   - `install-adb-auto-enable`: tell the user first that this downloads a
+     small free app from GitHub, so if their assistant asks to reach
+     api.github.com or github.com, that's expected. Installs
+     **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
+     https://github.com/mouldybread/adb-auto-enable/releases), grants it
+     `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization.
+   - `self-pair`: opens the app once, opens the pairing dialog in Settings,
+     reads the code off the screen, and hands it to the app.
+     (Screenshot: `setup/setup-06-adb-auto-enable.png`.)
+   - `always-on-vpn`: sets Always-on VPN for Tailscale, so Tailscale starts
+     itself after a reboot (lockdown stays off, so if Tailscale ever fails
+     the phone still has normal internet).
+     (Screenshot: `setup/setup-07-vpn-settings.png`.)
+   - `fix-port`: pins adbd to port **5555** and writes `ADB_PORT="5555"` to
+     `config.env`. From then on the app re-enables ADB on every boot, the
+     random wireless-debugging port is never used again, and reboots need
+     no human action.
 
 Leave the phone plugged in and on WiFi. Done.
 

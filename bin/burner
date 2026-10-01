@@ -2772,6 +2772,59 @@ def _run_self_pair(args):
     return 0
 
 
+def _check_stay_awake():
+    v = _setup_get_setting("global", "stay_on_while_plugged_in")
+    if v is None:
+        return None
+    return v == "7"
+
+
+def _run_stay_awake(args):
+    # 7 = stay on while charging from AC, USB or wireless.
+    r = adb("shell", "settings", "put", "global", "stay_on_while_plugged_in",
+            "7", timeout=15)
+    if r.returncode != 0 or not _check_stay_awake():
+        print("could not turn on Stay awake while charging.", file=sys.stderr)
+        return 1
+    print("screen now stays on while the phone is charging.")
+    return 0
+
+
+def _setup_has_secure_lock():
+    """True if a PIN, pattern or password is set, None if we can't tell."""
+    out = _setup_sh("locksettings", "verify")
+    if out is None:
+        return None
+    return "verified successfully" not in out
+
+
+def _check_screen_lock():
+    secure = _setup_has_secure_lock()
+    if secure is None:
+        return None
+    if secure:
+        return False
+    return _setup_sh("locksettings", "get-disabled") == "true"
+
+
+def _run_screen_lock(args):
+    secure = _setup_has_secure_lock()
+    if secure:
+        print("the phone has a PIN, pattern or password, so it locks after a "
+              "restart and burner can't get in. Ask the user to remove it "
+              "(it needs their PIN, so only they can): Settings > Security & "
+              "privacy > Device unlock > Screen lock > enter PIN > None (on "
+              "Samsung: Settings > Lock screen > Screen lock type > None). "
+              "Then re-run this step.", file=sys.stderr)
+        return 1
+    r = adb("shell", "locksettings", "set-disabled", "true", timeout=15)
+    if r.returncode != 0 or not _check_screen_lock():
+        print("could not turn off the swipe lock screen.", file=sys.stderr)
+        return 1
+    print("lock screen off: the phone opens straight to the home screen.")
+    return 0
+
+
 def _run_always_on_vpn(args):
     lock = _setup_get_setting("secure", "always_on_vpn_lockdown")
     if lock == "1":
@@ -2873,6 +2926,15 @@ SETUP_STEPS = [
          "to the agent exactly as shown. On the same phone, in split screen, "
          "send a screenshot of the dialog instead. Codes expire in about a minute, so send "
          "them fast. Keep the phone in hand.")},
+    {"name": "verify", "kind": "agent", "title": "Verify with burner doctor",
+     "shot": None, "check": _check_verify, "run": _run_verify,
+     "instruction": None},
+    {"name": "stay-awake", "kind": "agent", "title": "Stay awake while charging",
+     "shot": None, "check": _check_stay_awake, "run": _run_stay_awake,
+     "instruction": None},
+    {"name": "screen-lock", "kind": "agent", "title": "Turn off the lock screen",
+     "shot": None, "check": _check_screen_lock, "run": _run_screen_lock,
+     "instruction": None},
     {"name": "install-adb-auto-enable", "kind": "agent",
      "title": "Install adb-auto-enable", "shot": None,
      "check": _check_install_app, "run": _run_install_app,
@@ -2890,9 +2952,6 @@ SETUP_STEPS = [
      "instruction": None},
     {"name": "fix-port", "kind": "agent", "title": "Pin adbd to port 5555",
      "shot": None, "check": _check_fix_port, "run": _run_fix_port,
-     "instruction": None},
-    {"name": "verify", "kind": "agent", "title": "Verify with burner doctor",
-     "shot": None, "check": _check_verify, "run": _run_verify,
      "instruction": None},
 ]
 
