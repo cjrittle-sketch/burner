@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Burner Color and Type</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Atkinson+Hyperlegible+Next:ital,wght@0,300..800;1,400&family=Martian+Mono:wdth,wght@75..112.5,300..700&display=swap">
+<style>
+/* Layout: a brand board built around the Wink Phone logo. Friendly bold headlines, mono labels, swatches as chips. */
+:root{
+  /* brand constants (never theme-swapped) */
+  --b-handset:#1B1D22; --b-graphite:#4A505C; --b-wire:#9AA0AD; --b-lcd:#E6E8EC; --b-ash:#F4F5F8;
+  --b-burn:#FF6A13; --b-burn-deep:#B93E00; --b-fuse:#3D5AFE; --b-tether:#127A6C; --b-fault:#C8174A;
+  /* page chrome tokens (light) */
+  --bg:#F4F5F8; --surface:#E6E8EC; --fg:#1B1D22; --muted:#4A505C; --line:#D6DAE1; --accent:#B93E00; --chip:#1B1D22; --chip-fg:#F4F5F8;
+  --display:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:"Atkinson Hyperlegible Next","Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Martian Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1B1D22;--surface:#23262D;--fg:#E8EAEE;--muted:#9AA0AD;--line:#30343D;--accent:#FF8A4C;--chip:#E6E8EC;--chip-fg:#1B1D22;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1B1D22;--surface:#23262D;--fg:#E8EAEE;--muted:#9AA0AD;--line:#30343D;--accent:#FF8A4C;--chip:#E6E8EC;--chip-fg:#1B1D22;color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,40px);padding-block:0 80px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.02;letter-spacing:-.01em}
+h2{font-size:clamp(1.6rem,3.2vw,2.3rem);font-weight:800}
+h3{font-size:1.05rem;font-weight:750;letter-spacing:0}
+p{margin:0;max-width:65ch}
+.label{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.86em}
+a{color:var(--accent)}
+section{display:grid;gap:28px;padding-block:64px 0}
+.sec-head{display:grid;gap:10px;border-top:2px solid var(--fg);padding-top:14px}
+.sec-head .label{color:var(--fg)}
+.lede{color:var(--muted);font-size:1.05rem}
+
+/* masthead */
+.mast{display:grid;gap:22px;padding-block:48px 8px}
+.mast-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.mast h1{font-size:clamp(3.2rem,12vw,9rem);font-weight:900;letter-spacing:-.03em;line-height:.88}
+.mast h1 .dot{color:var(--b-burn)}
+.mast-logo{display:flex;align-items:center;gap:.08em}.mast-logo svg{width:.95em;height:.95em;flex:none}
+.mast p{font-size:1.15rem;max-width:58ch}
+.assume{font-size:.88rem;color:var(--muted);border-left:3px solid var(--b-fuse);padding-left:12px}
+
+/* brief */
+.brief{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.brief>div{background:var(--bg);padding:20px;display:grid;gap:10px;align-content:start;min-width:0}
+.brief ul{margin:0;padding-left:18px;display:grid;gap:4px;color:var(--muted);font-size:.95rem}
+.brief ul b{color:var(--fg);font-weight:650}
+
+/* competitor strip */
+.comp{display:grid;gap:12px}
+.comp-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.comp-chip{display:grid;gap:6px;font-size:.85rem;min-width:0}
+.comp-chip i{display:block;height:44px;border-radius:3px}
+.comp-chip span{color:var(--muted);font-size:.78rem}
+.comp-chip.us i{outline:2px solid var(--fg);outline-offset:2px}
+.note{font-size:.82rem;color:var(--muted)}
+
+/* swatches */
+.swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.sw{display:grid;grid-template-rows:auto 1fr;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--bg);min-width:0}
+.sw-color{height:150px;padding:12px;display:flex;flex-direction:column;justify-content:space-between;font-family:var(--mono);font-size:.7rem;letter-spacing:.05em;text-transform:uppercase}
+.sw-color b{font-family:var(--display);font-size:1.35rem;text-transform:none;letter-spacing:-.01em;font-weight:800}
+.sw-meta{padding:12px;display:grid;gap:8px;font-size:.88rem}
+.sw-meta .hexrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hex{font-family:var(--mono);font-size:.9rem;font-weight:600}
+.copy{font-family:var(--mono);font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;border:1px solid var(--line);background:transparent;color:var(--fg);padding:4px 8px;border-radius:3px;cursor:pointer}
+.copy:hover{border-color:var(--fg)}
+.copy:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sw-meta .rgb{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.sw-meta p{color:var(--muted)}
+
+/* ratio */
+.ratio{display:flex;height:64px;border-radius:4px;overflow:hidden;border:1px solid var(--line)}
+.ratio div{display:flex;align-items:flex-end;padding:8px;font-family:var(--mono);font-size:.68rem;letter-spacing:.04em;min-width:0;overflow:hidden;white-space:nowrap}
+
+/* contrast table */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:.9rem}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-family:var(--mono);font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:500}
+tr:last-child td{border-bottom:0}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pair{display:inline-flex;align-items:center;justify-content:center;width:84px;height:32px;border-radius:3px;font-weight:700;font-size:.9rem}
+.pill{font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.ok{color:var(--b-tether)} .lg{color:#9A6A00} .no{color:var(--b-fault)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .ok{color:#4FC2B1}:root:not([data-theme="light"]) .lg{color:#FFB627}:root:not([data-theme="light"]) .no{color:#FF6B8E}}
+:root[data-theme="dark"] .ok{color:#4FC2B1}:root[data-theme="dark"] .lg{color:#FFB627}:root[data-theme="dark"] .no{color:#FF6B8E}
+
+/* type */
+.type-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.spec{border:1px solid var(--line);border-radius:4px;padding:22px;display:grid;gap:14px;align-content:start;min-width:0}
+.spec .big{font-size:clamp(2.6rem,6vw,4rem);line-height:.95}
+.spec .why{color:var(--muted);font-size:.92rem}
+.spec .meta{display:flex;gap:6px;flex-wrap:wrap}
+.spec .meta span{font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--line);padding:3px 7px;border-radius:3px;color:var(--muted)}
+.scale{display:grid;gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.scale-row{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:baseline;padding:14px 18px;border-bottom:1px solid var(--line);min-width:0}
+.scale-row:last-child{border-bottom:0}
+.scale-row .label{line-height:1.5}
+.scale-row>div:last-child{min-width:0;overflow-wrap:anywhere}
+@media (max-width:560px){.scale-row{grid-template-columns:1fr;gap:6px}}
+
+.ansi{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.ansi div{display:flex;gap:10px;align-items:center;font-size:.86rem;min-width:0}
+.ansi i{flex:none;width:18px;height:18px;border-radius:2px}
+
+.chat-demo{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.chat{border-radius:8px;padding:18px;display:grid;gap:10px;align-content:start;font-size:.92rem;min-width:0}
+.chat.light{background:#FAFAF7;color:#1F1E1B;border:1px solid var(--line)}
+.chat.dark{background:#1F1F1E;color:#ECEBE6;border:1px solid #333}
+.msg{max-width:88%;line-height:1.45}
+.msg.user{justify-self:end;padding:9px 13px;border-radius:14px}
+.chat.light .msg.user{background:#ECEBE4}.chat.dark .msg.user{background:#2E2E2C}
+.bcard{border-radius:8px;padding:10px 12px;display:grid;gap:6px;font-size:.85rem}
+.chat.light .bcard{background:var(--b-ash);color:var(--b-handset);border:1px solid #D6DAE1}
+.chat.dark .bcard{background:var(--b-handset);color:var(--b-lcd);border:1px solid #30343D}
+.bcard-h{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid currentColor;opacity:.9}
+.mk{display:inline-flex;align-items:center;gap:6px}.ico{display:inline-block;flex:none;border-radius:3px}
+.bstep{display:flex;gap:8px;align-items:center}
+.bstep i{flex:none;width:8px;height:8px;border-radius:50%}
+.chat.light .bstep.ok i{background:var(--b-tether)}.chat.dark .bstep.ok i{background:#3FB7A6}
+.chat.light .bstep.run i{background:var(--b-fuse)}.chat.dark .bstep.run i{background:#8C9BFF}
+.chat.light .bstep.need i{background:var(--b-fault)}.chat.dark .bstep.need i{background:#FF4D7A}
+.bstep.need{font-weight:650}
+.ghost{display:inline-flex;align-items:center;padding:14px 4px;font-weight:650;text-decoration:underline;text-underline-offset:3px;color:var(--b-handset)}
+/* rules */
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.rule-col{display:grid;gap:0;border:1px solid var(--line);border-radius:4px;overflow:hidden;align-content:start}
+.rule-col h3{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+.rule-col h3 i{width:12px;height:12px;border-radius:2px;display:inline-block}
+.rule-col ol{margin:0;padding:0;list-style:none}
+.rule-col li{padding:12px 18px;border-bottom:1px solid var(--line);font-size:.93rem;display:grid;gap:2px}
+.rule-col li:last-child{border-bottom:0}
+.rule-col li b{font-weight:650}
+.rule-col li span{color:var(--muted);font-size:.87rem}
+
+/* places */
+.places{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.place{border:1px solid var(--line);border-radius:4px;padding:14px;display:grid;gap:8px;align-content:start;font-size:.88rem;min-width:0}
+.place .bar{display:flex;height:10px;border-radius:2px;overflow:hidden}
+.place .bar i{display:block;height:100%}
+.place p{color:var(--muted)}
+
+/* ===== SAMPLE LAYOUT: fixed brand colors, single look by design ===== */
+.sample-frame{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.browser-bar{background:var(--surface);display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+.browser-bar i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.browser-bar span{font-family:var(--mono);font-size:.7rem;color:var(--muted);margin-left:8px;background:var(--bg);padding:3px 10px;border-radius:3px}
+.site{background:var(--b-ash);color:var(--b-handset);font-family:var(--body)}
+.site-nav{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding:18px clamp(16px,4vw,40px);border-bottom:1.5px solid var(--b-handset)}
+.wordmark{font-family:var(--display);font-weight:900;font-size:1.35rem;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.site-nav nav{display:flex;gap:20px;font-size:.9rem;flex-wrap:wrap}
+.site-nav nav a{color:var(--b-handset);text-decoration:none}
+.site-hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:clamp(24px,4vw,56px);padding:clamp(28px,5vw,64px) clamp(16px,4vw,40px);align-items:center}
+@media (max-width:820px){.site-hero{grid-template-columns:1fr}}
+.site-hero .eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;display:inline-flex;gap:8px;align-items:center}
+.site-hero .eyebrow i{width:8px;height:8px;border-radius:50%;background:var(--b-tether)}
+.site-hero h2{font-size:clamp(2.2rem,5.6vw,4.4rem);font-weight:900;letter-spacing:-.025em;line-height:.92;margin:14px 0 18px;color:var(--b-handset)}
+.site-hero h2 em{font-style:normal;background:var(--b-handset);color:var(--b-lcd);padding:0 .12em}
+.site-hero p.sub{font-size:1.08rem;color:var(--b-graphite);max-width:46ch}
+.install{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.install code{flex:1 1 260px;background:var(--b-handset);color:var(--b-lcd);font-family:var(--mono);font-size:.82rem;padding:14px 16px;border-radius:4px;display:flex;align-items:center;gap:10px;overflow-x:auto;white-space:nowrap;min-width:0}
+.install code b{color:var(--b-burn);font-weight:500}
+.btn-burn{background:var(--b-burn);color:var(--b-handset);font-family:var(--display);font-weight:800;font-size:.95rem;border:0;border-radius:4px;padding:14px 20px;cursor:pointer;box-shadow:0 3px 0 var(--b-handset)}
+.btn-burn:focus-visible{outline:2px solid var(--b-handset);outline-offset:3px}
+.site-hero .fine{margin-top:12px;font-size:.8rem;color:var(--b-graphite)}
+/* phone */
+.phone{justify-self:center;width:min(100%,290px);background:var(--b-handset);border-radius:28px;padding:12px;box-shadow:0 18px 0 -6px rgba(27,29,34,.22)}
+.screen{background:var(--b-ash);border-radius:18px;overflow:hidden;display:grid}
+.screen-top{display:flex;justify-content:space-between;padding:8px 14px;font-family:var(--mono);font-size:.62rem;color:var(--b-graphite)}
+.agent-log{display:grid;gap:8px;padding:6px 12px 14px}
+.step{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start;font-size:.78rem;line-height:1.35;padding:9px 10px;border-radius:6px;background:#E3E8D8}
+.step b{font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 5px;border-radius:2px;margin-top:1px}
+.step.done b{background:var(--b-tether);color:#F4F5F8}
+.step.run{background:var(--b-handset);color:var(--b-ash)}
+.step.run b{background:#8C9BFF;color:var(--b-handset)}
+.step.next{opacity:.55}
+.step.next b{border:1px solid var(--b-wire)}
+.site-strip{background:var(--b-lcd);display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));border-top:1.5px solid var(--b-handset)}
+.site-strip div{padding:20px clamp(16px,3vw,28px);border-right:1.5px solid var(--b-handset);display:grid;gap:6px;align-content:start}
+.site-strip div:last-child{border-right:0}
+.site-strip .k{font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--b-graphite)}
+.site-strip h4{margin:0;font-family:var(--display);font-weight:800;font-size:1.05rem}
+.site-strip p{font-size:.88rem;color:var(--b-graphite)}
+.annot{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;font-size:.86rem;color:var(--muted)}
+.annot div{display:flex;gap:10px;min-width:0}
+.annot b{font-family:var(--mono);font-size:.7rem;color:var(--fg);flex:none;width:22px;height:22px;border:1px solid var(--fg);border-radius:50%;display:grid;place-items:center}
+
+/* social card */
+.social{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card-og{aspect-ratio:1200/630;max-width:100%;border-radius:6px;padding:clamp(16px,3vw,28px);display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.card-og.dark{background:var(--b-handset);color:var(--b-ash)}
+.card-og.light{background:var(--b-ash);color:var(--b-handset);border:1px solid var(--line)}
+.card-og .t{font-family:var(--display);font-weight:900;font-size:clamp(1.4rem,3vw,2rem);line-height:.95;letter-spacing:-.02em}
+.card-og .f{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;gap:8px}
+.card-og .t .u{color:var(--b-burn)}
+
+footer{padding-top:64px;font-size:.85rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+@media (prefers-reduced-motion:no-preference){.step.run b{animation:blink 1.2s steps(2,start) infinite}@keyframes blink{to{opacity:.35}}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="a-sym" viewBox="0 0 120 120"><rect x="31" y="4" width="58" height="112" rx="14" fill="#1B1D22"/><rect x="35.5" y="8.5" width="49" height="103" rx="10" fill="#FF6A13"/><circle cx="60" cy="16" r="2.6" fill="#1B1D22"/><polyline points="45,49 56,60 45,71" fill="none" stroke="#1B1D22" stroke-width="7" stroke-linecap="square"/><rect x="60" y="67" width="16" height="6.5" fill="#1B1D22"/></symbol>
+  <symbol id="a-icon" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#FF6A13"/><rect x="18" y="7" width="28" height="50" rx="7" fill="#1B1D22"/><polyline points="24,24 31.5,31.5 24,39" fill="none" stroke="#FF6A13" stroke-width="4.5" stroke-linecap="square"/><rect x="33" y="36.5" width="8" height="4.5" fill="#FF6A13"/></symbol>
+</defs></svg>
+<div class="wrap">
+
+<header class="mast">
+  <div class="mast-top"><span>Brand system · color + type</span><span>v0.2 · aligned to logo A · 2026-10-01</span></div>
+  <h1 class="mast-logo"><svg viewBox="0 0 120 120" aria-hidden="true"><use href="#a-sym"/></svg>burner<span class="dot">_</span></h1>
+  <p>The color and typography system for Burner, which lets your AI assistant use a real Android phone for you. It's built around the Wink Phone logo: a plain touchscreen phone whose orange screen winks back at you. Cool ink and paper neutrals do the quiet work, and the logo's orange is the one loud color.</p>
+</header>
+
+<!-- ANALYSIS -->
+<section id="brief">
+  <div class="sec-head"><span class="label">Analysis</span><h2>What the system has to carry</h2></div>
+  <div class="brief">
+    <div><span class="label">Personality</span><h3>A capable stand-in with good manners</h3>
+      <ul><li><b>Direct.</b> You ask, your assistant does it on a real phone.</li><li><b>Scrappy.</b> "Burner" means a disposable device, a little underground.</li><li><b>Trustworthy.</b> It's acting on someone's phone, so it has to look in control.</li></ul></div>
+    <div><span class="label">Audience</span><h3>People who already work through an AI assistant</h3>
+      <ul><li><b>Heavy assistant users</b> who want it to handle app-only tasks.</li><li><b>Builders</b> wiring phone access into their own agents.</li><li><b>Early adopters</b> who find tools on X and GitHub, not trade shows.</li></ul></div>
+    <div><span class="label">Where it shows up</span><h3>Mostly inside someone else's app</h3>
+      <ul><li><b>In the assistant's chat</b>, as a small card showing what it's doing on the phone.</li><li><b>useburner.si</b> and the web installer.</li><li><b>GitHub README</b> in light and dark mode.</li><li><b>Social cards, favicon, stickers.</b></li></ul></div>
+    <div><span class="label">Implication</span><h3>Be recognizable at chip size</h3>
+      <ul><li>Burner has to read as Burner inside Claude, ChatGPT and other assistants' UI, on light and dark.</li><li>The status colors carry the story: working, done, needs you.</li><li>One color and a wordmark must be enough; there's no room for more.</li></ul></div>
+  </div>
+
+  <div class="comp">
+    <h3>Competitor color territory</h3>
+    <div class="comp-row">
+      <div class="comp-chip"><i style="background:#3DDC84"></i>Android<span>Bright green. Off-limits, it reads as "official Google".</span></div>
+      <div class="comp-chip"><i style="background:#D97757"></i>Claude<span>Muted clay. Burner cards often sit inside this UI.</span></div>
+      <div class="comp-chip"><i style="background:linear-gradient(90deg,#F48120 50%,#1F6FB5 50%)"></i>BrowserStack<span>Orange and blue, device-cloud default.</span></div>
+      <div class="comp-chip"><i style="background:linear-gradient(90deg,#0A0A0A 50%,#FAFAFA 50%);border:1px solid var(--line)"></i>Assistant default<span>ChatGPT and most agent tools: pure black and white.</span></div>
+      <div class="comp-chip us"><i style="background:linear-gradient(90deg,#F4F5F8 0 55%,#1B1D22 55% 85%,#FF6A13 85%);border:1px solid var(--line)"></i><b>Burner</b><span>Cool ink and paper with the wink orange. Warm accent, cool everything else.</span></div>
+    </div>
+    <p class="note">Competitor hues are approximate, sampled from memory to show territory rather than exact brand values. Burn is the logo's orange. It is brighter and more saturated than Claude's clay, and it never appears without the ink phone shape, which keeps it apart from BrowserStack's orange.</p>
+  </div>
+</section>
+
+<!-- PRIMARY -->
+<section id="primary">
+  <div class="sec-head"><span class="label">Primary palette</span><h2>Ink, Slate, Wire, Mist, Paper</h2>
+  <p class="lede">The neutrals do almost all the work. They are the logo's own ink and paper, extended into a short cool-grey ramp, so the orange always has something calm to sit on.</p></div>
+  <div class="swatches" id="primary-sw"></div>
+</section>
+
+<!-- ACCENT -->
+<section id="accent">
+  <div class="sec-head"><span class="label">Accent palette</span><h2>Burn, plus three signals</h2>
+  <p class="lede">Burn is the logo's orange and the brand's one loud color. Pulse, Tether and Fault are status colors that map one-to-one to what the assistant is doing on the phone.</p></div>
+  <div class="swatches" id="accent-sw"></div>
+  <div style="display:grid;gap:10px">
+    <h3>Proportion on any surface</h3>
+    <div class="ratio" aria-label="Color proportion bar">
+      <div style="flex:60;background:var(--b-ash);color:var(--b-handset)">Paper or Ink 60</div>
+      <div style="flex:25;background:var(--b-lcd);color:var(--b-handset)">Mist 25</div>
+      <div style="flex:10;background:var(--b-graphite);color:var(--b-ash)">Slate 10</div>
+      <div style="flex:5;background:var(--b-burn);color:var(--b-handset)">Burn 5</div>
+    </div>
+    <p class="note">Status colors sit outside this ratio. They appear only when there is a status to report.</p>
+  </div>
+</section>
+
+<!-- CONTRAST -->
+<section id="contrast">
+  <div class="sec-head"><span class="label">Accessibility</span><h2>Approved pairings</h2>
+  <p class="lede">WCAG 2.x contrast ratios, computed from the hex values. AA needs 4.5 for body text and 3.0 for large text and UI marks.</p></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Sample</th><th>Text on background</th><th>Ratio</th><th>Use for</th></tr></thead>
+    <tbody id="pairs"></tbody>
+  </table></div>
+</section>
+
+<!-- TYPE -->
+<section id="type">
+  <div class="sec-head"><span class="label">Typography</span><h2>Friendly headlines, readable body, a small mono</h2>
+  <p class="lede">All three are free on Google Fonts, so the site, the installer, slides and social cards can use the same files.</p></div>
+  <div class="type-grid">
+    <div class="spec">
+      <span class="label">Headlines · Bricolage Grotesque, weight 700–800</span>
+      <div class="big" style="font-family:var(--display);font-weight:900;letter-spacing:-.03em">Let your assistant use your phone.</div>
+      <p class="why">The same family as the logo A wordmark, so headlines and logo speak with one voice. It's chunky and a little cheeky, like the wink. Use 800 for display and 700 for buttons. The logo itself will be outlined and hand-kerned, so it doesn't depend on this font.</p>
+      <div class="meta"><span>opsz 96 at display</span><span>wght 700–800</span><span>tracking −2 to −3%</span></div>
+    </div>
+    <div class="spec">
+      <span class="label">Body · Atkinson Hyperlegible Next, 400 / 650</span>
+      <p style="font-size:1.15rem;line-height:1.55">Connect any Android phone once. After that, ask your assistant to book the table, reply in the app, or change a setting, and you can watch every step it takes on the phone.</p>
+      <p class="why">Built for low-vision legibility, so 1, l and I, and 0 and O, are always distinct. That matters when a step names an app, a code or a device. Its open shapes sit comfortably next to the rounder headline face.</p>
+      <div class="meta"><span>16–18px body</span><span>line-height 1.55</span><span>max 65ch</span></div>
+    </div>
+    <div class="spec">
+      <span class="label">Utility · Martian Mono, width 100, weight 400–600</span>
+      <div style="font-family:var(--mono);font-size:1rem;line-height:1.7">STEP 03 · TAP "CONFIRM"<br>Pixel 7 · connected<br>0O 1lI 5S 8B</div>
+      <p class="why">Step labels, device names, status tags and every ALL-CAPS label. It gives status and step labels a precise, mechanical feel next to the friendly headlines. Never use it for paragraphs, and never for a shell prompt.</p>
+      <div class="meta"><span>11–14px labels</span><span>uppercase +8% tracking</span></div>
+    </div>
+  </div>
+
+  <div class="scale">
+    <div class="scale-row"><span class="label">Display · 72 / 0.9</span><div style="font-family:var(--display);font-weight:900;font-size:clamp(2.2rem,6vw,4.5rem);line-height:.9;letter-spacing:-.03em">Ask. It taps.</div></div>
+    <div class="scale-row"><span class="label">H1 · 48 / 1.0</span><div style="font-family:var(--display);font-weight:850;font-size:clamp(1.8rem,4.5vw,3rem);line-height:1;letter-spacing:-.02em">On a real phone.</div></div>
+    <div class="scale-row"><span class="label">H2 · 32 / 1.05</span><div style="font-family:var(--display);font-weight:800;font-size:2rem;line-height:1.05">Connect your phone</div></div>
+    <div class="scale-row"><span class="label">H3 · 20 / 1.2</span><div style="font-family:var(--display);font-weight:750;font-size:1.25rem">Your assistant takes it from here</div></div>
+    <div class="scale-row"><span class="label">Body · 17 / 1.55</span><div style="font-size:1.06rem">Anything you can tap on your phone, your assistant can now tap for you.</div></div>
+    <div class="scale-row"><span class="label">Small · 14 / 1.5</span><div style="font-size:.875rem">Works with Android 9 and later. You can stop it at any step.</div></div>
+    <div class="scale-row"><span class="label">Label · 12 mono caps</span><div class="label" style="color:var(--fg)">Phone connected · 3 steps</div></div>
+  </div>
+</section>
+
+<!-- ASSISTANT -->
+<section id="assistant">
+  <div class="sec-head"><span class="label">Inside the assistant</span><h2>The card people actually see</h2>
+  <p class="lede">Most people meet Burner as a small card in their assistant's chat while it works on the phone. It sits inside another brand's UI, so it uses only Ink or Paper, one Burn mark, and the three status colors.</p></div>
+  <div class="chat-demo">
+    <div class="chat light">
+      <div class="msg user">Book a table for two at Lupa tonight around 8. It's only in their app.</div>
+      <div class="msg bot">On it. I'm using your phone through Burner.</div>
+      <div class="bcard">
+        <div class="bcard-h"><span class="mk"><svg class="ico" width="14" height="14" viewBox="0 0 64 64" aria-hidden="true"><use href="#a-icon"/></svg> burner</span><span>Pixel 7</span></div>
+        <div class="bstep ok"><i></i>Opened Lupa</div>
+        <div class="bstep ok"><i></i>Picked tonight, 2 people</div>
+        <div class="bstep run"><i></i>Choosing 8:00 PM</div>
+        <div class="bstep need"><i></i>Needs you: confirm the card ending 4417</div>
+      </div>
+    </div>
+    <div class="chat dark">
+      <div class="msg user">Turn on dark mode on my phone.</div>
+      <div class="bcard">
+        <div class="bcard-h"><span class="mk"><svg class="ico" width="14" height="14" viewBox="0 0 64 64" aria-hidden="true"><use href="#a-icon"/></svg> burner</span><span>Pixel 7</span></div>
+        <div class="bstep ok"><i></i>Opened Settings</div>
+        <div class="bstep ok"><i></i>Tapped Display</div>
+        <div class="bstep ok"><i></i>Dark theme is on</div>
+      </div>
+      <div class="msg bot">Done. Dark theme is on.</div>
+    </div>
+  </div>
+  <div class="ansi">
+    <div><i style="background:#FF6A13"></i><span><b>Burn</b> · the wink icon only</span></div>
+    <div><i style="background:#3FB7A6"></i><span><b>Tether</b> · step done</span></div>
+    <div><i style="background:#3D5AFE"></i><span><b>Pulse</b> · working on it</span></div>
+    <div><i style="background:#FF4D7A"></i><span><b>Fault</b> · failed, or needs you</span></div>
+  </div>
+  <p class="note">On dark grounds Tether and Fault lift to #3FB7A6 and #FF4D7A so they clear 6:1 on Ink. Fault is magenta-red, not orange, so it never gets confused with Burn. The demo tasks and the restaurant are illustrative.</p>
+</section>
+
+<!-- RULES -->
+<section id="rules">
+  <div class="sec-head"><span class="label">Usage rules</span><h2>How to use it, and how not to</h2></div>
+  <div class="rules">
+    <div class="rule-col"><h3><i style="background:var(--b-tether)"></i>Do</h3><ol>
+      <li><b>One Burn moment per view.</b><span>The wink icon, the wordmark underscore, the connect button. If two things are Burn, neither is.</span></li>
+      <li><b>Put Ink text on Burn.</b><span>5.9:1. White on Burn is only 2.9, so it fails body text.</span></li>
+      <li><b>Use Burn Deep for links on light grounds.</b><span>Burn itself is 2.6 on Paper; Burn Deep is 5.1.</span></li>
+      <li><b>Let orange fill only a phone screen.</b><span>The logo is the one place Burn covers a whole shape. Everywhere else it's a button, an underscore or an icon.</span></li>
+      <li><b>Set step labels and status tags in Martian Mono.</b><span>Small caps labels only. Never sentences.</span></li>
+      <li><b>Keep headlines short and lowercase-friendly.</b><span>Lowercase matches the wordmark. Four to six words per line at display size.</span></li>
+    </ol></div>
+    <div class="rule-col"><h3><i style="background:var(--b-fault)"></i>Don't</h3><ol>
+      <li><b>Don't use Burn as a background block.</b><span>Large fields of it read as an error or a sale. Keep it under 5% of any surface.</span></li>
+      <li><b>Don't use Fault for branding, or Burn for errors.</b><span>Status colors only mean status.</span></li>
+      <li><b>Don't set Burn or Wire as text on light grounds.</b><span>2.6:1 and 2.4:1 on Paper. Use Burn Deep or Slate instead.</span></li>
+      <li><b>Don't use green for success.</b><span>Android owns that green. Tether teal does the job and stays ours.</span></li>
+      <li><b>Don't use the >_ face outside the phone.</b><span>On its own it reads as a command prompt. The wink always lives inside the phone outline.</span></li>
+      <li><b>Don't set body copy in Bricolage or Martian Mono.</b><span>Paragraphs are always Atkinson Hyperlegible Next.</span></li>
+    </ol></div>
+  </div>
+
+  <h3>Mix by placement</h3>
+  <div class="places">
+    <div class="place"><span class="label">Website hero</span><div class="bar"><i style="flex:55;background:#F4F5F8"></i><i style="flex:15;background:#E6E8EC"></i><i style="flex:23;background:#1B1D22"></i><i style="flex:7;background:#FF6A13"></i></div><p>Paper ground, Ink type, Mist strips, Burn on the button and the logo.</p></div>
+    <div class="place"><span class="label">Docs and installer</span><div class="bar"><i style="flex:70;background:#F4F5F8"></i><i style="flex:20;background:#4A505C"></i><i style="flex:7;background:#1B1D22"></i><i style="flex:3;background:#B93E00"></i></div><p>Paper ground, Slate secondary text, Burn Deep links.</p></div>
+    <div class="place"><span class="label">Card in the assistant</span><div class="bar"><i style="flex:70;background:#1B1D22"></i><i style="flex:20;background:#E6E8EC"></i><i style="flex:5;background:#3FB7A6"></i><i style="flex:5;background:#FF6A13"></i></div><p>Ink or Paper to match the host's theme, status colors only for status.</p></div>
+    <div class="place"><span class="label">Social card</span><div class="bar"><i style="flex:75;background:#1B1D22"></i><i style="flex:20;background:#E6E8EC"></i><i style="flex:5;background:#FF6A13"></i></div><p>Ink ground, Paper headline, the wink icon. It stands out in a feed of white cards.</p></div>
+  </div>
+</section>
+
+<!-- SAMPLE -->
+<section id="sample">
+  <div class="sec-head"><span class="label">Sample layout</span><h2>useburner.si, first screen</h2>
+  <p class="lede">Every rule above, applied once. The sample uses fixed brand colors, so it looks the same in light and dark mode.</p></div>
+
+  <div class="sample-frame">
+    <div class="browser-bar"><i></i><i></i><i></i><span>useburner.si</span></div>
+    <div class="site">
+      <div class="site-nav">
+        <div class="wordmark"><svg width="30" height="30" viewBox="0 0 120 120" aria-hidden="true"><use href="#a-sym"/></svg>burner</div>
+        <nav><a href="#sample">Docs</a><a href="#sample">Installer</a><a href="#sample">GitHub</a></nav>
+      </div>
+      <div class="site-hero">
+        <div>
+          <span class="eyebrow"><i></i>Android 9+ · works from your assistant</span>
+          <h2>Let your assistant use your <em>phone</em>.</h2>
+          <p class="sub">Burner gives your AI assistant your Android phone. Ask for something that only works in an app, and it taps through it for you while you watch every step.</p>
+          <div class="install">
+            <button class="btn-burn" type="button" id="sample-install">Connect your phone</button>
+            <span class="ghost">See how it works</span>
+          </div>
+          <p class="fine">Free and open source. Stop it at any step.</p>
+        </div>
+        <div class="phone" aria-label="Phone showing assistant steps">
+          <div class="screen">
+            <div class="screen-top"><span>14:44</span><span class="mk"><svg class="ico" width="12" height="12" viewBox="0 0 64 64" aria-hidden="true"><use href="#a-icon"/></svg> burner · connected</span></div>
+            <div class="agent-log">
+              <div class="step done"><b>done</b><span>Open Settings</span></div>
+              <div class="step done"><b>done</b><span>Tap "Display"</span></div>
+              <div class="step run"><b>run</b><span>Tap "Dark theme"</span></div>
+              <div class="step next"><b>next</b><span>Confirm the toggle is on</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="site-strip">
+        <div><span class="k">01 · Connect</span><h4>Any Android phone</h4><p>The web installer walks you through it once.</p></div>
+        <div><span class="k">02 · Ask</span><h4>In your assistant</h4><p>Ask for anything you would do in an app yourself.</p></div>
+        <div><span class="k">03 · Watch</span><h4>Every step, live</h4><p>It shows each tap and stops to ask before anything final.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="annot">
+    <div><b>1</b><span>Paper ground with a Mist strip, so the orange logo and button carry the color.</span></div>
+    <div><b>2</b><span>The one Burn moment is the connect button, with Ink text and a hard 3px drop shadow.</span></div>
+    <div><b>3</b><span>The highlighted word inverts to Mist on Ink instead of adding another color.</span></div>
+    <div><b>4</b><span>Tether and Pulse appear only inside the phone, where they report real step status.</span></div>
+  </div>
+
+  <h3>Social cards, 1200 × 630</h3>
+  <div class="social">
+    <div class="card-og dark"><div class="f"><span class="mk"><svg class="ico" width="14" height="14" viewBox="0 0 64 64" aria-hidden="true"><use href="#a-icon"/></svg> burner</span><span>v0.4</span></div><div class="t">Your assistant can now use your phone<span class="u">_</span></div><div class="f"><span>useburner.si</span><span>Android 9+</span></div></div>
+    <div class="card-og light"><div class="f"><span class="mk"><svg class="ico" width="14" height="14" viewBox="0 0 64 64" aria-hidden="true"><use href="#a-icon"/></svg> burner</span><span>Docs</span></div><div class="t">Ask. It taps. You watch.</div><div class="f"><span>Works from your assistant</span><span>useburner.si</span></div></div>
+  </div>
+</section>
+
+<footer><span>Burner brand system v0.2 · color and type · logo: concept A, Wink Phone</span><span>Fonts: Bricolage Grotesque, Atkinson Hyperlegible Next, Martian Mono (Google Fonts, OFL)</span></footer>
+</div>
+
+<script>
+const primary=[
+  {n:"Ink",hex:"#1B1D22",fg:"#E6E8EC",role:"The logo's phone body. Primary dark, assistant card on dark themes, all body text on light grounds."},
+  {n:"Slate",hex:"#4A505C",fg:"#F4F5F8",role:"Secondary text and icons on light grounds. 7.9:1 on Paper."},
+  {n:"Wire",hex:"#9AA0AD",fg:"#1B1D22",role:"Borders, dividers, quiet metadata. Never body text on light."},
+  {n:"Mist",hex:"#E6E8EC",fg:"#1B1D22",role:"Quiet secondary surface. Panels and strips on Paper, and primary text on Ink."},
+  {n:"Paper",hex:"#F4F5F8",fg:"#1B1D22",role:"Main light ground, from the logo. Site, docs, installer and README light mode."}
+];
+const accent=[
+  {n:"Burn",hex:"#FF6A13",fg:"#1B1D22",role:"The logo's screen orange. The wink icon, the wordmark underscore and the main button. Under 5% of any view outside the logo."},
+  {n:"Burn Deep",hex:"#B93E00",fg:"#F4F5F8",role:"Burn for text. Links and inline emphasis on Paper or Mist."},
+  {n:"Pulse",hex:"#3D5AFE",fg:"#1B1D22",role:"Status: working on it. Blue, so it never reads as part of the orange logo. Lift to #8C9BFF on dark."},
+  {n:"Tether",hex:"#127A6C",fg:"#F4F5F8",role:"Status: connected, step passed. Replaces green. Lift to #3FB7A6 on dark."},
+  {n:"Fault",hex:"#C8174A",fg:"#F4F5F8",role:"Status: failed, disconnected. Lift to #FF4D7A on dark."}
+];
+function rgb(h){h=h.slice(1);return [0,2,4].map(i=>parseInt(h.substr(i,2),16))}
+function lum(h){return rgb(h).map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)}).reduce((a,v,i)=>a+v*[0.2126,0.7152,0.0722][i],0)}
+function ratio(a,b){const x=[lum(a),lum(b)].sort((p,q)=>q-p);return (x[0]+0.05)/(x[1]+0.05)}
+function copyHex(btn,hex){
+  const done=()=>{btn.textContent="Copied";setTimeout(()=>btn.textContent="Copy",1200)};
+  try{navigator.clipboard.writeText(hex).then(done,()=>{btn.textContent=hex})}catch(e){btn.textContent=hex}
+}
+function render(list,el){
+  el.innerHTML=list.map((c,i)=>{const [r,g,b]=rgb(c.hex);return `<div class="sw">
+    <div class="sw-color" style="background:${c.hex};color:${c.fg};${c.hex==='#F4F5F8'?'box-shadow:inset 0 -1px 0 var(--line)':''}"><span>${String(i+1).padStart(2,'0')}</span><b>${c.n}</b></div>
+    <div class="sw-meta"><div class="hexrow"><span class="hex">${c.hex}</span><button class="copy" type="button" id="cp-${c.n.replace(/\s/g,'')}">Copy</button></div>
+    <span class="rgb">RGB ${r} ${g} ${b}</span><p>${c.role}</p></div></div>`}).join("");
+  list.forEach(c=>{const b=document.getElementById("cp-"+c.n.replace(/\s/g,''));b.addEventListener("click",()=>copyHex(b,c.hex))});
+}
+render(primary,document.getElementById("primary-sw"));
+render(accent,document.getElementById("accent-sw"));
+const pairs=[
+  ["#1B1D22","#F4F5F8","Ink on Paper","Body text, docs"],
+  ["#1B1D22","#E6E8EC","Ink on Mist","Text on strips and panels"],
+  ["#E6E8EC","#1B1D22","Mist on Ink","Dark cards, dark README"],
+  ["#4A505C","#F4F5F8","Slate on Paper","Secondary text"],
+  ["#1B1D22","#FF6A13","Ink on Burn","Buttons"],
+  ["#FF6A13","#1B1D22","Burn on Ink","Accents on dark"],
+  ["#B93E00","#F4F5F8","Burn Deep on Paper","Links"],
+  ["#F4F5F8","#FF6A13","Paper on Burn","Avoid for text"],
+  ["#FF6A13","#F4F5F8","Burn on Paper","Never as text"]
+];
+document.getElementById("pairs").innerHTML=pairs.map(([fg,bg,name,use])=>{
+  const r=ratio(fg,bg);const cls=r>=4.5?"ok":r>=3?"lg":"no";const tag=r>=4.5?"AA text":r>=3?"Large / UI only":"Fails";
+  return `<tr><td><span class="pair" style="background:${bg};color:${fg};${bg==='#F4F5F8'?'border:1px solid var(--line)':''}">Aa 12</span></td><td>${name}</td><td class="num">${r.toFixed(2)}:1</td><td><span class="pill ${cls}">${tag}</span> <span class="note">${use}</span></td></tr>`}).join("");
+const inst=document.getElementById("sample-install");
+inst.addEventListener("click",()=>{inst.textContent="Sample only";setTimeout(()=>inst.textContent="Connect your phone",1400)});
+</script>
+</body>
+</html>
