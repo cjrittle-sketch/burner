@@ -15,6 +15,8 @@ home, so it can use the apps you use.
 - "Check whether my paycheck landed and tell me the balance."
 - "Message that Marketplace seller and offer 20 percent less."
 - "Order my usual from the store app that never works in my browser."
+- "Play my chill playlist on the living room speaker."
+- "Turn off the lamps I left on. I'm already at the airport."
 
 ## Get started
 
