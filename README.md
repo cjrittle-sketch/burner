@@ -104,4 +104,4 @@ The full setup steps and command reference are in [SKILL.md](SKILL.md).
 
 ## License
 
-MIT, co-authors Muse & Claude. See [LICENSE](LICENSE).
+MIT, co-authors Muse, Claude & [@tropoFarmer](https://x.com/tropoFarmer). See [LICENSE](LICENSE).
