@@ -3023,9 +3023,6 @@ def _setup_step_status(step):
 def _setup_print_human(step):
     print("HUMAN STEP: {}".format(step["title"]))
     print(step["instruction"])
-    print("screenshot: {}".format(step["shot"]))
-    if step.get("shot2"):
-        print("screenshot: {}".format(step["shot2"]))
     print("When done, tell the agent; it records with: "
           "burner setup --step {} --confirm".format(step["name"]))
 

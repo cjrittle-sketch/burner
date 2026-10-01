@@ -1445,7 +1445,6 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(rc, 0)
         text = out.getvalue()
         self.assertIn("Tailscale", text)
-        self.assertIn("setup/setup-01-tailscale.png", text)
 
     def test_confirm_records_human_done(self):
         with self.cap():

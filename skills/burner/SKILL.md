@@ -26,8 +26,7 @@ has no route to the phone. Same-LAN setups skip this.
 
 ## Pair the phone
 
-The guided path is `burner setup`: it walks every step, shows a screenshot for
-each human step (in `setup/`), runs the agent steps itself, and finishes with
+The guided path is `burner setup`: it walks every step, runs the agent steps itself, and finishes with
 `burner doctor`. Pairing codes last about a minute: pair as soon as one arrives,
 and ask for a fresh one if it expires. Talk to the user in plain, non-technical words during setup: say what's
 happening for them ("Installing burner on my side"), leave out installer

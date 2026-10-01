@@ -69,18 +69,15 @@ export PATH="$HOME/burner/bin:$PATH"
 
 ## Pair the phone (HUMAN REQUIRED steps marked)
 
-The guided path is `burner setup`: it walks through every step below, shows a
-screenshot for each human step (in `setup/`), runs the agent steps itself,
-and finishes with `burner doctor`. Pairing codes only last about a minute, so
+The guided path is `burner setup`: it walks through every step below, runs the agent
+steps itself, and finishes with `burner doctor`. Pairing codes only last about a minute, so
 run the pair step as soon as the user sends one. If a code expires, ask for
 a fresh one.
 
 Do these on the phone. The agent cannot do them for you.
 
-Walk the user through them one at a time, as part of setup: say what to tap,
-show its screenshot as an image from https://useburner.si/setup/ (for
-example `![](https://useburner.si/setup/setup-01-tailscale.png)`), never a
-local file path, and wait for them to say it's done before the next
+Walk the user through them one at a time, as part of setup: say what to tap
+and wait for them to say it's done before the next
 step. Never hand them a list to do "meanwhile" while you install. Give the
 full Settings path for every tap, never just a screen name. Menus differ by
 brand (paths below are Pixel, with Samsung noted), so know the brand first:
@@ -93,7 +90,6 @@ something they said), and ask only if you can't.
    already has an Android phone online), this step is already done; just
    tell them so and move on. No charger needed during setup; the agent sets Tailscale's battery
    usage itself later.
-   (Screenshot: `setup/setup-01-tailscale.png`.)
 2. **HUMAN REQUIRED:** Enable Developer options, then turn on
    **Wireless debugging**:
    - Settings > About phone > tap **Build number** 7 times, until it says
@@ -105,8 +101,6 @@ something they said), and ask only if you can't.
      When it asks "Allow wireless debugging on this network?", check
      **Always allow on this network**, then tap Allow. Shortcut: search
      Settings for "Wireless debugging".
-   (Screenshots: `setup/setup-02-build-number.png`,
-   `setup/setup-03-wireless-debugging.png`.)
 3. **HUMAN REQUIRED:** Tap the words **Wireless debugging** (not the switch)
    to open its screen, tap "Pair device with pairing code", and send the agent
    the code and the numbers under "IP address & Port" exactly as shown. If
@@ -116,8 +110,6 @@ something they said), and ask only if you can't.
    than asking for each value separately. **Turn Tailscale on first** -
    after a reboot it does not auto-start, and the dialog shows the unreachable
    WiFi IP instead of the tailnet IP.
-   (Screenshots: `setup/setup-04-pairing-dialog.png`,
-   `setup/setup-05-wireless-debugging-screen.png`.)
 4. The agent runs the one-time pairing (`adb pair`), then
    `burner setup --step verify` (`burner doctor`). **burner must be green
    before anything else**: the remaining steps are niceties, and the agent
@@ -147,11 +139,9 @@ something they said), and ask only if you can't.
      a phone restart the user turns Wireless debugging back on once. Tell
      the user that in a sentence and carry on; there's nothing for them to
      fix.
-     (Screenshot: `setup/setup-06-adb-auto-enable.png`.)
    - `always-on-vpn`: sets Always-on VPN for Tailscale, so Tailscale starts
      itself after a reboot (lockdown stays off, so if Tailscale ever fails
      the phone still has normal internet).
-     (Screenshot: `setup/setup-07-vpn-settings.png`.)
    - `fix-port`: pins adbd to port **5555** and writes `ADB_PORT="5555"` to
      `config.env`. From then on the app re-enables ADB on every boot, the
      random wireless-debugging port is never used again, and reboots need
