@@ -4,7 +4,10 @@
 
 Give your AI assistant a physical side phone.
 
-burner lets your AI assistant use a spare Android phone that sits in a drawer at
+**burner runs on a real phone, with real apps, real bluetooth and your real home
+connection.**
+
+It lets your AI assistant use a spare Android phone that sits in a drawer at
 home, so it can use the apps you use.
 
 ## What it can do for you
