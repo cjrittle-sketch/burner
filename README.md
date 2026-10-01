@@ -4,8 +4,8 @@
 
 Give your AI assistant a physical side phone.
 
-**burner runs on a real phone, with real apps, real bluetooth and your real home
-connection.**
+**burner runs on your real phone, with real apps, real bluetooth and your real
+home connection.**
 
 It lets your AI assistant use a spare Android phone that sits in a drawer at
 home, so it can use the apps you use.
@@ -65,6 +65,9 @@ your yes.
 **Does it work when I'm away from home?**
 Yes. The phone stays plugged in at home, and your AI assistant can use it from
 wherever you are.
+
+**What do I need?**
+A spare Android phone, a free Tailscale account and 10 minutes. That's it.
 
 **Is my stuff private?**
 Yes. It runs on your own phone, on your own Wi-Fi at home, not in someone
