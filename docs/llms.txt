@@ -1,6 +1,6 @@
 # burner
 
-> give your AI a physical side phone.
+> give your AI assistant a physical side phone.
 
 burner hands an AI agent a real, dedicated Android phone it can see and touch:
 read the screen as a UI tree, tap, type, open deep links, take screenshots, and

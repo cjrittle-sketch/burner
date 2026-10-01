@@ -2,7 +2,7 @@
 
 # burner
 
-give your AI a physical side phone.
+give your AI assistant a physical side phone.
 
 ## What it does
 
