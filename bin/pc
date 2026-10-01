@@ -45,6 +45,19 @@ def load_config():
 CFG = load_config()
 TARGET = "127.0.0.1:{}".format(CFG.get("LOCAL_PORT", "15555"))
 UI_PATH = "/sdcard/pc-ui.xml"
+SNAP_DIR = os.path.join(os.path.expanduser("~"), ".cache", "pc")
+SNAP_PATH = os.path.join(SNAP_DIR, "snap.json")
+SNAP_TTL = 120  # seconds: @eN handles expire after this (belt and braces;
+                # any mutating action already deletes the snap file)
+
+
+def snap_invalidate():
+    """Drop the saved snap handles (called on every screen-changing action)."""
+    try:
+        if os.path.exists(SNAP_PATH):
+            os.remove(SNAP_PATH)
+    except OSError:
+        pass
 
 
 def adb(*args, timeout=30):
@@ -201,6 +214,7 @@ def u2sock(cmd, arg="", timeout=30):
 def u2_invalidate():
     """Tell the u2 mux the screen changed (drops its 2s dump cache)."""
     u2sock("invalidate", timeout=5)
+    snap_invalidate()  # @eN handles from pc snap are now stale
 
 
 def fast_dump():
@@ -506,6 +520,16 @@ def compact_visible(n, include_all):
     return include_all or is_interactive(n) or bool(node_label(n))
 
 
+def visible_lines(nodes, include_all=False):
+    """Compact one-line-per-node rendering of walk() nodes, in screen order.
+    Shared by dump, snap, and settle diffing so all three see the same rows."""
+    return [format_compact(n, show_bounds=include_all)
+            for n in nodes
+            if compact_visible(n, include_all)
+            # drop the <hierarchy> root itself (no class/label/clickable)
+            and (n["class"] or node_label(n) or n["clickable"])]
+
+
 def wake():
     try:
         if scrcpy_send("wake"):
@@ -540,6 +564,55 @@ def tap_center(x, y, waker=None):
     u2_invalidate()
 
 
+def snap_save(nodes, include_all=False):
+    """Number the visible nodes @e1..@eN and persist handles to SNAP_PATH.
+
+    Returns the list of (handle, line) pairs. Handles are single-use: any
+    mutating pc action deletes the snap file via snap_invalidate()."""
+    filt = [n for n in nodes
+            if compact_visible(n, include_all)
+            # drop the <hierarchy> root itself (no class/label/clickable)
+            and (n["class"] or node_label(n) or n["clickable"])]
+    entries = {}
+    numbered = []
+    for i, n in enumerate(filt, 1):
+        cx, cy = n.get("center") or (None, None)
+        entries[str(i)] = {"x": cx, "y": cy,
+                           "label": node_label(n),
+                           "class": (n.get("class") or "").split(".")[-1]}
+        numbered.append(("@e{}".format(i),
+                         format_compact(n, show_bounds=include_all)))
+    try:
+        os.makedirs(SNAP_DIR, exist_ok=True)
+        with open(SNAP_PATH, "w") as f:
+            json.dump({"ts": time.time(), "entries": entries}, f)
+    except OSError as e:
+        print("warning: could not save snap: {}".format(e), file=sys.stderr)
+    return numbered
+
+
+def snap_resolve(handle):
+    """Resolve '@eN' to (x, y) pixel coords from the last pc snap.
+
+    Returns (x, y) or raises ValueError with a human-readable reason."""
+    m = re.fullmatch(r"@e(\d+)", (handle or "").strip())
+    if not m:
+        raise ValueError('not a snap handle: "{}"'.format(handle))
+    try:
+        with open(SNAP_PATH) as f:
+            snap = json.load(f)
+    except (OSError, ValueError):
+        raise ValueError("no snap saved (run `pc snap` first)")
+    if time.time() - snap.get("ts", 0) > SNAP_TTL:
+        raise ValueError("snap expired (run `pc snap` again)")
+    entry = snap.get("entries", {}).get(m.group(1))
+    if entry is None:
+        raise ValueError("no such handle {} in current snap".format(handle))
+    if entry.get("x") is None:
+        raise ValueError("handle {} has no tap point".format(handle))
+    return entry["x"], entry["y"]
+
+
 def cmd_dump(args):
     root = ui_dump()
     nodes = [n for n in walk(root)
@@ -567,6 +640,25 @@ def cmd_dump(args):
     else:
         for n in nodes:
             print(format_compact(n, show_bounds=args.all))
+    return 0
+
+
+def cmd_snap(args):
+    """Numbered snapshot: same rows as dump, prefixed @e1..@eN.
+
+    Handles resolve in `pc tap @eN` (exact coordinates, no re-matching).
+    The snap file is deleted by any mutating action, so handles never
+    outlive the screen they were taken from."""
+    root = ui_dump()
+    nodes = walk(root)
+    numbered = snap_save(nodes, include_all=args.all)
+    if as_json(args):
+        print(json.dumps({"ok": True,
+                          "handles": [{"handle": h, "line": line}
+                                      for h, line in numbered]}))
+        return 0
+    for h, line in numbered:
+        print("{} {}".format(h, line))
     return 0
 
 
@@ -600,6 +692,77 @@ def _tap_refused(args, x, y, cover):
     return _tap_fail(args, msg)
 
 
+def settle_lines(prev_lines, timeout=10, quiet=0.5, poll=0.3):
+    """Re-read the screen until it stops changing.
+
+    Returns (added, removed): compact lines that appeared/disappeared
+    relative to prev_lines (the pre-action screen). Reads every `poll`
+    seconds; stops after `quiet` seconds with no change (minimum two
+    reads, so an action that changes nothing reports "unchanged" instead
+    of racing an animation) or at `timeout` seconds. A read that shrinks
+    to <=20% of a 12+ element screen is a partial mid-transition dump and
+    is retried at 250/400/600ms before being trusted."""
+    deadline = time.time() + timeout
+    cur = list(prev_lines)
+    quiet_start = None
+    reads = 0
+    while True:
+        time.sleep(poll)
+        if time.time() > deadline:
+            break
+        nxt = visible_lines(walk(ui_dump()))
+        reads += 1
+        if len(cur) >= 12 and len(nxt) * 5 <= len(cur):
+            # Partial dump mid-transition: retry at 250/400/600ms.
+            for wait in (0.25, 0.15, 0.2):
+                time.sleep(wait)
+                retry = visible_lines(walk(ui_dump()))
+                reads += 1
+                nxt = retry
+                if not (len(cur) >= 12 and len(nxt) * 5 <= len(cur)):
+                    break
+        if nxt == cur:
+            if quiet_start is None:
+                quiet_start = time.time()
+            if time.time() - quiet_start >= quiet and reads >= 2:
+                break
+        else:
+            quiet_start = None
+        cur = nxt
+    added = [l for l in cur if l not in prev_lines]
+    removed = [l for l in prev_lines if l not in cur]
+    return added, removed
+
+
+def _print_settle_diff(added, removed, cap=80):
+    """Human-readable settle diff: '+...'/'-...' lines, capped."""
+    if not added and not removed:
+        print("unchanged")
+        return
+    print("settled: +{} -{}".format(len(added), len(removed)))
+    shown = 0
+    for prefix, lines in (("+", added), ("-", removed)):
+        for l in lines:
+            if shown >= cap:
+                print("... {} more".format(len(added) + len(removed) - cap))
+                return
+            print("{} {}".format(prefix, l))
+            shown += 1
+
+
+def _tap_ambiguous(args, used, hits, fuzzy_used):
+    """Refuse an ambiguous tap: list up to 5 candidates, exit 1."""
+    lines = ["  [{}] {}".format(i, format_compact(h))
+             for i, h in enumerate(hits[:5])]
+    if len(hits) > 5:
+        lines.append("  ... and {} more".format(len(hits) - 5))
+    msg = ('ambiguous tap: "{}" matched {} candidates{}:\n{}\n'
+           "use --index N or a longer label").format(
+               used, len(hits), " (fuzzy)" if fuzzy_used else "",
+               "\n".join(lines))
+    return _tap_fail(args, msg)
+
+
 def cmd_tap(args):
     # Occlusion checking needs the local node list, so the daemon fast path
     # (on-device click / coord lookup) only runs with --no-occlusion-check.
@@ -613,9 +776,17 @@ def cmd_tap(args):
             xy_norm = parse_normalized_xy(args.xy)
         except ValueError as e:
             return _tap_fail(args, str(e))
+    # @eN snap handles resolve locally (no phone needed yet); a bad handle
+    # is a usage error, reported before waking the device.
+    snap_xy = None
+    if args.xy is None and args.text and args.text.strip().startswith("@e"):
+        try:
+            snap_xy = snap_resolve(args.text)
+        except ValueError as e:
+            return _tap_fail(args, str(e))
     waker = wake_async()
-    if args.no_occlusion_check and args.xy is None \
-            and not args.fuzzy and args.index == 0:
+    if args.no_occlusion_check and args.xy is None and snap_xy is None \
+            and not args.fuzzy and args.index is None and not args.settle:
         r = u2sock("click_text", args.text, timeout=20)
         if r is not None and r != U2_NOT_FOUND:
             try:
@@ -635,26 +806,49 @@ def cmd_tap(args):
     _update_screen_from_dump(root)
     nodes = walk(root)
 
-    if args.xy is not None:
-        # Normalized 0.0-1.0 coordinates -> pixels (already validated above).
-        nx, ny = xy_norm
+    if args.xy is not None or snap_xy is not None:
         w, h = screen_dims()
-        x, y = int(nx * w), int(ny * h)
+        if snap_xy is not None:
+            x, y = snap_xy
+            tap_label = args.text.strip()
+        else:
+            # Normalized 0.0-1.0 coordinates -> pixels (validated above).
+            nx, ny = xy_norm
+            x, y = int(nx * w), int(ny * h)
+            tap_label = "--xy {}".format(args.xy)
         if not args.no_occlusion_check:
             cover = topmost_occluder(nodes, x, y, w, h)
             if cover is not None:
                 return _tap_refused(args, x, y, cover)
+        prev_lines = visible_lines(nodes) if args.settle else None
         tap_center(x, y)
-        return _tap_ok(args, "--xy {}".format(args.xy), (x, y))
+        if args.settle:
+            return _tap_settled_ok(args, tap_label, (x, y),
+                                   *settle_lines(prev_lines))
+        return _tap_ok(args, tap_label, (x, y))
 
-    hits = find_nodes(nodes, args.text, exact=not args.fuzzy)
+    # Fallback selectors: "a || b" tries each label in order (first hit wins).
+    selectors = [s.strip() for s in args.text.split("||")]
+    hits, used, fuzzy_used = [], selectors[0], False
+    for sel in selectors:
+        hits = find_nodes(nodes, sel, exact=not args.fuzzy)
+        if hits:
+            used = sel
+            break
     if not hits and not args.fuzzy:
         # Auto-retry with fuzzy match before giving up (saves a manual retry
         # on long labels like Amazon order titles).
-        hits = find_nodes(nodes, args.text, exact=False)
+        for sel in selectors:
+            hits = find_nodes(nodes, sel, exact=False)
+            if hits:
+                used, fuzzy_used = sel, True
+                break
     if not hits:
         return _tap_fail(args, 'no match for "{}"'.format(args.text))
-    node = hits[args.index] if args.index < len(hits) else hits[0]
+    if len(hits) > 1 and args.index is None:
+        return _tap_ambiguous(args, used, hits, fuzzy_used)
+    node = hits[args.index] if args.index is not None \
+        and args.index < len(hits) else hits[0]
     xy = clickable_target(node)
     if xy[0] is None:
         return _tap_fail(args, "match has no tappable bounds")
@@ -668,8 +862,25 @@ def cmd_tap(args):
                     print("tap point covered, using {}".format(xy))
             else:
                 return _tap_refused(args, xy[0], xy[1], cover)
+    tap_label = node["text"] or node["class"]
+    prev_lines = visible_lines(nodes) if args.settle else None
     tap_center(*xy)
-    return _tap_ok(args, node["text"] or node["class"], xy)
+    if args.settle:
+        return _tap_settled_ok(args, tap_label, xy, *settle_lines(prev_lines))
+    return _tap_ok(args, tap_label, xy)
+
+
+def _tap_settled_ok(args, label, xy, added, removed):
+    """Report a successful tap plus its settle diff."""
+    if as_json(args):
+        print(json.dumps({"ok": True,
+                          "tapped": {"text": label, "x": xy[0], "y": xy[1]},
+                          "settled": {"added": added[:80],
+                                      "removed": removed[:80]}}))
+        return 0
+    print("tapped {} @ {}".format(label, xy))
+    _print_settle_diff(added, removed)
+    return 0
 
 
 def _wait_fail(args, msg):
@@ -1255,15 +1466,26 @@ def build_parser():
                    help="machine-readable JSON on stdout")
     p.set_defaults(fn=cmd_dump)
 
+    p = sub.add_parser("snap", help="numbered UI snapshot (@e1..@eN handles for tap)")
+    p.add_argument("--all", action="store_true", help="include empty-text nodes")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_snap)
+
     p = sub.add_parser("tap", help="tap node by text (or --xy normalized coords)")
     p.add_argument("text", nargs="?", default=None,
-                   help="node text to tap (omit with --xy)")
+                   help='node text to tap (omit with --xy); "@eN" taps a pc snap handle; '
+                        '"a || b" tries fallback labels in order')
     p.add_argument("--fuzzy", action="store_true")
-    p.add_argument("--index", type=int, default=0, help="which match to tap")
+    p.add_argument("--index", type=int, default=None,
+                   help="which match to tap (required when the label is ambiguous)")
     p.add_argument("--xy", metavar="X,Y",
                    help="normalized 0.0-1.0 coordinates, e.g. --xy 0.5,0.8")
     p.add_argument("--no-occlusion-check", action="store_true",
                    help="skip the occlusion check (faster when you know it's safe)")
+    p.add_argument("--settle", action="store_true",
+                   help="after tapping, wait for the screen to stop changing "
+                        "and show what appeared/disappeared")
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                    help="machine-readable JSON on stdout")
     p.set_defaults(fn=cmd_tap)

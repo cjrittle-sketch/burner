@@ -13,7 +13,7 @@ apps, social apps, store apps that block bots in browsers.
 ## Install
 
 ```bash
-git clone https://github.com/HALPLACEHOLDER/burner   # placeholder URL, repo not yet published
+git clone https://github.com/useburner/burner   
 cd burner
 ./install.sh          # idempotent; local-only, no sudo
 export PATH="$PWD/bin:$PATH"

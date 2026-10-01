@@ -14,7 +14,7 @@ block bots in a browser. Think Tinder, Snapchat, Vinted, most banking apps,
 and store apps that fingerprint automation. A spare phone on your network is a
 legit client those apps cannot tell apart from you holding it.
 
-Repo: https://github.com/HALPLACEHOLDER/burner (placeholder URL, not yet published)
+Repo: https://github.com/useburner/burner
 
 ## How it works
 
@@ -57,7 +57,7 @@ Measured 2026-09-30 on a Pixel 7 over Tailscale:
 ## Quickstart
 
 ```bash
-git clone https://github.com/HALPLACEHOLDER/burner   # placeholder URL, not yet published
+git clone https://github.com/useburner/burner   
 cd burner
 ./install.sh          # idempotent; local-only, no sudo
 export PC_WORKSPACE="$PWD"

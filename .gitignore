@@ -21,3 +21,7 @@ shots/
 
 # Platform tools installed by install.sh
 .android-tools/
+
+# JS / reel build outputs
+node_modules/
+reel/out/

@@ -16,7 +16,7 @@ apps, social apps, store apps that block bots in the browser.
 ## Install
 
 ```bash
-git clone https://github.com/HALPLACEHOLDER/burner   # placeholder URL, repo not yet published
+git clone https://github.com/useburner/burner   
 cd burner
 ./install.sh
 ```
@@ -76,7 +76,11 @@ If `pc doctor` reports green, the agent can drive the phone.
 ```
 pc state                 focused app + top screen texts
 pc dump [--all]          every UI node: text, class, bounds
-pc tap "Text" [--fuzzy]  tap first matching node (--index 1 for the second)
+pc snap [--all]          numbered snapshot: @e1..@eN handles for exact taps
+pc tap "Text" [--fuzzy]  tap matching node; refuses when ambiguous (see below)
+pc tap @e3                tap a snap handle's exact coordinates (no re-matching)
+pc tap "A || B"          fallback labels: tries A, then B
+pc tap "Text" --settle   wait for the screen to stop changing, show the diff
 pc wait "Text" [--timeout 30]   wait for text to appear (or --absent to vanish)
 pc type "text" --clear    type char-by-char, Bloks/RN-safe (--field "Hint" focuses first)
 pc press BACK|HOME        key events
@@ -95,5 +99,23 @@ pc doctor                full health check
 Codes are pulled from the user's connected Gmail, typed as plain text, and
 never stored. The tool never makes purchases on its own: any buy needs explicit
 human approval each time.
+
+## Tapping precisely (read this before driving the UI)
+
+`pc tap` refuses to guess. If a label matches two or more nodes it fails with
+the candidate list instead of tapping the first one — re-run with `--index N`
+(picks the Nth candidate) or a longer, unique label. `"A || B"` tries fallback
+labels in order, so `pc tap "Checkout || Proceed to checkout"` survives
+renames. `--fuzzy` substring matching auto-retries when the exact label
+misses, and is flagged in ambiguity errors.
+
+For multi-step flows, `pc snap` prints the same rows as `dump` numbered
+`@e1..@eN`, and `pc tap @eN` taps that handle's exact coordinates — no
+re-matching, no ambiguity. Handles are single-use: any tap, press, type, or
+launch deletes the snap, so a handle can never outlive its screen.
+
+After important taps, `--settle` re-reads the screen until it stops changing
+(500ms quiet, 10s max) and prints only what appeared/disappeared, capped at
+80 lines, or `unchanged`. Use it instead of `dump` → eyeball → `dump` loops.
 
 Full detail, benchmarks, and architecture: see `README.md`.

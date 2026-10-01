@@ -1088,5 +1088,284 @@ class OfflineSafetyTests(OfflineTestCase):
         self.assertIn("phone control CLI", r.stdout)
 
 
+# --------------------------------- 11. ambiguous taps, snap handles, settle
+
+AMBI_XML = """<hierarchy rotation="0">
+  <node text="" class="android.widget.FrameLayout" bounds="[0,0][1080,2400]" clickable="false" enabled="true" focused="false" checked="false">
+    <node text="OK" class="android.widget.Button" bounds="[100,400][400,500]" clickable="true" enabled="true" focused="false" checked="false"/>
+    <node text="Cancel" class="android.widget.Button" bounds="[500,400][800,500]" clickable="true" enabled="true" focused="false" checked="false"/>
+    <node text="OK" class="android.widget.Button" bounds="[100,600][400,700]" clickable="true" enabled="true" focused="false" checked="false"/>
+  </node>
+</hierarchy>"""
+
+FUZZY_AMBI_XML = """<hierarchy rotation="0">
+  <node text="" class="android.widget.FrameLayout" bounds="[0,0][1080,2400]" clickable="false" enabled="true" focused="false" checked="false">
+    <node text="Okay" class="android.widget.Button" bounds="[100,400][400,500]" clickable="true" enabled="true" focused="false" checked="false"/>
+    <node text="OK fine" class="android.widget.Button" bounds="[100,600][400,700]" clickable="true" enabled="true" focused="false" checked="false"/>
+  </node>
+</hierarchy>"""
+
+SETTLE_A_XML = """<hierarchy rotation="0">
+  <node text="" class="android.widget.FrameLayout" bounds="[0,0][1080,2400]" clickable="false" enabled="true" focused="false" checked="false">
+    <node text="Loading" class="android.widget.TextView" bounds="[100,200][500,300]" clickable="false" enabled="true" focused="false" checked="false"/>
+  </node>
+</hierarchy>"""
+
+SETTLE_B_XML = """<hierarchy rotation="0">
+  <node text="" class="android.widget.FrameLayout" bounds="[0,0][1080,2400]" clickable="false" enabled="true" focused="false" checked="false">
+    <node text="Results" class="android.widget.TextView" bounds="[100,200][500,300]" clickable="false" enabled="true" focused="false" checked="false"/>
+    <node text="Buy" class="android.widget.Button" bounds="[100,400][400,500]" clickable="true" enabled="true" focused="false" checked="false"/>
+  </node>
+</hierarchy>"""
+
+
+def _twelve_line_xml():
+    kids = "".join(
+        '<node text="Row%d" class="android.widget.TextView" '
+        'bounds="[%d,200][%d,300]" clickable="false" enabled="true" '
+        'focused="false" checked="false"/>' % (i, 100 + i * 10, 500 + i * 10)
+        for i in range(12))
+    return ('<hierarchy rotation="0"><node text="" '
+            'class="android.widget.FrameLayout" bounds="[0,0][1080,2400]" '
+            'clickable="false" enabled="true" focused="false" '
+            'checked="false">' + kids + "</node></hierarchy>")
+
+
+class AmbiguousTapTests(OfflineTestCase):
+    def _tap(self, argv, xml=AMBI_XML):
+        self.allow("wake_async")
+        self.allow("ui_dump", return_value=ET.fromstring(xml))
+        tc = self.allow("tap_center")
+        args = self.parse(argv)
+        with self.cap() as (out, err):
+            rc = pc.cmd_tap(args)
+        return rc, out.getvalue(), err.getvalue(), tc
+
+    def test_ambiguous_tap_refused(self):
+        rc, out, err, tc = self._tap(["tap", "OK"])
+        self.assertEqual(rc, 1)
+        self.assertIn("ambiguous tap", err)
+        self.assertIn("2 candidates", err)
+        self.assertIn("use --index N or a longer label", err)
+        self.assertIn("[0]", err)
+        self.assertIn("[1]", err)
+        tc.assert_not_called()
+
+    def test_ambiguous_tap_index_selects(self):
+        rc, out, err, tc = self._tap(["tap", "OK", "--index", "1"])
+        self.assertEqual(rc, 0)
+        tc.assert_called_once_with(250, 650)  # second OK button
+
+    def test_single_match_needs_no_index(self):
+        rc, out, err, tc = self._tap(["tap", "Cancel"])
+        self.assertEqual(rc, 0)
+        tc.assert_called_once_with(650, 450)
+
+    def test_fallback_selector_second_label_wins(self):
+        rc, out, err, tc = self._tap(["tap", "Nope || Cancel"])
+        self.assertEqual(rc, 0)
+        tc.assert_called_once_with(650, 450)
+
+    def test_fallback_selector_first_hit_wins(self):
+        rc, out, err, tc = self._tap(["tap", "Cancel || OK"])
+        self.assertEqual(rc, 0)
+        tc.assert_called_once_with(650, 450)  # Cancel matched first
+
+    def test_fallback_all_miss(self):
+        rc, out, err, tc = self._tap(["tap", "Nope || Nada"])
+        self.assertEqual(rc, 1)
+        self.assertIn("no match", err)
+        tc.assert_not_called()
+
+    def test_fuzzy_ambiguity_flagged(self):
+        rc, out, err, tc = self._tap(["tap", "ok"], xml=FUZZY_AMBI_XML)
+        self.assertEqual(rc, 1)
+        self.assertIn("ambiguous tap", err)
+        self.assertIn("(fuzzy)", err)
+
+    def test_ambiguous_json_shape(self):
+        self.allow("wake_async")
+        self.allow("ui_dump", return_value=ET.fromstring(AMBI_XML))
+        self.allow("tap_center")
+        args = self.parse(["tap", "--json", "OK"])
+        with self.cap() as (out, err):
+            rc = pc.cmd_tap(args)
+        self.assertEqual(rc, 1)
+        body = json.loads(out.getvalue())
+        self.assertFalse(body["ok"])
+        self.assertIn("ambiguous tap", body["error"])
+
+
+class SnapTests(OfflineTestCase):
+    def setUp(self):
+        super().setUp()
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._dir_patch = mock.patch.object(pc, "SNAP_DIR", self._tmp.name)
+        self._dir_patch.start()
+        self.addCleanup(self._dir_patch.stop)
+        self._snap_patch = mock.patch.object(
+            pc, "SNAP_PATH", os.path.join(self._tmp.name, "snap.json"))
+        self._snap_patch.start()
+        self.addCleanup(self._snap_patch.stop)
+
+    def _save(self, xml=AMBI_XML):
+        nodes = pc.walk(ET.fromstring(xml))
+        return pc.snap_save(nodes)
+
+    def test_snap_numbers_handles(self):
+        numbered = self._save()
+        handles = [h for h, _ in numbered]
+        self.assertEqual(handles[0], "@e1")
+        self.assertTrue(all(h.startswith("@e") for h in handles))
+        # 3 visible nodes: the empty FrameLayout root carries no label
+        self.assertEqual(len(numbered), 3)
+
+    def test_snap_file_persists_entries(self):
+        self._save()
+        with open(os.path.join(self._tmp.name, "snap.json")) as f:
+            snap = json.load(f)
+        self.assertIn("ts", snap)
+        self.assertEqual(snap["entries"]["1"]["x"], 250)
+
+    def test_snap_resolve_roundtrip(self):
+        self._save()
+        self.assertEqual(pc.snap_resolve("@e1"), (250, 450))
+        self.assertEqual(pc.snap_resolve("  @e3 "), (250, 650))
+
+    def test_snap_resolve_no_file(self):
+        with self.assertRaisesRegex(ValueError, "run `pc snap` first"):
+            pc.snap_resolve("@e1")
+
+    def test_snap_resolve_bad_handle(self):
+        with self.assertRaisesRegex(ValueError, "not a snap handle"):
+            pc.snap_resolve("OK")
+
+    def test_snap_resolve_expired(self):
+        self._save()
+        path = os.path.join(self._tmp.name, "snap.json")
+        with open(path) as f:
+            snap = json.load(f)
+        snap["ts"] -= pc.SNAP_TTL + 10
+        with open(path, "w") as f:
+            json.dump(snap, f)
+        with self.assertRaisesRegex(ValueError, "expired"):
+            pc.snap_resolve("@e1")
+
+    def test_snap_resolve_missing_entry(self):
+        self._save()
+        with self.assertRaisesRegex(ValueError, "no such handle"):
+            pc.snap_resolve("@e99")
+
+    def test_u2_invalidate_drops_snap(self):
+        # Every mutating action funnels through u2_invalidate(); it must
+        # delete the snap file so @eN handles never outlive their screen.
+        self._save()
+        path = os.path.join(self._tmp.name, "snap.json")
+        self.assertTrue(os.path.exists(path))
+        guard = self._guards["u2_invalidate"]
+        with mock.patch.object(pc, "u2_invalidate", guard.temp_original):
+            self.allow("u2sock", return_value=None)
+            si = self.allow("snap_invalidate")
+            pc.u2_invalidate()
+            si.assert_called_once_with()
+
+    def test_cmd_snap_output(self):
+        self.allow("ui_dump", return_value=ET.fromstring(AMBI_XML))
+        args = self.parse(["snap"])
+        with self.cap() as (out, err):
+            rc = pc.cmd_snap(args)
+        self.assertEqual(rc, 0)
+        lines = out.getvalue().strip().split("\n")
+        self.assertTrue(lines[0].startswith("@e1 "))
+        self.assertIn("OK", lines[0])
+
+    def test_tap_at_snap_handle(self):
+        self._save()
+        self.allow("wake_async")
+        self.allow("ui_dump", return_value=ET.fromstring(AMBI_XML))
+        tc = self.allow("tap_center")
+        args = self.parse(["tap", "@e2"])
+        with self.cap() as (out, err):
+            rc = pc.cmd_tap(args)
+        self.assertEqual(rc, 0)
+        tc.assert_called_once_with(650, 450)  # Cancel button coords
+        self.assertIn("@e2", out.getvalue())
+
+    def test_tap_stale_snap_fails(self):
+        args = self.parse(["tap", "@e1"])
+        with self.cap() as (out, err):
+            rc = pc.cmd_tap(args)
+        self.assertEqual(rc, 1)
+        self.assertIn("no snap saved", err.getvalue())
+
+
+class SettleTests(OfflineTestCase):
+    def _lines(self, xml):
+        return pc.visible_lines(pc.walk(ET.fromstring(xml)))
+
+    def test_settle_unchanged(self):
+        root = ET.fromstring(SETTLE_A_XML)
+        self.allow("ui_dump", return_value=root)
+        added, removed = pc.settle_lines(self._lines(SETTLE_A_XML),
+                                         timeout=2, quiet=0.05, poll=0.01)
+        self.assertEqual((added, removed), ([], []))
+
+    def test_settle_detects_change(self):
+        roots = [ET.fromstring(SETTLE_B_XML)] * 30
+        self.allow("ui_dump", side_effect=roots)
+        added, removed = pc.settle_lines(self._lines(SETTLE_A_XML),
+                                         timeout=2, quiet=0.05, poll=0.01)
+        self.assertTrue(any("Results" in l for l in added))
+        self.assertTrue(any("Loading" in l for l in removed))
+
+    def test_settle_partial_dump_retried(self):
+        full = _twelve_line_xml()
+        tiny = SETTLE_A_XML  # 2 lines vs 13: <=20% of a 12+ screen
+        roots = [ET.fromstring(tiny)] + [ET.fromstring(full)] * 6
+        self.allow("ui_dump", side_effect=roots)
+        added, removed = pc.settle_lines(self._lines(full),
+                                         timeout=5, quiet=0.05, poll=0.01)
+        # The partial read must not surface as a mass disappearance.
+        self.assertEqual((added, removed), ([], []))
+
+    def test_tap_settle_reports_unchanged(self):
+        self.allow("wake_async")
+        self.allow("ui_dump", return_value=ET.fromstring(TAP_XML))
+        tc = self.allow("tap_center")
+        args = self.parse(["tap", "--settle", "Not now"])
+        with self.cap() as (out, err):
+            with mock.patch.object(pc, "settle_lines", return_value=([], [])) \
+                    as sl:
+                rc = pc.cmd_tap(args)
+        self.assertEqual(rc, 0)
+        tc.assert_called_once()
+        sl.assert_called_once()
+        self.assertIn("unchanged", out.getvalue())
+
+    def test_tap_settle_json_shape(self):
+        self.allow("wake_async")
+        self.allow("ui_dump", return_value=ET.fromstring(TAP_XML))
+        self.allow("tap_center")
+        args = self.parse(["tap", "--json", "--settle", "Not now"])
+        with self.cap() as (out, err):
+            with mock.patch.object(
+                    pc, "settle_lines",
+                    return_value=(["+ Results [TextView] (300,250)"],
+                                  ["- Loading [TextView] (300,250)"])):
+                rc = pc.cmd_tap(args)
+        self.assertEqual(rc, 0)
+        body = json.loads(out.getvalue())
+        self.assertTrue(body["ok"])
+        self.assertIn("settled", body)
+        self.assertEqual(len(body["settled"]["added"]), 1)
+
+    def test_print_settle_diff_cap(self):
+        added = ["line%d" % i for i in range(100)]
+        with self.cap() as (out, err):
+            pc._print_settle_diff(added, [], cap=80)
+        text = out.getvalue()
+        self.assertIn("settled: +100 -0", text)
+        self.assertIn("... 20 more", text)
 if __name__ == "__main__":
     unittest.main()
