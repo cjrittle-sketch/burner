@@ -2,209 +2,102 @@
 
 # burner
 
-give your AI assistant a physical side phone.
+Give your AI assistant a physical side phone.
 
-## What it does
+burner lets your AI assistant use a spare Android phone that sits in a drawer at
+home, so it can use the apps you use.
 
-burner hands an AI agent a real, dedicated Android phone it can see and touch:
-read the screen as a UI tree, tap buttons, type into fields, open deep links,
-take screenshots, and pull email verification codes. The whole thing runs
-through one CLI: `pc`.
+## What it can do for you
 
-Why a phone at all? Plenty of apps have no API, no MCP server, and actively
-block bots in a browser. Think Tinder, Snapchat, Vinted, most banking apps,
-and store apps that fingerprint automation. A spare phone on your network is a
-legit client those apps cannot tell apart from you holding it.
+- "Screen my Tinder matches and tell me who's worth a reply."
+- "Keep my Snapchat streaks alive while I'm on vacation."
+- "Spot underpriced flips on Vinted before anyone else sees them."
+- "Check whether my paycheck landed and tell me the balance."
+- "Message that Marketplace seller and offer 20 percent less."
+- "Order my usual from the store app that never works in my browser."
 
-Site: https://useburner.si (source: https://github.com/useburner/burner)
+## Get started
 
-## How it works
-
-```
-agent
-  |
-  v
-pc CLI (bin/pc)
-  |-- adb -----------------------> phone, over ADB
-  |-- u2 daemon (lib/u2/u2mux.py) -> fast UI dumps, taps, text entry
-  |-- scrcpy mux ----------------> hardware keys only (home/back/wake)
-  |
-  v
-socat tunnel: 127.0.0.1:LOCAL_PORT -> CONNECT proxy -> PHONE_IP:ADB_PORT (Tailscale or LAN)
-```
-
-The phone runs wireless debugging. The VM reaches it through a local socat
-tunnel (`tunnel.sh`) that forwards through the runtime's HTTP CONNECT proxy to
-the phone's tailnet IP and ADB port. Pairing is one-time (`adb pair` with a
-6-digit code); after that the VM's adb key stays authorized. `pc ensure`
-heals a wedged stack (tunnel, adb server, u2 daemon) in about 5 seconds.
-
-The u2 daemon keeps a persistent connection to the phone and caches UI dumps,
-which is where the speed comes from (see benchmarks). Taps go through
-`adb shell input tap`, which is orientation-aware; the u2 dump's `rotation`
-attribute is the source of truth for screen orientation.
-
-## Benchmarks
-
-Measured 2026-09-30 on a Pixel 7 over Tailscale:
-
-| Operation | Time |
-|---|---|
-| Cached tap (dump cache hit) | ~0.33s |
-| Cold exact-text tap | ~0.56s |
-| `pc wait` (match found) | ~0.77s |
-| Cold UI dump | ~1.01s |
-| Cached UI dump | ~0.09s |
-
-## Quickstart
-
-```bash
-curl -fsSL https://useburner.si/install.sh | bash   # installs to ~/burner (or $BURNER_DIR)
-export PC_WORKSPACE="$HOME/burner"
-export PATH="$HOME/burner/bin:$PATH"
-```
-
-The web installer downloads the source from GitHub and runs the repo's
-`install.sh` (idempotent; local-only, no sudo). Prefer a git checkout?
-`git clone https://github.com/useburner/burner && cd burner && ./install.sh`
-works the same way, and re-running the web installer on a checkout does a
-`git pull --ff-only`.
-
-Then pair the phone (needs a human once, ~10 minutes). The guided path is
-`pc setup` - it walks every step, shows a screenshot for each human step
-(in `setup/`), and finishes with `pc doctor`. Keep the burner in hand;
-pairing codes expire in about a minute.
-
-1. On the phone: install Tailscale, sign in, leave it connected, set its
-   battery usage to Unrestricted. Connect to WiFi, plug into a charger.
-   (On hosted Muse, the VM must join your tailnet first via `tailscale up`.)
-2. Enable Developer options, turn on Wireless debugging.
-3. Tap "Pair device with pairing code" and give the agent the IP, pairing
-   port, and 6-digit code (expires fast; turn Tailscale on first so the
-   dialog shows the tailnet IP). After the one-time pair, the agent installs
-   adb-auto-enable (open source, com.tpn.adbautoenable), which re-enables ADB
-   on every boot and pins it to the fixed port 5555 - put `ADB_PORT="5555"`
-   in `config.env` once and never touch the random wireless-debugging port
-   again.
-
-Verify:
-
-```bash
-pc doctor
-pc dump
-pc tap "Settings"
-```
-
-## Command reference
+Paste this to your AI assistant:
 
 ```
-pc setup [--list-steps] [--step NAME] [--confirm] [--yes]
-    Guided phone setup wizard. --list-steps shows each step's status;
-    --step runs one step; --confirm records a human step as done.
-    Pairing codes passed via --code are never stored.
-
-pc dump [--verbose] [--all] [--json]
-    List visible UI text and bounds. --all includes empty-text nodes.
-
-pc tap "Text" [--fuzzy] [--index N] [--xy] [--no-occlusion-check] [--json]
-    Tap the first node matching the text. --index picks the Nth match,
-    --fuzzy allows close matches, --xy taps raw coordinates.
-
-pc wait "Text" [--timeout 30] [--fuzzy] [--absent] [--json]
-    Poll until text appears (exit 1 on timeout), or until it disappears
-    with --absent.
-
-pc type "text" [--field "Hint"] [--clear] [--unicode] [--ascii]
-    Type char-by-char, safe on React Native / Bloks fields where bulk
-    `adb shell input text` is ignored. --field taps the field first,
-    --clear empties it first.
-
-pc press BACK|HOME|<keycode>
-    Key events: BACK, HOME, ENTER, DEL, volume, dpad, wake/sleep...
-
-pc state [--json]
-    Focused app plus the top screen texts and orientation.
-
-pc start com.example.app
-    Launch an app by package name.
-
-pc shot
-    Screenshot, saved under shots/.
-
-pc open <url>
-    Open a URL or deep link via VIEW intent. Deep links skip menu
-    navigation, e.g. pc open https://www.amazon.com/gp/css/order-history
-
-pc sleep <seconds>
-    Sleep, mainly for use inside pc do flows.
-
-pc do 'open URL; wait "Cart" --timeout 30; tap "Checkout"'
-    Run a ;-separated flow in one call, stopping on the first failure.
-
-pc recipe <name>
-    Run a saved flow from recipes/<name>.pc (same ;-separated format,
-    one step per line, # comments allowed).
-
-pc ensure
-    Heal the stack: restart tunnel, reconnect adb, revive the u2 daemon.
-
-pc gcode --from "sender@example.com" [--mins 15]
-    Pull the newest verification code from Gmail. Transient: read, used,
-    never stored.
-
-pc vcode --from "sender@example.com" [--mins 15] [--timeout 60] [--submit "Continue"]
-    One-shot code flow: wait for the code field, pull the email code,
-    clear, type char-by-char, wait for the submit button to enable, tap it.
-
-pc amazon-status
-    Latest Amazon order status in one shot (stops at the order list).
-
-pc doctor [--json]
-    End-to-end health check: tunnel, adb auth, u2 daemon, screen state.
+Set up burner for me. Read the guide at https://useburner.si/skill.md and do everything in it. Walk me through the parts that need me.
 ```
 
-Verification codes come from email, never SMS: the side phone has no SIM, so
-any SMS code screen is a dead end. `gcode`/`vcode` pull the code from the
-connected Gmail, type it as plain text, and never store it or ask the user to
-paste it.
+Your AI assistant reads the guide and walks you through the rest. Setup takes
+about 10 minutes, once, and any spare Android phone works. After that, plug the
+phone in, leave it in a drawer, and never touch it again.
+
+## Questions
+
+**Will it buy things on its own?**
+Never without your explicit okay. Every purchase, message, or post waits for
+your yes.
+
+**Does it work when I'm away from home?**
+Yes. The phone stays plugged in at home, and your AI assistant can use it from
+wherever you are.
+
+**Is my stuff private?**
+Yes. It runs on your own phone, on your own Wi-Fi at home, not in someone
+else's data center. There's no burner account and no burner server, so once
+it's set up nothing you do ever passes through us. Only you and your AI
+assistant can reach the phone. Sign-in codes come from your email and are never
+stored.
+
+**Will apps see it as coming from my home?**
+Yes. The phone uses your own Wi-Fi, so apps see a regular phone at your house,
+not a computer in some faraway data center. It also uses your location like any
+phone would, so nearby stores, delivery, and local listings match where you
+live.
+
+**What if the phone restarts?**
+It comes back on its own. You don't need to do anything.
+
+**Do I need to pay or sign up?**
+No. burner is free and open source, and there's no burner account or burner
+server. The one other app it uses, Tailscale, is free for personal use, so a
+normal setup at home costs nothing.
+
+**Where can I find the technical details?**
+Start with [How it works](#how-it-works) below. The full setup steps and every
+command are in [SKILL.md](SKILL.md).
 
 ## Security notes
 
-- Your phone, your network. The tunnel binds to localhost and reaches the
-  phone over Tailscale (or your LAN). Do not expose the adb tunnel publicly:
-  anyone who can reach it gets full control of the phone.
-- Verification codes are transient: pulled, typed, never written to disk.
-- `config.env` holds your tailnet IP and ports and is gitignored. Never
-  commit it. Pairing codes and one-time passwords never go in config files.
-- Screenshots land in `shots/`, which is also gitignored: they are your
-  personal screen content.
+- It's your phone on your own Wi-Fi. Only computers signed in to your own
+  Tailscale can reach it. Never open the phone up to the public internet:
+  anyone who reaches it gets full control of the phone.
+- Sign-in codes get read, typed and forgotten. They're never saved.
+- Your phone's address lives in `config.env` on your computer and is kept out
+  of GitHub. Pairing codes are never saved anywhere.
+- Screenshots stay in the `shots/` folder and are kept out of GitHub too,
+  since they show your personal stuff.
 
 ## Gotchas
 
-- ADB auto-enables on boot (adb-auto-enable pins it to fixed port 5555).
-  If the phone goes unreachable after a reboot, wait ~60-90s for boot plus
-  ~30s for the app to switch adbd to 5555, then run `pc ensure`.
-- Tailscale must auto-start after reboot too: the agent sets Always-on VPN
-  for it during pairing (`settings put secure always_on_vpn_app
-  com.tailscale.ipn`). Without this, a reboot leaves the phone unreachable
-  until someone opens the Tailscale app by hand.
-- The screen must stay awake or dumps come back empty. Keep the phone on its
-  charger; short display timeouts will break long flows.
-- No SIM needed. The phone is WiFi-only; codes arrive by email.
-- Purchases need human approval. burner never buys anything on its own: every
-  purchase is an explicit human decision, every time.
-- First `adb connect` right after pairing can transiently fail; a retry
-  connects fine.
+- After a restart, give the phone about 2 minutes to come back. If your AI
+  assistant still can't reach it, `pc ensure` reconnects it.
+- Tailscale has to turn itself on after a restart. Your AI assistant sets that
+  up during setup, so you never have to open the app.
+- Keep the phone on its charger with the screen allowed to stay on. If the
+  screen goes dark, your AI assistant can't see what's on it.
+- No SIM needed. The phone only uses Wi-Fi, and sign-in codes come by email.
+- Nothing gets bought, sent or posted without your yes. Every time.
+- The first connection right after pairing sometimes fails. Trying again fixes
+  it.
 
-## Install details
+## How it works
 
-`install.sh` checks for python3 >= 3.10 and pip, finds adb on PATH or
-downloads Google's platform-tools for your OS into `.android-tools/`, creates
-`.venv/` with `uiautomator2`, copies `config.env.example` to `config.env`
-(never overwrites), and makes `bin/pc` executable. It writes nothing outside
-the repo and needs no sudo. For the agent-focused guide, see `SKILL.md`; the
-Claude Code plugin skill lives in `skills/burner/`.
+burner is a small command-line tool, `pc`, that your AI assistant runs. It
+connects to the phone through Android's wireless debugging, over Tailscale (or
+your home Wi-Fi when both are on the same network). From there it reads what's
+on the screen, taps, types, opens apps and links, and takes screenshots, the
+same way you would. Sign-in codes come from your email, so the phone doesn't
+need a SIM. Everything the phone does in your apps happens on your own Wi-Fi.
+
+The full setup steps and command reference are in [SKILL.md](SKILL.md).
 
 ## License
 
-MIT, co-authors Muse & Claude. See `LICENSE`.
+MIT, co-authors Muse & Claude. See [LICENSE](LICENSE).

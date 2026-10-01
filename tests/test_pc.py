@@ -972,12 +972,13 @@ class RegressionTests(OfflineTestCase):
 
 class DocsTests(OfflineTestCase):
     def _readme_commands(self):
-        with open(os.path.join(ROOT, "README.md")) as f:
+        with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as f:
             text = f.read()
-        section = text.split("## Command reference", 1)[1]
-        section = section.split("\n## ", 1)[0]
+        # every "## Command reference ..." section (short and full)
+        sections = [s.split("\n## ", 1)[0]
+                    for s in text.split("## Command reference")[1:]]
         cmds = {}
-        for line in section.splitlines():
+        for line in "\n".join(sections).splitlines():
             s = line.strip()
             if not s.startswith("pc "):
                 continue
@@ -995,7 +996,7 @@ class DocsTests(OfflineTestCase):
 
     def test_readme_flags_exist_in_argparse(self):
         cmds = self._readme_commands()
-        self.assertTrue(cmds, "no commands parsed from README")
+        self.assertTrue(cmds, "no commands parsed from SKILL.md")
         ap = pc.build_parser()
         sub = next(a for a in ap._actions
                    if isinstance(a, argparse._SubParsersAction))
@@ -1005,7 +1006,7 @@ class DocsTests(OfflineTestCase):
         for cmd, flags in sorted(cmds.items()):
             with self.subTest(cmd=cmd):
                 self.assertIn(cmd, sub.choices,
-                              "README documents unknown command")
+                              "SKILL.md documents unknown command")
                 parser = sub.choices[cmd]
                 opts = set(top_opts)
                 for a in parser._actions:
@@ -1013,7 +1014,7 @@ class DocsTests(OfflineTestCase):
                 missing = flags - opts
                 self.assertFalse(
                     missing,
-                    "README flags missing from argparse for %r: %s"
+                    "SKILL.md flags missing from argparse for %r: %s"
                     % (cmd, sorted(missing)))
 
     def test_no_muse_phone_string_in_tree(self):

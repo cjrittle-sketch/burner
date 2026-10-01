@@ -152,6 +152,79 @@ Codes are pulled from the user's connected Gmail, typed as plain text, and
 never stored. The tool never makes purchases on its own: any buy needs explicit
 human approval each time.
 
+## Command reference (full)
+
+```
+pc setup [--list-steps] [--step NAME] [--confirm] [--yes]
+    Guided phone setup wizard. --list-steps shows each step's status;
+    --step runs one step; --confirm records a human step as done.
+    Pairing codes passed via --code are never stored.
+
+pc dump [--verbose] [--all] [--json]
+    List visible UI text and bounds. --all includes empty-text nodes.
+
+pc tap "Text" [--fuzzy] [--index N] [--xy] [--no-occlusion-check] [--json]
+    Tap the first node matching the text. --index picks the Nth match,
+    --fuzzy allows close matches, --xy taps raw coordinates.
+
+pc wait "Text" [--timeout 30] [--fuzzy] [--absent] [--json]
+    Poll until text appears (exit 1 on timeout), or until it disappears
+    with --absent.
+
+pc type "text" [--field "Hint"] [--clear] [--unicode] [--ascii]
+    Type char-by-char, safe on React Native / Bloks fields where bulk
+    `adb shell input text` is ignored. --field taps the field first,
+    --clear empties it first.
+
+pc press BACK|HOME|<keycode>
+    Key events: BACK, HOME, ENTER, DEL, volume, dpad, wake/sleep...
+
+pc state [--json]
+    Focused app plus the top screen texts and orientation.
+
+pc start com.example.app
+    Launch an app by package name.
+
+pc shot
+    Screenshot, saved under shots/.
+
+pc open <url>
+    Open a URL or deep link via VIEW intent. Deep links skip menu
+    navigation, e.g. pc open https://www.amazon.com/gp/css/order-history
+
+pc sleep <seconds>
+    Sleep, mainly for use inside pc do flows.
+
+pc do 'open URL; wait "Cart" --timeout 30; tap "Checkout"'
+    Run a ;-separated flow in one call, stopping on the first failure.
+
+pc recipe <name>
+    Run a saved flow from recipes/<name>.pc (same ;-separated format,
+    one step per line, # comments allowed).
+
+pc ensure
+    Heal the stack: restart tunnel, reconnect adb, revive the u2 daemon.
+
+pc gcode --from "sender@example.com" [--mins 15]
+    Pull the newest verification code from Gmail. Transient: read, used,
+    never stored.
+
+pc vcode --from "sender@example.com" [--mins 15] [--timeout 60] [--submit "Continue"]
+    One-shot code flow: wait for the code field, pull the email code,
+    clear, type char-by-char, wait for the submit button to enable, tap it.
+
+pc amazon-status
+    Latest Amazon order status in one shot (stops at the order list).
+
+pc doctor [--json]
+    End-to-end health check: tunnel, adb auth, u2 daemon, screen state.
+```
+
+Verification codes come from email, never SMS: the side phone has no SIM, so
+any SMS code screen is a dead end. `gcode`/`vcode` pull the code from the
+connected Gmail, type it as plain text, and never store it or ask the user to
+paste it.
+
 ## Tapping precisely (read this before driving the UI)
 
 `pc tap` refuses to guess. If a label matches two or more nodes it fails with
@@ -191,4 +264,4 @@ item, price, and payment method - not "buy something like this."
 of typed text, passwords, or messages. Screenshots are never stored in the
 navigation database.
 
-Full detail, benchmarks, and architecture: see `README.md`.
+How it works, security notes and gotchas: see `README.md`.
