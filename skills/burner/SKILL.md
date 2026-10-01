@@ -1,6 +1,6 @@
 ---
 name: burner
-description: Give your AI a physical Android phone. Control a dedicated Android phone over ADB via the burner CLI: dump UI, tap, type, wait, screenshots, deep links, and transient verification-code flows. For apps with no API or MCP (marketplaces, banking, social, bot-blocking store apps). Pairs over Tailscale or LAN with one-time human-assisted wireless-debugging pairing.
+description: Use when the user says "use my burner", "use my burner phone", "on my burner", or asks you to do something in a phone app. Gives your AI a physical Android phone. Control a dedicated Android phone over ADB via the burner CLI: dump UI, tap, type, wait, screenshots, deep links, and transient verification-code flows. For apps with no API or MCP (marketplaces, banking, social, bot-blocking store apps). Pairs over Tailscale or LAN with one-time human-assisted wireless-debugging pairing.
 ---
 
 # burner
@@ -9,6 +9,9 @@ Give your AI a physical Android phone. burner is a CLI (`burner`) that drives a
 dedicated Android phone over ADB, so an agent can operate real mobile apps that
 have no API, no MCP server, and no web automation path: marketplaces, banking
 apps, social apps, store apps that block bots in browsers.
+
+When the user says "use my burner", "use my burner phone" or "do it on my
+burner", that means this phone: use the `burner` commands below.
 
 ## Install
 

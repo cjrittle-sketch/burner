@@ -5,6 +5,9 @@ dedicated Android phone over ADB, so an agent can drive real mobile apps that
 have no API, no MCP server, and no web automation path: marketplaces, banking
 apps, social apps, store apps that block bots in the browser.
 
+When the user says "use my burner", "use my burner phone" or "do it on my
+burner", that means this phone: use the `burner` commands below.
+
 ## Prerequisites
 
 - A Linux or macOS VM/container with Python 3.10+ and network access.
