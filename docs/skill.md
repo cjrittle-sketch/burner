@@ -62,17 +62,29 @@ Do these on the phone. The agent cannot do them for you.
 
 Walk the user through them one at a time, as part of setup: say what to tap,
 link the screenshot, and wait for them to say it's done before the next
-step. Never hand them a list to do "meanwhile" while you install.
+step. Never hand them a list to do "meanwhile" while you install. Give the
+full Settings path for every tap, never just a screen name, and ask the phone
+brand first: menus differ (paths below are Pixel, with Samsung noted).
 
 1. **HUMAN REQUIRED:** Connect the phone to WiFi, plug it into a charger, and
    install Tailscale from the Play Store. Sign in, leave it connected, and set
-   Tailscale battery usage to Unrestricted so Android does not kill it.
+   Tailscale battery usage to Unrestricted so Android does not kill it
+   (Settings > Apps > Tailscale > App battery usage > Unrestricted; on
+   Samsung, Settings > Apps > Tailscale > Battery > Unrestricted).
    (Screenshot: [setup/setup-01-tailscale.png](https://useburner.si/setup/setup-01-tailscale.png).)
-2. **HUMAN REQUIRED:** Enable Developer options (Settings > About phone > tap
-   Build number 7 times), then turn on **Wireless debugging**.
+2. **HUMAN REQUIRED:** Enable Developer options, then turn on
+   **Wireless debugging**:
+   - Settings > About phone > tap **Build number** 7 times, until it says
+     "You are now a developer" (enter the phone PIN if asked). On Samsung,
+     Build number is in Settings > About phone > Software information.
+   - Go back to Settings > System > **Developer options** (on Samsung,
+     Developer options is at the bottom of the main Settings list).
+   - Scroll down to the Debugging section, turn on **Wireless debugging**,
+     and tap Allow. Shortcut: search Settings for "Wireless debugging".
    (Screenshots: [setup/setup-02-build-number.png](https://useburner.si/setup/setup-02-build-number.png),
    [setup/setup-03-wireless-debugging.png](https://useburner.si/setup/setup-03-wireless-debugging.png).)
-3. **HUMAN REQUIRED:** Tap "Pair device with pairing code" and send the agent
+3. **HUMAN REQUIRED:** Tap the words **Wireless debugging** (not the switch)
+   to open its screen, tap "Pair device with pairing code", and send the agent
    the IP, the pairing port, and the 6-digit code. The code expires fast
    (about a minute), so send it right after the phone shows it and keep the
    phone in hand. **Turn Tailscale on first** -
