@@ -79,8 +79,10 @@ brand first: menus differ (paths below are Pixel, with Samsung noted).
      Build number is in Settings > About phone > Software information.
    - Go back to Settings > System > **Developer options** (on Samsung,
      Developer options is at the bottom of the main Settings list).
-   - Scroll down to the Debugging section, turn on **Wireless debugging**,
-     and tap Allow. Shortcut: search Settings for "Wireless debugging".
+   - Scroll down to the Debugging section and turn on **Wireless debugging**.
+     When it asks "Allow wireless debugging on this network?", check
+     **Always allow on this network**, then tap Allow. Shortcut: search
+     Settings for "Wireless debugging".
    (Screenshots: [setup/setup-02-build-number.png](https://useburner.si/setup/setup-02-build-number.png),
    [setup/setup-03-wireless-debugging.png](https://useburner.si/setup/setup-03-wireless-debugging.png).)
 3. **HUMAN REQUIRED:** Tap the words **Wireless debugging** (not the switch)
