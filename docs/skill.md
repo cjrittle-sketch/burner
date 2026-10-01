@@ -237,7 +237,7 @@ burner type "text" --clear    type char-by-char, Bloks/RN-safe (--field "Hint" f
 burner press BACK|HOME        key events (--repeat N, --delay MS, --ctrl/--shift/--alt/--meta)
 burner start com.app.pkg     launch an app
 burner shot                  screenshot to shots/
-burner open <url>            open a deep link / URL in the app
+burner open <url> [pkg]      open a deep link / URL (pkg targets one app)
 burner do 'step; step'       run a ;-separated flow in one call
 burner recipe <name>         run a saved flow from recipes/<name>.burner
 burner record <name>         record actions to recipes/<name>.burner (stop with --stop)
@@ -292,9 +292,11 @@ burner start com.example.app
 burner shot
     Screenshot, saved under shots/.
 
-burner open <url>
+burner open <url> [package]
     Open a URL or deep link via VIEW intent. Deep links skip menu
     navigation, e.g. burner open https://www.amazon.com/gp/css/order-history
+    A package targets one app and skips the "Open with" chooser, e.g.
+    burner open market://details?id=com.example.app com.android.vending
 
 burner sleep <seconds>
     Sleep, mainly for use inside burner do flows.

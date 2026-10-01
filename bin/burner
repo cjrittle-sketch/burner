@@ -1952,8 +1952,13 @@ def cmd_forget(args):
 # ------------------------------------------------------------------- main
 
 def cmd_open(args):
-    adb_or_ensure("shell", "am", "start", "-a", "android.intent.action.VIEW",
-                  "-d", args.url)
+    cmd = ["shell", "am", "start", "-a", "android.intent.action.VIEW",
+           "-d", args.url]
+    # A trailing package targets the intent, skipping the "Open with" chooser
+    # when several apps claim the link (e.g. Play Store and Aurora Store).
+    if args.package:
+        cmd.append(args.package)
+    adb_or_ensure(*cmd)
     u2_invalidate()
     print("opened {}".format(args.url))
     return 0
@@ -2116,6 +2121,8 @@ def build_parser():
 
     p = sub.add_parser("open", help="open URL/deep link via VIEW intent")
     p.add_argument("url")
+    p.add_argument("package", nargs="?", default=None,
+                   help="app package to handle the link (skips the chooser)")
     p.set_defaults(fn=cmd_open)
 
     p = sub.add_parser("sleep", help="sleep N seconds (for use in 'do')")

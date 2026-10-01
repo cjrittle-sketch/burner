@@ -2,8 +2,10 @@
 # Usage: PLAY_PACKAGE=com.example.app burner recipe play-install
 #
 # Deep links straight to the listing, skipping Play Store search (the slow,
-# flaky part).
-open market://details?id=$PLAY_PACKAGE
+# flaky part). Targets com.android.vending because Aurora Store also claims
+# market:// links; without a target the phone shows an "Open with" chooser
+# this linear recipe cannot get past.
+open market://details?id=$PLAY_PACKAGE com.android.vending
 # Listing loaded. "Install" also substring-matches "Uninstall", so this passes
 # for installed apps too; the next step tells them apart.
 wait "Install" --timeout 45
