@@ -1,3 +1,5 @@
+<img src="https://useburner.si/logo.png" alt="burner logo" width="120">
+
 # burner
 
 give your AI a physical side phone.
