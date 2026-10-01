@@ -17,6 +17,15 @@ apps, social apps, store apps that block bots in the browser.
   setups skip this step.
 - A human available once for ~10 minutes to pair the phone (see below).
 
+## How to talk to the user during setup
+
+Keep updates short, plain and non-technical. Say what's happening for them,
+not how: "Installing burner on my side, this takes a minute" or "Done, now
+one thing on your phone." Never relay installer output or name the parts
+(platform tools, adb, venv, Python, uiautomator2, ports, commands). Mention
+progress only when it changes what they do next, and don't promise to
+report back; just do it.
+
 ## First, work out where the user is
 
 Work out which device they are talking to you from before asking. Use what

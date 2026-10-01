@@ -29,7 +29,9 @@ has no route to the phone. Same-LAN setups skip this.
 The guided path is `burner setup`: it walks every step, shows a screenshot for
 each human step (in `setup/`), runs the agent steps itself, and finishes with
 `burner doctor`. Pairing codes last about a minute: pair the moment one arrives,
-and don't mention the limit to the user unless one expires. First work out which device the user is chatting from (infer it from the
+and don't mention the limit to the user unless one expires. Talk to the user in plain, non-technical words during setup: say what's
+happening for them ("Installing burner on my side"), never relay installer
+output or name the parts (adb, venv, Python, ports). First work out which device the user is chatting from (infer it from the
 client, platform or user agent, confirm in one line, ask only if unsure): if it's
 the burner phone itself, skip "use a spare phone" advice. Switching apps
 cancels the pairing code, so have them open Settings and the chat in split
