@@ -13,10 +13,9 @@ apps, social apps, store apps that block bots in browsers.
 ## Install
 
 ```bash
-git clone https://github.com/useburner/burner   
-cd burner
-./install.sh          # idempotent; local-only, no sudo
-export PATH="$PWD/bin:$PATH"
+curl -fsSL https://useburner.si/install.sh | bash   # idempotent; no sudo; installs to ~/burner
+export PC_WORKSPACE="$HOME/burner"
+export PATH="$HOME/burner/bin:$PATH"
 ```
 
 Needs: Linux/macOS VM with Python 3.10+, a spare Android 11+ phone,
@@ -83,5 +82,5 @@ pc amazon-status | pc doctor
   switch adbd to port 5555, then `pc ensure`.
 - `pc ensure` heals a wedged stack (tunnel, adb, u2 daemon) in ~5s.
 
-See the repo-root `SKILL.md` and `README.md` for the full guide, benchmarks,
-architecture, and troubleshooting.
+See the repo-root `SKILL.md` and `README.md` (or https://useburner.si/skill.md)
+for the full guide, benchmarks, architecture, and troubleshooting.

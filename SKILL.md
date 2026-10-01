@@ -20,20 +20,20 @@ apps, social apps, store apps that block bots in the browser.
 ## Install
 
 ```bash
-git clone https://github.com/useburner/burner   
-cd burner
-./install.sh
+curl -fsSL https://useburner.si/install.sh | bash
 ```
 
-`install.sh` is idempotent and writes nothing outside the repo: it finds or
+This fetches the source into `~/burner` (or `$BURNER_DIR`) and runs its
+`install.sh`. `install.sh` is idempotent and writes nothing outside the repo: it finds or
 downloads platform-tools (adb), creates `.venv/`, installs `uiautomator2`,
 copies `config.env.example` to `config.env` (never overwrites an existing
 one), and makes `bin/pc` executable. No sudo, no system-wide writes.
 
-Then put the repo on your PATH or call it directly:
+Then put it on your PATH or call it directly:
 
 ```bash
-export PATH="$PWD/bin:$PATH"
+export PC_WORKSPACE="$HOME/burner"
+export PATH="$HOME/burner/bin:$PATH"
 ```
 
 ## Pair the phone (HUMAN REQUIRED steps marked)

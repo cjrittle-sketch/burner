@@ -14,7 +14,7 @@ block bots in a browser. Think Tinder, Snapchat, Vinted, most banking apps,
 and store apps that fingerprint automation. A spare phone on your network is a
 legit client those apps cannot tell apart from you holding it.
 
-Repo: https://github.com/useburner/burner
+Site: https://useburner.si (source: https://github.com/useburner/burner)
 
 ## How it works
 
@@ -57,12 +57,16 @@ Measured 2026-09-30 on a Pixel 7 over Tailscale:
 ## Quickstart
 
 ```bash
-git clone https://github.com/useburner/burner   
-cd burner
-./install.sh          # idempotent; local-only, no sudo
-export PC_WORKSPACE="$PWD"
-export PATH="$PWD/bin:$PATH"
+curl -fsSL https://useburner.si/install.sh | bash   # installs to ~/burner (or $BURNER_DIR)
+export PC_WORKSPACE="$HOME/burner"
+export PATH="$HOME/burner/bin:$PATH"
 ```
+
+The web installer downloads the source from GitHub and runs the repo's
+`install.sh` (idempotent; local-only, no sudo). Prefer a git checkout?
+`git clone https://github.com/useburner/burner && cd burner && ./install.sh`
+works the same way, and re-running the web installer on a checkout does a
+`git pull --ff-only`.
 
 Then pair the phone (needs a human once, ~10 minutes). The guided path is
 `pc setup` - it walks every step, shows a screenshot for each human step

@@ -14,7 +14,7 @@ dependencies = ["uiautomator2"]
 keywords = ["android", "adb", "phone-control", "automation"]
 
 [project.urls]
-Homepage = "https://github.com/useburner/burner"
+Homepage = "https://useburner.si"
 Repository = "https://github.com/useburner/burner"
 
 [project.scripts]
