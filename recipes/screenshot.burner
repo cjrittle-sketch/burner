@@ -1,6 +1,7 @@
 # Screenshot the burner phone. Prints the saved file's path (under shots/).
 # Usage: burner recipe screenshot
 #
-# For "take a screenshot of my burner" or "what's on my burner?": run this,
-# then send the saved image back to the user.
+# For "take a screenshot of my burner" or "what's on my burner?" (the screen
+# right now, not the installed apps): run this, then send the saved image
+# itself back to the user.
 shot
