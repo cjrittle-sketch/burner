@@ -21,8 +21,16 @@ export PATH="$PWD/bin:$PATH"
 
 Needs: Linux/macOS VM with Python 3.10+, a spare Android 11+ phone,
 Tailscale (or same LAN), and a human once for ~10 minutes to pair.
+If the agent runs on hosted Muse: the Muse VM must join your tailnet first
+(the agent runs `tailscale up`, you approve it once); without this the VM
+has no route to the phone. Same-LAN setups skip this.
 
 ## Pair the phone
+
+The guided path is `pc setup`: it walks every step, shows a screenshot for
+each human step (in `setup/`), runs the agent steps itself, and finishes with
+`pc doctor`. Keep the burner phone in hand during setup; pairing codes expire
+in about a minute.
 
 **HUMAN REQUIRED:** on the phone, enable Developer options, turn on Wireless
 debugging, tap "Pair device with pairing code", and send the agent the IP,
@@ -32,7 +40,7 @@ installs **adb-auto-enable** (open source, `com.tpn.adbautoenable`), grants
 it `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization; then
 **HUMAN REQUIRED:** open the app and finish its one-time self-pairing. From
 then on ADB re-enables on every boot on the fixed port **5555**, so
-`ADB_PORT="5555"` in `config.env` is permanent — reboots need no human action.
+`ADB_PORT="5555"` in `config.env` is permanent - reboots need no human action.
 The agent also sets Always-on VPN for Tailscale
 (`adb shell settings put secure always_on_vpn_app com.tailscale.ipn`, lockdown
 left off) so Tailscale auto-starts after reboot; without it the phone is
@@ -40,7 +48,7 @@ unreachable until a human opens the app.
 
 Security: port 5555 listens on the phone's WiFi and tailnet interfaces (never
 the internet; ADB is unencrypted, so trusted networks only). Any new computer
-triggers an on-device authorization prompt — never approve one uninitiated.
+triggers an on-device authorization prompt - never approve one uninitiated.
 
 ## Verify
 

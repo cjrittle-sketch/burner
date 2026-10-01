@@ -1054,7 +1054,9 @@ class DocsTests(OfflineTestCase):
             self.assertFalse(ipre.search(v),
                              "real-looking IP in %s=%r" % (k, v))
         self.assertIn("YOUR_PHONE_TAILSCALE_IP", assignments.values())
-        self.assertIn("YOUR_ADB_CONNECTION_PORT", assignments.values())
+        # ADB_PORT is pinned to 5555 by adb-auto-enable (installed during
+        # pairing); it is intentionally not a placeholder anymore.
+        self.assertEqual(assignments.get("ADB_PORT"), "5555")
 
 
 # --------------------------------- 8. offline safety + sanity checks
@@ -1372,5 +1374,247 @@ class SettleTests(OfflineTestCase):
         text = out.getvalue()
         self.assertIn("settled: +100 -0", text)
         self.assertIn("... 20 more", text)
+
+
+# --------------------------------- 12. setup wizard
+
+def _setup_args(**kw):
+    base = dict(list_steps=False, step=None, confirm=False, yes=True,
+                code=None, ip=None, pair_port=None, connect_port=None)
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+class SetupWizardTests(OfflineTestCase):
+    def setUp(self):
+        super().setUp()
+        # Redirect the setup state file to a temp dir.
+        self.tmp = tempfile.mkdtemp()
+        self._sp = mock.patch.object(pc, "SETUP_STATE_PATH",
+                                     os.path.join(self.tmp, "setup-state.json"))
+        self._sp.start()
+        self.addCleanup(self._sp.stop)
+
+    def _adb(self, table):
+        """Build a mock for pc.adb from {(cmd tuple): stdout}."""
+        def fake(*args, **kwargs):
+            key = tuple(str(a) for a in args)
+            if key in table:
+                return SimpleNamespace(returncode=0, stdout=table[key],
+                                       stderr="")
+            return SimpleNamespace(returncode=1, stdout="", stderr="no")
+        return fake
+
+    def test_step_registry_order_and_kinds(self):
+        names = [s["name"] for s in pc.SETUP_STEPS]
+        self.assertEqual(names, ["prereqs", "tailscale-phone", "dev-options",
+                                 "wireless-debug", "pair",
+                                 "install-adb-auto-enable", "self-pair",
+                                 "always-on-vpn", "fix-port", "verify"])
+        kinds = {s["name"]: s["kind"] for s in pc.SETUP_STEPS}
+        self.assertEqual(kinds["prereqs"], "agent")
+        self.assertEqual(kinds["tailscale-phone"], "human")
+        self.assertEqual(kinds["pair"], "agent")
+        self.assertEqual(kinds["self-pair"], "human")
+        # Human steps must carry an instruction and a screenshot path.
+        for s in pc.SETUP_STEPS:
+            if s["kind"] == "human":
+                self.assertTrue(s["instruction"], s["name"])
+                self.assertTrue(s["shot"], s["name"])
+                self.assertNotIn("\u2014", s["instruction"])  # no em dashes
+
+    def test_list_steps(self):
+        m = self.allow("adb")
+        m.side_effect = self._adb({("get-state",): "unknown"})
+        with self.cap() as (out, err):
+            rc = pc.cmd_setup(_setup_args(list_steps=True))
+        self.assertEqual(rc, 0)
+        text = out.getvalue()
+        for name in ("prereqs", "pair", "verify"):
+            self.assertIn(name, text)
+
+    def test_human_step_prints_instruction_no_block(self):
+        m = self.allow("adb")
+        m.side_effect = self._adb({})
+        with self.cap() as (out, err):
+            rc = pc.cmd_setup(_setup_args(step="tailscale-phone"))
+        self.assertEqual(rc, 0)
+        text = out.getvalue()
+        self.assertIn("Tailscale", text)
+        self.assertIn("setup/setup-01-tailscale.png", text)
+
+    def test_confirm_records_human_done(self):
+        with self.cap():
+            rc = pc.cmd_setup(_setup_args(step="self-pair", confirm=True))
+        self.assertEqual(rc, 0)
+        st = pc._setup_state_load()
+        self.assertIn("self-pair", st["done"])
+
+    def test_unknown_status_falls_back_to_state_file(self):
+        pc._setup_state_save("self-pair")
+        m = self.allow("adb")
+        m.side_effect = self._adb({})
+        step = next(s for s in pc.SETUP_STEPS if s["name"] == "self-pair")
+        self.assertEqual(pc._setup_step_status(step), "done")
+
+    def test_live_false_beats_state_file(self):
+        pc._setup_state_save("wireless-debug")
+        m = self.allow("adb")
+        m.side_effect = self._adb({("shell", "settings", "get", "global",
+                                    "adb_wifi_enabled"): "0"})
+        step = next(s for s in pc.SETUP_STEPS if s["name"] == "wireless-debug")
+        self.assertEqual(pc._setup_step_status(step), "pending")
+
+    def test_check_wireless_debug_true(self):
+        m = self.allow("adb")
+        m.side_effect = self._adb({("shell", "settings", "get", "global",
+                                    "adb_wifi_enabled"): "1"})
+        self.assertTrue(pc._check_wireless_debug())
+
+    def test_check_always_on_vpn(self):
+        m = self.allow("adb")
+        m.side_effect = self._adb({("shell", "settings", "get", "secure",
+                                    "always_on_vpn_app"): "com.tailscale.ipn"})
+        self.assertTrue(pc._check_always_on_vpn())
+
+    def test_run_always_on_vpn_refuses_lockdown(self):
+        m = self.allow("adb")
+        m.side_effect = self._adb({("shell", "settings", "get", "secure",
+                                    "always_on_vpn_lockdown"): "1"})
+        with self.cap() as (out, err):
+            rc = pc._run_always_on_vpn(_setup_args())
+        self.assertEqual(rc, 1)
+        self.assertIn("lockdown", err.getvalue().lower())
+
+    def test_run_always_on_vpn_success(self):
+        calls = []
+
+        def fake_adb(*args, **kwargs):
+            calls.append(tuple(str(a) for a in args))
+            key = tuple(str(a) for a in args)
+            if key == ("shell", "settings", "get", "secure",
+                       "always_on_vpn_lockdown"):
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if key == ("shell", "settings", "put", "secure",
+                       "always_on_vpn_app", "com.tailscale.ipn"):
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if key == ("shell", "settings", "get", "secure",
+                       "always_on_vpn_app"):
+                return SimpleNamespace(returncode=0, stdout="com.tailscale.ipn",
+                                       stderr="")
+            return SimpleNamespace(returncode=1, stdout="", stderr="")
+        m = self.allow("adb")
+        m.side_effect = fake_adb
+        with self.cap():
+            rc = pc._run_always_on_vpn(_setup_args())
+        self.assertEqual(rc, 0)
+
+    def test_pair_needs_code_ip_port(self):
+        with self.cap() as (out, err):
+            rc = pc.cmd_setup(_setup_args(step="pair"))
+        self.assertEqual(rc, 1)
+        self.assertIn("--code", err.getvalue())
+
+    def test_pair_rejects_bad_code(self):
+        with self.cap():
+            rc = pc.cmd_setup(_setup_args(step="pair", code="abc",
+                                          ip="100.0.0.1", pair_port="1234"))
+        self.assertEqual(rc, 1)
+
+    def test_pair_code_never_written_to_disk(self):
+        popen = self.allow("_setup_popen")
+        popen.return_value = mock.Mock()
+        spawn = self.allow("_setup_spawn")
+        spawn.return_value = SimpleNamespace(returncode=0, stdout="paired",
+                                             stderr="")
+        # get-state: offline until pairing runs, then device.
+        states = {"n": 0}
+
+        def fake_adb(*args, **kwargs):
+            key = tuple(str(a) for a in args)
+            if key == ("get-state",):
+                states["n"] += 1
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout="device" if states["n"] > 1 else "offline",
+                    stderr="")
+            return SimpleNamespace(returncode=1, stdout="", stderr="no")
+        m = self.allow("adb")
+        m.side_effect = fake_adb
+        write_cfg = self.allow("_setup_write_config")
+        with self.cap():
+            rc = pc.cmd_setup(_setup_args(step="pair", code="482913",
+                                          ip="100.99.0.1", pair_port="37001",
+                                          connect_port="5555"))
+        self.assertEqual(rc, 0)
+        # The code went to `adb pair` on stdin, not argv or disk.
+        pair_call = [c for c in spawn.call_args_list
+                     if c[0][0][:2] == [pc.ADB_BIN, "pair"]]
+        self.assertTrue(pair_call)
+        self.assertNotIn("482913", " ".join(pair_call[0][0][0]))
+        self.assertEqual(pair_call[0][1].get("input_text").strip(), "482913")
+        for root, _dirs, files in os.walk(self.tmp):
+            for f in files:
+                with open(os.path.join(root, f)) as fh:
+                    self.assertNotIn("482913", fh.read())
+        written = write_cfg.call_args[0][0]
+        self.assertNotIn("482913", json.dumps(written))
+
+    def test_setup_not_recorded(self):
+        args = self.parse(["setup", "--step", "pair", "--code", "482913"])
+        with mock.patch.object(pc.sys, "argv",
+                               ["pc", "setup", "--step", "pair",
+                                "--code", "482913"]):
+            self.assertIsNone(pc.record_command_line(args))
+
+    def test_install_app_downloads_apk(self):
+        urlopen = self.allow("_setup_urlopen")
+        urlopen.side_effect = [
+            json.dumps({"assets": [
+                {"name": "adb-auto-enable-v0.3.5.apk",
+                 "browser_download_url": "https://example/x.apk"}]}).encode(),
+            b"fake-apk-bytes",
+        ]
+        m = self.allow("adb")
+        m.side_effect = self._adb({})
+        with mock.patch.object(pc, "WORKSPACE", self.tmp):
+            with self.cap():
+                path = pc._setup_find_apk()
+        self.assertTrue(path and path.endswith(".apk"))
+        with open(path, "rb") as f:
+            self.assertEqual(f.read(), b"fake-apk-bytes")
+
+    def test_install_app_uses_local_apk_first(self):
+        apk = os.path.join(self.tmp, "adb-auto-enable-local.apk")
+        with open(apk, "wb") as f:
+            f.write(b"x")
+        urlopen = self.allow("_setup_urlopen")
+        with mock.patch.object(pc, "WORKSPACE", self.tmp):
+            path = pc._setup_find_apk()
+        self.assertEqual(path, apk)
+        urlopen.assert_not_called()
+
+    def test_write_config_preserves_comments(self):
+        cfg = os.path.join(self.tmp, "config.env")
+        with open(cfg, "w") as f:
+            f.write('# comment\nADB_PORT="1234"\nLOCAL_PORT="15555"\n')
+        with mock.patch.object(pc, "ROOT", self.tmp):
+            pc._setup_write_config({"ADB_PORT": "5555",
+                                    "PHONE_TAILSCALE_IP": "100.1.2.3"})
+            with open(cfg) as f:
+                text = f.read()
+        self.assertIn("# comment", text)
+        self.assertIn('ADB_PORT="5555"', text)
+        self.assertIn('PHONE_TAILSCALE_IP="100.1.2.3"', text)
+        self.assertNotIn('"1234"', text)
+
+    def test_verify_reports_red_on_doctor_failure(self):
+        with mock.patch.object(pc, "cmd_doctor", return_value=1):
+            with self.cap() as (out, err):
+                rc = pc._run_verify(_setup_args())
+        self.assertEqual(rc, 1)
+        self.assertIn("RED", err.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

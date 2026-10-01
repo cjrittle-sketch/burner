@@ -64,16 +64,20 @@ export PC_WORKSPACE="$PWD"
 export PATH="$PWD/bin:$PATH"
 ```
 
-Then pair the phone (needs a human once, ~10 minutes):
+Then pair the phone (needs a human once, ~10 minutes). The guided path is
+`pc setup` - it walks every step, shows a screenshot for each human step
+(in `setup/`), and finishes with `pc doctor`. Keep the burner in hand;
+pairing codes expire in about a minute.
 
 1. On the phone: install Tailscale, sign in, leave it connected, set its
    battery usage to Unrestricted. Connect to WiFi, plug into a charger.
+   (On hosted Muse, the VM must join your tailnet first via `tailscale up`.)
 2. Enable Developer options, turn on Wireless debugging.
 3. Tap "Pair device with pairing code" and give the agent the IP, pairing
    port, and 6-digit code (expires fast; turn Tailscale on first so the
    dialog shows the tailnet IP). After the one-time pair, the agent installs
    adb-auto-enable (open source, com.tpn.adbautoenable), which re-enables ADB
-   on every boot and pins it to the fixed port 5555 — put `ADB_PORT="5555"`
+   on every boot and pins it to the fixed port 5555 - put `ADB_PORT="5555"`
    in `config.env` once and never touch the random wireless-debugging port
    again.
 
@@ -88,6 +92,11 @@ pc tap "Settings"
 ## Command reference
 
 ```
+pc setup [--list-steps] [--step NAME] [--confirm] [--yes]
+    Guided phone setup wizard. --list-steps shows each step's status;
+    --step runs one step; --confirm records a human step as done.
+    Pairing codes passed via --code are never stored.
+
 pc dump [--verbose] [--all] [--json]
     List visible UI text and bounds. --all includes empty-text nodes.
 

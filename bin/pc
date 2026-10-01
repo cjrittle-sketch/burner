@@ -2169,6 +2169,25 @@ def build_parser():
                    help="confirm deletion without prompting")
     p.set_defaults(fn=cmd_forget)
 
+    p = sub.add_parser("setup", help="guided phone setup wizard")
+    p.add_argument("--list-steps", action="store_true",
+                   help="list setup steps with their status")
+    p.add_argument("--step", metavar="NAME",
+                   help="run a single step non-interactively")
+    p.add_argument("--confirm", action="store_true",
+                   help="record a human step as done (with --step)")
+    p.add_argument("--yes", action="store_true",
+                   help="auto-confirm agent actions")
+    p.add_argument("--code", metavar="CODE",
+                   help="6-digit pairing code (pair step; never stored)")
+    p.add_argument("--ip", metavar="IP",
+                   help="phone tailnet IP from pairing dialog (pair step)")
+    p.add_argument("--pair-port", metavar="PORT",
+                   help="pairing port from pairing dialog (pair step)")
+    p.add_argument("--connect-port", metavar="PORT",
+                   help="wireless debugging port (pair step)")
+    p.set_defaults(fn=cmd_setup)
+
     return ap
 
 
@@ -2254,7 +2273,7 @@ def record_command_line(args):
         # Skip non-action commands
         non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
                           "route", "forget", "record", "replay", "recipe", "do",
-                          "ensure", "gcode", "vcode", "amazon-status"}
+                          "ensure", "gcode", "vcode", "amazon-status", "setup"}
         if argv[0] in non_recordable:
             return None
         # Reconstruct with proper quoting
@@ -2320,6 +2339,544 @@ def cmd_replay(args):
                 steps.append(line)
     print("replaying '{}' ({} steps)".format(args.name, len(steps)))
     return cmd_do(argparse.Namespace(flow="; ".join(steps)))
+
+
+# ------------------------------------------------------- setup wizard
+"""
+Guided phone setup: `pc setup` walks a human + agent through pairing a new
+burner phone, step by step. Human steps print an instruction and a screenshot
+path; the agent relays them in chat and records completion with
+`pc setup --step <name> --confirm`. Agent steps run automatically.
+Pairing codes are transient: passed on stdin to `adb pair`, never stored.
+"""
+
+SETUP_STATE_PATH = os.path.join(os.path.expanduser("~"), ".cache", "pc",
+                                "setup-state.json")
+SETUP_APK_CACHE = os.path.join(os.path.expanduser("~"), ".cache", "pc")
+SETUP_APK_VERSION = "v0.3.5"
+SETUP_APK_PKG = "com.tpn.adbautoenable"
+SETUP_VPN_APP = "com.tailscale.ipn"
+SETUP_SHOTS = "setup/setup-{:02d}-{}.png"
+
+
+def _setup_sh(*args, timeout=15):
+    """Run an adb shell command, return stripped stdout or None on failure."""
+    try:
+        r = adb("shell", *args, timeout=timeout)
+    except Exception:
+        return None
+    if r.returncode != 0:
+        return None
+    return (r.stdout or "").strip() or None
+
+
+def _setup_get_setting(namespace, key):
+    v = _setup_sh("settings", "get", namespace, key)
+    return v if v not in (None, "null") else None
+
+
+def _setup_device_state():
+    try:
+        r = adb("get-state", timeout=10)
+    except Exception:
+        return None
+    if r.returncode != 0:
+        return None
+    return (r.stdout or "").strip() or None
+
+
+def _setup_state_load():
+    try:
+        with open(SETUP_STATE_PATH) as f:
+            st = json.load(f)
+            if isinstance(st.get("done"), dict):
+                return st
+    except Exception:
+        pass
+    return {"done": {}}
+
+
+def _setup_state_save(step):
+    st = _setup_state_load()
+    st["done"][step] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        os.makedirs(os.path.dirname(SETUP_STATE_PATH), exist_ok=True)
+        with open(SETUP_STATE_PATH, "w") as f:
+            json.dump(st, f, indent=2)
+    except OSError as e:
+        print("warning: could not save setup state: {}".format(e),
+              file=sys.stderr)
+
+
+def _setup_write_config(updates):
+    """Update keys in config.env, preserving comments and other lines."""
+    path = os.path.join(ROOT, "config.env")
+    lines = []
+    if os.path.exists(path):
+        with open(path) as f:
+            lines = f.readlines()
+    seen = set()
+    out = []
+    for line in lines:
+        s = line.strip()
+        if s and not s.startswith("#") and "=" in s:
+            k = s.split("=", 1)[0].strip()
+            if k in updates:
+                out.append('{}="{}"\n'.format(k, updates[k]))
+                seen.add(k)
+                continue
+        out.append(line)
+    for k, v in updates.items():
+        if k not in seen:
+            out.append('{}="{}"\n'.format(k, v))
+    with open(path, "w") as f:
+        f.writelines(out)
+    global CFG, TARGET
+    CFG = load_config()
+    TARGET = "127.0.0.1:{}".format(CFG.get("LOCAL_PORT", "15555"))
+
+
+def _setup_spawn(cmd, input_text=None, timeout=60):
+    """Run a subprocess (socat, adb pair). Separate helper so tests can mock."""
+    return subprocess.run(cmd, input=input_text, capture_output=True,
+                          text=True, timeout=timeout)
+
+
+def _setup_popen(cmd):
+    """Start a background subprocess (tunnel). Separate helper for tests."""
+    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL)
+
+
+def _setup_urlopen(url, timeout=60):
+    """Fetch a URL, return bytes. Separate helper so tests can mock."""
+    import urllib.request
+    req = urllib.request.Request(url, headers={"User-Agent": "burner-pc-setup"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+# --- step check functions: True=done, False=not done, None=cannot tell ---
+
+def _check_prereqs():
+    try:
+        r = _setup_spawn([ADB_BIN, "version"], timeout=10)
+    except Exception:
+        return False
+    return r.returncode == 0
+
+
+def _check_tailscale_phone():
+    # The phone is reachable over adb only via Tailscale (or LAN).
+    st = _setup_device_state()
+    if st == "device":
+        return True
+    return None
+
+
+def _check_dev_options():
+    v = _setup_get_setting("global", "development_settings_enabled")
+    if v is None:
+        return None
+    return v == "1"
+
+
+def _check_wireless_debug():
+    v = _setup_get_setting("global", "adb_wifi_enabled")
+    if v is None:
+        return None
+    return v == "1"
+
+
+def _check_pair():
+    return _setup_device_state() == "device"
+
+
+def _check_install_app():
+    out = _setup_sh("pm", "list", "packages", SETUP_APK_PKG)
+    if out is None:
+        return None
+    return "package:{}".format(SETUP_APK_PKG) in out
+
+
+def _check_self_pair():
+    # Nothing to query live; the human confirms in the app.
+    return None
+
+
+def _check_always_on_vpn():
+    v = _setup_get_setting("secure", "always_on_vpn_app")
+    if v is None:
+        return None
+    return v == SETUP_VPN_APP
+
+
+def _check_fix_port():
+    if CFG.get("ADB_PORT") != "5555":
+        return False
+    port = _setup_sh("getprop", "service.adb.tcp.port")
+    if port is None:
+        return None
+    return port == "5555"
+
+
+def _check_verify():
+    return None  # run it to find out
+
+
+# --- step run functions (agent steps) ---
+
+def _run_prereqs(args):
+    ok = True
+    r = _setup_spawn([ADB_BIN, "version"], timeout=10)
+    if r.returncode != 0:
+        print("adb binary missing or broken. Run ./install.sh first.")
+        return 1
+    print("adb: {}".format((r.stdout or "").strip().splitlines()[0]))
+    cfg_path = os.path.join(ROOT, "config.env")
+    if not os.path.exists(cfg_path):
+        ex = os.path.join(ROOT, "config.env.example")
+        if os.path.exists(ex):
+            with open(ex) as f:
+                content = f.read()
+            with open(cfg_path, "w") as f:
+                f.write(content)
+            print("created config.env from example; fill in PHONE_TAILSCALE_IP.")
+        else:
+            print("config.env missing and no example found.")
+            ok = False
+    else:
+        print("config.env present.")
+    return 0 if ok else 1
+
+
+def _run_pair(args):
+    if not args.code or not args.ip or not args.pair_port:
+        print("pair needs --code, --ip and --pair-port from the phone's "
+              "pairing dialog (it expires in about a minute).", file=sys.stderr)
+        return 1
+    code = args.code.strip()
+    if not re.fullmatch(r"\d{6}", code):
+        print("pair: code must be 6 digits.", file=sys.stderr)
+        return 1
+    pair_local = 15556
+    proxy_host = os.environ.get("HTTPS_PROXY", "")
+    proxy_host = proxy_host.split("://")[-1]
+    proxy_auth = proxy_host.split("@")[0] if "@" in proxy_host else ""
+    proxy_host = proxy_host.split("@")[-1].split(":")[0]
+    socat_cmd = ["socat",
+                 "TCP-LISTEN:{},bind=127.0.0.1,reuseaddr".format(pair_local),
+                 "PROXY:{}:{}:{},proxyport=3130,proxyauth={}".format(
+                     proxy_host, args.ip, args.pair_port, proxy_auth)]
+    socat = _setup_popen(socat_cmd)
+    time.sleep(1)
+    try:
+        r = _setup_spawn([ADB_BIN, "pair", "127.0.0.1:{}".format(pair_local)],
+                         input_text=code + "\n", timeout=30)
+        paired = r.returncode == 0
+    finally:
+        socat.terminate()
+    if not paired:
+        print("pairing failed. The code probably expired; get a fresh one "
+              "from the phone and retry.", file=sys.stderr)
+        return 1
+    print("paired.")
+    connect_port = args.connect_port or CFG.get("ADB_PORT", "5555")
+    updates = {"PHONE_TAILSCALE_IP": args.ip, "ADB_PORT": str(connect_port)}
+    _setup_write_config(updates)
+    print("wrote PHONE_TAILSCALE_IP and ADB_PORT to config.env.")
+    _setup_spawn([os.path.join(ROOT, "tunnel.sh"), "start"], timeout=45)
+    r = adb("connect", TARGET, timeout=20)
+    time.sleep(1)
+    if _setup_device_state() == "device":
+        print("connected: {}".format(TARGET))
+        return 0
+    print("paired but connect failed. Output: {}".format(
+        ((r.stdout or "") + " " + (r.stderr or "")).strip()[:120]),
+        file=sys.stderr)
+    return 1
+
+
+def _setup_find_apk():
+    """Locate an adb-auto-enable APK locally or download v0.3.5. Returns path."""
+    candidates = []
+    for base in (WORKSPACE, os.path.expanduser("~/.cache/pc"),
+                 os.path.expanduser("~/workspace")):
+        try:
+            for f in os.listdir(base):
+                if f.endswith(".apk") and "adb" in f.lower():
+                    candidates.append(os.path.join(base, f))
+        except OSError:
+            pass
+    if candidates:
+        return candidates[0]
+    api = ("https://api.github.com/repos/mouldybread/adb-auto-enable"
+           "/releases/tags/{}".format(SETUP_APK_VERSION))
+    try:
+        data = json.loads(_setup_urlopen(api).decode("utf-8"))
+    except Exception as e:
+        print("could not list GitHub releases: {}".format(e), file=sys.stderr)
+        return None
+    asset_url = None
+    for a in data.get("assets", []):
+        if a.get("name", "").endswith(".apk"):
+            asset_url = a.get("browser_download_url")
+            break
+    if not asset_url:
+        print("no APK asset in release {}.".format(SETUP_APK_VERSION),
+              file=sys.stderr)
+        return None
+    dest = os.path.join(SETUP_APK_CACHE,
+                        "adb-auto-enable-{}.apk".format(SETUP_APK_VERSION))
+    print("downloading adb-auto-enable {} ...".format(SETUP_APK_VERSION))
+    try:
+        blob = _setup_urlopen(asset_url, timeout=120)
+    except Exception as e:
+        print("download failed: {}".format(e), file=sys.stderr)
+        return None
+    os.makedirs(SETUP_APK_CACHE, exist_ok=True)
+    with open(dest, "wb") as f:
+        f.write(blob)
+    return dest
+
+
+def _run_install_app(args):
+    apk = _setup_find_apk()
+    if not apk:
+        return 1
+    print("installing {} ...".format(os.path.basename(apk)))
+    r = adb("install", "-r", apk, timeout=120)
+    if r.returncode != 0:
+        print("install failed: {}".format(
+            ((r.stderr or "") + " " + (r.stdout or "")).strip()[:200]),
+            file=sys.stderr)
+        return 1
+    r = adb("shell", "pm", "grant", SETUP_APK_PKG,
+            "android.permission.WRITE_SECURE_SETTINGS", timeout=15)
+    if r.returncode != 0:
+        print("WRITE_SECURE_SETTINGS grant failed; do it manually on the phone.",
+              file=sys.stderr)
+        return 1
+    r = adb("shell", "dumpsys", "deviceidle", "whitelist",
+            "+" + SETUP_APK_PKG, timeout=15)
+    if r.returncode != 0:
+        print("warning: deviceidle whitelist failed (non-fatal).",
+              file=sys.stderr)
+    print("installed, granted WRITE_SECURE_SETTINGS, whitelisted.")
+    return 0
+
+
+def _run_always_on_vpn(args):
+    lock = _setup_get_setting("secure", "always_on_vpn_lockdown")
+    if lock == "1":
+        print("always-on VPN lockdown is ON (Block connections without VPN). "
+              "Turn it off on the phone first: Settings > Network > VPN > "
+              "Tailscale gear > uncheck it. I will not change it for you.",
+              file=sys.stderr)
+        return 1
+    r = adb("shell", "settings", "put", "secure", "always_on_vpn_app",
+            SETUP_VPN_APP, timeout=15)
+    if r.returncode != 0:
+        print("settings put failed.", file=sys.stderr)
+        return 1
+    v = _setup_get_setting("secure", "always_on_vpn_app")
+    if v != SETUP_VPN_APP:
+        print("verify failed: always_on_vpn_app is {!r}.".format(v),
+              file=sys.stderr)
+        return 1
+    print("Always-on VPN set to Tailscale (lockdown off). "
+          "Tailscale now starts itself after reboot.")
+    return 0
+
+
+def _run_fix_port(args):
+    r = adb("shell", "setprop", "service.adb.tcp.port", "5555", timeout=15)
+    if r.returncode != 0:
+        print("setprop failed.", file=sys.stderr)
+        return 1
+    _setup_write_config({"ADB_PORT": "5555"})
+    _setup_spawn([os.path.join(ROOT, "tunnel.sh"), "start"], timeout=45)
+    r = adb("connect", TARGET, timeout=20)
+    time.sleep(2)
+    port = _setup_sh("getprop", "service.adb.tcp.port")
+    if _setup_device_state() == "device" and port == "5555":
+        print("adbd is on fixed port 5555. config.env updated.")
+        return 0
+    print("port switch did not stick (adbd port: {}). The adb-auto-enable "
+          "app's self-pairing (step self-pair) is what pins it; make sure "
+          "that step is done, then re-run.".format(port), file=sys.stderr)
+    return 1
+
+
+def _run_verify(args):
+    rc = cmd_doctor(argparse.Namespace(json=False))
+    if rc == 0:
+        print("setup GREEN: phone is reachable and healthy.")
+    else:
+        print("setup RED: doctor found problems (see above).", file=sys.stderr)
+    return rc
+
+
+SETUP_STEPS = [
+    {"name": "prereqs", "kind": "agent", "title": "Prerequisites",
+     "shot": None, "check": _check_prereqs, "run": _run_prereqs,
+     "instruction": None},
+    {"name": "tailscale-phone", "kind": "human", "title": "Tailscale on the phone",
+     "shot": SETUP_SHOTS.format(1, "tailscale"), "check": _check_tailscale_phone,
+     "run": None,
+     "instruction": (
+         "On the burner phone: install Tailscale from the Play Store, sign in "
+         "to your Tailscale account, and turn it on so it says Connected. "
+         "Then set Tailscale battery usage to Unrestricted (Settings > Apps > "
+         "Tailscale > Battery) so Android does not kill it.")},
+    {"name": "dev-options", "kind": "human", "title": "Enable Developer options",
+     "shot": SETUP_SHOTS.format(2, "build-number"), "check": _check_dev_options,
+     "run": None,
+     "instruction": (
+         "On the phone: Settings > About phone. Tap Build number 7 times "
+         "until it says you are now a developer.")},
+    {"name": "wireless-debug", "kind": "human", "title": "Turn on Wireless debugging",
+     "shot": SETUP_SHOTS.format(3, "wireless-debugging"),
+     "check": _check_wireless_debug, "run": None,
+     "instruction": (
+         "On the phone: Settings > System > Developer options. Turn ON "
+         "Wireless debugging. Leave it on.")},
+    {"name": "pair", "kind": "agent", "title": "Pair over adb",
+     "shot": SETUP_SHOTS.format(4, "pairing-dialog"),
+     "shot2": SETUP_SHOTS.format(5, "wireless-debugging-screen"),
+     "check": _check_pair, "run": _run_pair,
+     "instruction": (
+         "On the phone: Developer options > Wireless debugging > Pair device "
+         "with pairing code. Make sure Tailscale is ON first, or the dialog "
+         "shows the wrong IP. Send the agent the 6-digit code, the pairing "
+         "port, and the IP shown. Codes expire in about a minute, so send "
+         "them fast. Keep the phone in hand.")},
+    {"name": "install-adb-auto-enable", "kind": "agent",
+     "title": "Install adb-auto-enable", "shot": None,
+     "check": _check_install_app, "run": _run_install_app,
+     "instruction": None},
+    {"name": "self-pair", "kind": "human", "title": "In-app self-pairing",
+     "shot": SETUP_SHOTS.format(6, "adb-auto-enable"),
+     "check": _check_self_pair, "run": None,
+     "instruction": (
+         "On the phone: open the ADB Auto Enable app and tap its pair "
+         "button. It pairs with the phone itself over localhost, one time "
+         "only. This is what re-enables ADB after every reboot.")},
+    {"name": "always-on-vpn", "kind": "agent", "title": "Always-on VPN for Tailscale",
+     "shot": SETUP_SHOTS.format(7, "vpn-settings"),
+     "check": _check_always_on_vpn, "run": _run_always_on_vpn,
+     "instruction": None},
+    {"name": "fix-port", "kind": "agent", "title": "Pin adbd to port 5555",
+     "shot": None, "check": _check_fix_port, "run": _run_fix_port,
+     "instruction": None},
+    {"name": "verify", "kind": "agent", "title": "Verify with pc doctor",
+     "shot": None, "check": _check_verify, "run": _run_verify,
+     "instruction": None},
+]
+
+
+def _setup_step_status(step):
+    """Return 'done', 'pending', or 'unknown' for a step."""
+    try:
+        live = step["check"]()
+    except Exception:
+        live = None
+    if live is True:
+        return "done"
+    if live is False:
+        return "pending"
+    st = _setup_state_load()
+    if step["name"] in st["done"]:
+        return "done"
+    return "unknown"
+
+
+def _setup_print_human(step):
+    print("HUMAN STEP: {}".format(step["title"]))
+    print(step["instruction"])
+    print("screenshot: {}".format(step["shot"]))
+    if step.get("shot2"):
+        print("screenshot: {}".format(step["shot2"]))
+    print("When done, tell the agent; it records with: "
+          "pc setup --step {} --confirm".format(step["name"]))
+
+
+def _setup_ask(prompt, auto_yes):
+    if auto_yes:
+        return True
+    try:
+        ans = input(prompt + " [y/n] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    return ans in ("y", "yes")
+
+
+def cmd_setup(args):
+    steps = {s["name"]: s for s in SETUP_STEPS}
+
+    if args.list_steps:
+        for s in SETUP_STEPS:
+            print("{:24s} {:6s} {}".format(
+                s["name"], s["kind"], _setup_step_status(s)))
+        return 0
+
+    if args.step:
+        s = steps.get(args.step)
+        if not s:
+            print("unknown step: {}. Use --list-steps.".format(args.step),
+                  file=sys.stderr)
+            return 1
+        if args.confirm:
+            _setup_state_save(s["name"])
+            print("recorded '{}' as done.".format(s["name"]))
+            return 0
+        status = _setup_step_status(s)
+        if status == "done":
+            print("step '{}' already done.".format(s["name"]))
+            return 0
+        if s["kind"] == "human":
+            _setup_print_human(s)
+            return 0
+        rc = s["run"](args)
+        if rc == 0 and _setup_step_status(s) == "done":
+            _setup_state_save(s["name"])
+        return rc
+
+    # Full interactive run.
+    for s in SETUP_STEPS:
+        status = _setup_step_status(s)
+        print("--- {} [{}]".format(s["name"], status))
+        if status == "done":
+            continue
+        if s["kind"] == "human":
+            _setup_print_human(s)
+            if args.yes:
+                print("(waiting on the human; continuing to agent steps)")
+                continue
+            try:
+                ans = input("done, skip, or quit? [done/skip/quit] "
+                            ).strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                return 1
+            if ans == "done":
+                _setup_state_save(s["name"])
+            elif ans == "quit":
+                return 1
+            continue
+        if not _setup_ask("run '{}'?".format(s["title"]), args.yes):
+            print("skipped.")
+            continue
+        rc = s["run"](args)
+        if rc != 0:
+            print("step '{}' failed; fix it and re-run.".format(s["name"]),
+                  file=sys.stderr)
+            return rc
+        if _setup_step_status(s) == "done":
+            _setup_state_save(s["name"])
+    print("setup complete.")
+    return 0
 
 
 def main():
