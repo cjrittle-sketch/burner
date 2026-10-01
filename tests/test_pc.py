@@ -7,7 +7,7 @@ pc.u2_invalidate, pc.scrcpy_send, pc.ensure, and socket.socket all raise
 AssertionError if called without an explicit mock. Any test that accidentally
 attempts live I/O fails loudly instead of hanging on a real connection.
 
-Run:  cd /home/hatch/workspace/burner-build && python3 -m unittest discover -s tests
+Run from the repo root:  python3 -m unittest discover -s tests
 """
 import argparse
 import contextlib
@@ -25,7 +25,7 @@ from importlib.machinery import SourceFileLoader
 from types import SimpleNamespace
 from unittest import mock
 
-_PC_PATH = "/home/hatch/workspace/burner-build/bin/pc"
+_PC_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "pc")
 
 
 def _load_pc():
