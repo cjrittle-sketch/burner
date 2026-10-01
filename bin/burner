@@ -2188,6 +2188,11 @@ def build_parser():
                    help="wireless debugging port (pair step)")
     p.set_defaults(fn=cmd_setup)
 
+    p = sub.add_parser("uninstall", help="undo the phone changes burner setup made")
+    p.add_argument("--yes", action="store_true",
+                   help="actually do it (without it, only list the changes)")
+    p.set_defaults(fn=cmd_uninstall)
+
     return ap
 
 
@@ -2273,7 +2278,8 @@ def record_command_line(args):
         # Skip non-action commands
         non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
                           "route", "forget", "record", "replay", "recipe", "do",
-                          "ensure", "gcode", "vcode", "amazon-status", "setup"}
+                          "ensure", "gcode", "vcode", "amazon-status", "setup",
+                          "uninstall"}
         if argv[0] in non_recordable:
             return None
         # Reconstruct with proper quoting
@@ -3061,6 +3067,55 @@ def cmd_setup(args):
         if _setup_step_status(s) == "done":
             _setup_state_save(s["name"])
     print("setup complete.")
+    return 0
+
+
+UNINSTALL_STEPS = [
+    ("screen no longer stays on while charging",
+     ["settings", "put", "global", "stay_on_while_plugged_in", "0"]),
+    ("swipe lock screen back on",
+     ["locksettings", "set-disabled", "false"]),
+    ("Tailscale no longer set as always-on VPN",
+     ["settings", "delete", "secure", "always_on_vpn_app"]),
+    ("ADB Auto Enable removed", ["pm", "uninstall", SETUP_APK_PKG]),
+    ("uiautomator helper app removed",
+     ["pm", "uninstall", "com.github.uiautomator"]),
+    ("uiautomator test app removed",
+     ["pm", "uninstall", "com.github.uiautomator.test"]),
+    ("uiautomator server file removed",
+     ["rm", "-f", "/data/local/tmp/u2.jar"]),
+    # Last: this drops our own connection to the phone.
+    ("Wireless debugging turned off",
+     ["settings", "put", "global", "adb_wifi_enabled", "0"]),
+]
+
+
+def cmd_uninstall(args):
+    """Undo what burner setup changed on the phone, then forget setup state.
+    Leaves Tailscale, Developer options and this computer's files alone."""
+    if not args.yes:
+        print("burner uninstall will, on the phone:")
+        for label, _ in UNINSTALL_STEPS:
+            print("  - {}".format(label))
+        print("and forget this computer's setup progress. Tailscale and "
+              "Developer options stay as they are. Run with --yes to do it.")
+        return 0
+    if _setup_device_state() != "device":
+        print("phone not reachable; run `burner ensure` first.", file=sys.stderr)
+        return 1
+    for label, cmd in UNINSTALL_STEPS:
+        try:
+            r = adb("shell", *cmd, timeout=30)
+            ok = r.returncode == 0
+        except Exception:
+            ok = cmd[-1] == "0"  # the connection drop on the last step
+        print("{} {}".format("ok  " if ok else "skip", label))
+    adb("disconnect", TARGET, timeout=10)
+    try:
+        os.remove(SETUP_STATE_PATH)
+    except OSError:
+        pass
+    print("done. To remove burner from this computer too, delete {}".format(ROOT))
     return 0
 
 

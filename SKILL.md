@@ -269,6 +269,10 @@ burner amazon-status
 
 burner doctor [--json]
     End-to-end health check: tunnel, adb auth, u2 daemon, screen state.
+
+burner uninstall [--yes]
+    Undo the phone changes setup made (stay awake, lock screen, always-on
+    VPN, helper apps, wireless debugging). Without --yes it only lists them.
 ```
 
 Verification codes come from email, never SMS: the side phone has no SIM, so

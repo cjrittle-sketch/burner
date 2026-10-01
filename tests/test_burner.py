@@ -1453,6 +1453,14 @@ class SetupWizardTests(OfflineTestCase):
         st = pc._setup_state_load()
         self.assertIn("tailscale-phone", st["done"])
 
+    def test_uninstall_without_yes_only_lists(self):
+        m = self.allow("adb")
+        with self.cap() as (out, err):
+            rc = pc.cmd_uninstall(SimpleNamespace(yes=False))
+        self.assertEqual(rc, 0)
+        self.assertIn("Run with --yes", out.getvalue())
+        m.assert_not_called()
+
     def test_read_pair_dialog(self):
         xml = ('<hierarchy><node text="Pair with device" bounds="[0,0][1,1]"/>'
                '<node text="Wi-Fi pairing code" bounds="[0,0][1,1]"/>'
