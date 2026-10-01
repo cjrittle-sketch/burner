@@ -90,6 +90,9 @@ No. burner is free and open source, and there's no burner account or burner
 server. The one other app it uses, Tailscale, is free for personal use, so a
 normal setup at home costs nothing.
 
+**How do I get rid of it?**
+Just tell your AI assistant to uninstall burner.
+
 **Where can I find the technical details?**
 Start with [How it works](#how-it-works) below. The full setup steps and every
 command are in [SKILL.md](SKILL.md).
