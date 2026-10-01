@@ -56,6 +56,17 @@ Do these on the phone. The agent cannot do them for you.
    fixed port **5555**. Put `ADB_PORT="5555"` in `config.env` once — the
    random wireless-debugging port is never used again, and reboots need no
    human action.
+6. The agent sets Always-on VPN for Tailscale over adb, so Tailscale
+   auto-starts after reboot (without it the phone is unreachable until a
+   human opens the app manually):
+
+   ```bash
+   adb -s <device> shell settings put secure always_on_vpn_app com.tailscale.ipn
+   ```
+
+   Leave lockdown off (default): if Tailscale ever fails, the phone still
+   has normal internet. Verify with
+   `settings get secure always_on_vpn_app` returning `com.tailscale.ipn`.
 
 Leave the phone plugged in and on WiFi. Done.
 

@@ -33,6 +33,10 @@ it `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization; then
 **HUMAN REQUIRED:** open the app and finish its one-time self-pairing. From
 then on ADB re-enables on every boot on the fixed port **5555**, so
 `ADB_PORT="5555"` in `config.env` is permanent — reboots need no human action.
+The agent also sets Always-on VPN for Tailscale
+(`adb shell settings put secure always_on_vpn_app com.tailscale.ipn`, lockdown
+left off) so Tailscale auto-starts after reboot; without it the phone is
+unreachable until a human opens the app.
 
 Security: port 5555 listens on the phone's WiFi and tailnet interfaces (never
 the internet; ADB is unencrypted, so trusted networks only). Any new computer

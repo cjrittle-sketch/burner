@@ -169,6 +169,10 @@ paste it.
 - ADB auto-enables on boot (adb-auto-enable pins it to fixed port 5555).
   If the phone goes unreachable after a reboot, wait ~60-90s for boot plus
   ~30s for the app to switch adbd to 5555, then run `pc ensure`.
+- Tailscale must auto-start after reboot too: the agent sets Always-on VPN
+  for it during pairing (`settings put secure always_on_vpn_app
+  com.tailscale.ipn`). Without this, a reboot leaves the phone unreachable
+  until someone opens the Tailscale app by hand.
 - The screen must stay awake or dumps come back empty. Keep the phone on its
   charger; short display timeouts will break long flows.
 - No SIM needed. The phone is WiFi-only; codes arrive by email.
