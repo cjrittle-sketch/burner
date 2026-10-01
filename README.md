@@ -15,9 +15,9 @@ home, so it can use the apps you use.
 - "Screen my Tinder matches and tell me who's worth a reply."
 - "Keep my Snapchat streaks alive while I'm on vacation."
 - "Spot underpriced flips on Vinted before anyone else sees them."
-- "Check whether my paycheck landed and tell me the balance."
-- "Message that Marketplace seller and offer 20 percent less."
-- "Order my usual from the store app that never works in my browser."
+- "Download the Airbnb app and find me a cabin for next weekend."
+- "Open Uber Eats and get last Friday's dinner ready to reorder."
+- "Check my Ring app and tell me who came to the door."
 - "Play my chill playlist on the living room speaker."
 - "Turn off the lamps I left on. I'm already at the airport."
 
