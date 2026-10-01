@@ -2763,8 +2763,8 @@ SETUP_STEPS = [
          "at the top of its card, tap Split screen (Samsung: Open in split "
          "screen view), and pick the chat app. Then tap Pair device in the "
          "Settings half and type the code in the chat half. Make sure Tailscale is ON first, or the dialog "
-         "shows the wrong IP. Send the agent the 6-digit code, the pairing "
-         "port, and the IP shown. Codes expire in about a minute, so send "
+         "shows the wrong IP. Send the agent a screenshot of the dialog, or "
+         "type the code and the IP address & Port line exactly as shown. Codes expire in about a minute, so send "
          "them fast. Keep the phone in hand.")},
     {"name": "install-adb-auto-enable", "kind": "agent",
      "title": "Install adb-auto-enable", "shot": None,

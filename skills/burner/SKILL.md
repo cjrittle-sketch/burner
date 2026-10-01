@@ -36,8 +36,9 @@ screen (Recent apps > Settings icon > Split screen) before tapping Pair. Walk th
 giving the full Settings path for each tap (the wizard prints them).
 
 **HUMAN REQUIRED:** on the phone, enable Developer options, turn on Wireless
-debugging, tap "Pair device with pairing code", and send the agent the IP,
-pairing port, and 6-digit code (it expires fast; turn Tailscale on first so
+debugging, tap "Pair device with pairing code", and send the agent a
+screenshot of that dialog or type the code and IP & port line as shown (never
+ask for "the pairing port" by name; the code expires fast; turn Tailscale on first so
 the dialog shows the tailnet IP). After the one-time `adb pair`, the agent
 installs **adb-auto-enable** (open source, `com.tpn.adbautoenable`), grants
 it `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization; then
