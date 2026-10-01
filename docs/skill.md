@@ -13,13 +13,8 @@ apps, social apps, store apps that block bots in the browser.
 - A spare Android phone (Android 11+) you can dedicate to this. It becomes the
   agent's side phone, so do not use your daily driver.
 - Tailscale installed on both the VM and the phone (or both on the same LAN).
-- If the agent runs on hosted Muse (not your own hardware): the Muse VM must
-  join your tailnet. Run `burner setup --step tailnet`: if this computer
-  isn't on the tailnet yet, it prints an approval link. Send that link to
-  the user right away as its own message, wait for them to approve, then
-  re-run the step. A fresh assistant session may be a new computer that
-  needs approving again, even if an earlier one was approved. Without this the VM has no route to the phone. Same-LAN
-  setups skip this step.
+- If the agent runs on a hosted service (not your own hardware), its
+  computer joins your tailnet during setup (step 3 of the setup order).
 - A human available once for ~10 minutes to pair the phone (see below).
 
 ## How to talk to the user during setup
@@ -30,6 +25,21 @@ one thing on your phone." Most people don't need installer output or the
 names of the parts (platform tools, adb, venv, Python, uiautomator2,
 ports), so leave those out unless they ask. If something fails, say so
 plainly.
+
+## Setup order
+
+Go in this order, so the user sees progress before being asked for anything:
+
+1. Tell them you're starting ("Setting up burner, I'll install it on my side
+   first") and run the install (below).
+2. Ask which device they're on (next section).
+3. Get this computer onto their tailnet: run `burner setup --step tailnet`.
+   If it's already on, move on. If not, it prints an approval
+   link: send the link as its own message with one plain line ("Tap this to
+   let my computer reach your phone, then tell me when it's done"), wait,
+   and re-run the step. A fresh assistant session can be a new computer
+   that needs approving again. Same-Wi-Fi setups skip this.
+4. Walk them through the phone steps, then finish with burner.
 
 ## First, work out where the user is
 

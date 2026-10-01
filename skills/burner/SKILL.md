@@ -21,7 +21,7 @@ export PATH="$HOME/burner/bin:$PATH"
 Needs: Linux/macOS VM with Python 3.10+, a spare Android 11+ phone,
 Tailscale (or same LAN), and a human once for ~10 minutes to pair.
 If the agent runs on hosted Muse: the Muse VM must join your tailnet first
-(`burner setup --step tailnet` prints an approval link: send it to the
+(after installing and asking which device they're on, `burner setup --step tailnet` prints an approval link: send it to the
 user right away and re-run after they approve; a fresh session may need it again); without this the VM
 has no route to the phone. Same-LAN setups skip this.
 
