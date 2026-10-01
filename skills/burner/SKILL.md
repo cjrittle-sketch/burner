@@ -45,7 +45,9 @@ code and IP & port line as shown, or on the same phone (in split screen) a
 screenshot of the dialog (never
 ask for "the pairing port" by name; turn Tailscale on first so
 the dialog shows the tailnet IP). After the one-time `adb pair`, the agent
-runs `burner setup --step verify` and gets burner green first. Then it
+tells the user right away that the phone is connected and setup is
+finishing (the phone may flip through screens on its own), posts a short
+line as each finishing step completes. It runs `burner setup --step verify` and gets burner green first. Then it
 finishes the phone with burner itself, nothing for the user to tap:
 Tailscale battery Unrestricted (`tailscale-battery`), screen
 stays awake while charging (`stay-awake`), lock screen off (`screen-lock`;

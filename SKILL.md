@@ -140,8 +140,16 @@ something they said), and ask only if you can't.
    `burner setup --step verify` (`burner doctor`). **burner must be green
    before anything else**: the remaining steps are niceties, and the agent
    does them itself with burner, so there is nothing more for the user to
-   tap except removing a PIN (step 5). Tell them the phone will flip through
-   Settings on its own for a bit.
+   tap except removing a PIN (step 5).
+
+   **Keep the user posted from here on; the rest takes a few minutes and
+   silence feels broken.** The moment pairing works, send a message before
+   running anything else, e.g. "Paired, your phone is connected. I'm
+   finishing setup now. Your phone may flip through screens on its own for
+   a few minutes; you can set it down." Then run the step 5 commands one at
+   a time and send a short line as each finishes ("Screen set to stay on
+   while charging", "Tailscale will now start by itself after a restart"),
+   so they always see what just happened. End with a clear "All done".
 5. The agent finishes the phone with burner, one `burner setup --step` each:
    - `tailscale-battery`: Tailscale battery usage set to Unrestricted, so
      Android doesn't stop it.
