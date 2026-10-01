@@ -4,4 +4,6 @@
 # For "take a screenshot of my burner" or "what's on my burner?" (the screen
 # right now, not the installed apps): run this, then send the saved image
 # itself back to the user.
+# If your chat can't show files from ~/burner, use
+# `burner shot --out ./burner-screen.png` to save into your working folder.
 shot

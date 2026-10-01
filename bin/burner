@@ -1373,8 +1373,14 @@ def cmd_start(args):
 
 
 def cmd_shot(args):
-    r = subprocess.run([os.path.join(ROOT, "screenshot.sh")],
-                       capture_output=True, text=True, timeout=60)
+    cmd = [os.path.join(ROOT, "screenshot.sh")]
+    out = getattr(args, "out", None)
+    if out:
+        # screenshot.sh runs from the repo dir, so pass an absolute path.
+        out = os.path.abspath(os.path.expanduser(out))
+        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+        cmd.append(out)
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     print(r.stdout.strip())
     return r.returncode
 
@@ -2100,6 +2106,8 @@ def build_parser():
     p.set_defaults(fn=cmd_start)
 
     p = sub.add_parser("shot", help="screenshot via screenshot.sh")
+    p.add_argument("--out", metavar="PATH",
+                   help="save here instead of shots/ (e.g. your workspace)")
     p.set_defaults(fn=cmd_shot)
 
     p = sub.add_parser("ensure", help="tunnel + adb connect check")

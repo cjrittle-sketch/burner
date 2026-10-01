@@ -14,8 +14,13 @@ burner", that means this phone: use the `burner` commands below.
 
 | The user says | Do this |
 |---|---|
-| "What's on my burner?" | Means the screen right now, not the installed apps. Run `burner recipe screenshot` and send the image back. |
-| "Take a screenshot of my burner" | Same: `burner recipe screenshot`, send the image. |
+| "What's on my burner?" | Means the screen right now, not the installed apps. Take a screenshot and send the image back (below). |
+| "Take a screenshot of my burner" | Same: take a screenshot and send the image. |
+
+To send a screenshot, save it where your chat can show files from, usually
+your working folder: `burner shot --out ./burner-screen.png`, then attach
+that file. Plain `burner shot` saves under `~/burner/shots/`, which many chat
+apps can't display.
 
 ## Prerequisites
 
@@ -296,8 +301,8 @@ burner state [--json]
 burner start com.example.app
     Launch an app by package name.
 
-burner shot
-    Screenshot, saved under shots/.
+burner shot [--out PATH]
+    Screenshot, saved under shots/ or to PATH.
 
 burner open <url> [package]
     Open a URL or deep link via VIEW intent. Deep links skip menu
