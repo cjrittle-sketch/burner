@@ -23,9 +23,12 @@ Ask which device they are talking to you from, then follow that path:
 
 - **From the spare phone itself:** that phone is the burner phone. Skip any
   "find a spare phone" advice and do the human steps below on the phone they
-  are holding. For pairing (step 3), have them put Settings and this chat
-  side by side in split screen, so the pairing dialog stays open while they
-  send you the code. Leaving the dialog cancels the code.
+  are holding. Switching apps closes the pairing dialog and cancels the
+  code, so before step 3 have them put Settings and this chat side by side
+  in split screen: open Recent apps (swipe up and hold), tap the Settings
+  icon at the top of its card, tap "Split screen" (Samsung: "Open in split
+  screen view"), then pick this chat app. Only then tap "Pair device with
+  pairing code" in the Settings half and type the code into the chat half.
 - **From a computer or their everyday phone:** they need the spare phone in
   hand for the human steps below. If they don't have one yet, stop and tell
   them what to get.

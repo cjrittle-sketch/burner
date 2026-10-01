@@ -2758,8 +2758,11 @@ SETUP_STEPS = [
          "On the phone: in Developer options, tap the words Wireless "
          "debugging (not the switch) to open its screen, then tap Pair device "
          "with pairing code. If you're chatting with the agent on this same "
-         "phone, use split screen so the dialog stays open while you send "
-         "the code; leaving it cancels the code. Make sure Tailscale is ON first, or the dialog "
+         "phone, switching apps closes the dialog and cancels the code, so "
+         "set up split screen first: open Recent apps, tap the Settings icon "
+         "at the top of its card, tap Split screen (Samsung: Open in split "
+         "screen view), and pick the chat app. Then tap Pair device in the "
+         "Settings half and type the code in the chat half. Make sure Tailscale is ON first, or the dialog "
          "shows the wrong IP. Send the agent the 6-digit code, the pairing "
          "port, and the IP shown. Codes expire in about a minute, so send "
          "them fast. Keep the phone in hand.")},

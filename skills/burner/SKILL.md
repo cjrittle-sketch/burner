@@ -30,8 +30,9 @@ The guided path is `burner setup`: it walks every step, shows a screenshot for
 each human step (in `setup/`), runs the agent steps itself, and finishes with
 `burner doctor`. Keep the burner phone in hand during setup; pairing codes expire
 in about a minute. First ask which device the user is chatting from: if it's
-the burner phone itself, skip "use a spare phone" advice and have them pair in
-split screen so the dialog stays open. Walk the human steps one at a time,
+the burner phone itself, skip "use a spare phone" advice. Switching apps
+cancels the pairing code, so have them open Settings and the chat in split
+screen (Recent apps > Settings icon > Split screen) before tapping Pair. Walk the human steps one at a time,
 giving the full Settings path for each tap (the wizard prints them).
 
 **HUMAN REQUIRED:** on the phone, enable Developer options, turn on Wireless
