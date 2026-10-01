@@ -2792,7 +2792,7 @@ def _run_self_pair(args):
               "up on the phone, so it can't be paired. burner still works. "
               "Without it, after the phone restarts the user turns Wireless "
               "debugging back on once and sends a screenshot of that screen. "
-              "Tell the user this in one line; don't ask them to fix the app.")
+              "There's nothing for the user to fix.")
         return 0
     adb("shell", "am", "start", "-a",
         "android.settings.APPLICATION_DEVELOPMENT_SETTINGS", timeout=15)

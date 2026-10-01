@@ -23,10 +23,10 @@ apps, social apps, store apps that block bots in the browser.
 
 Keep updates short, plain and non-technical. Say what's happening for them,
 not how: "Installing burner on my side, this takes a minute" or "Done, now
-one thing on your phone." Never relay installer output or name the parts
-(platform tools, adb, venv, Python, uiautomator2, ports, commands). Mention
-progress only when it changes what they do next, and don't promise to
-report back; just do it.
+one thing on your phone." Most people don't need installer output or the
+names of the parts (platform tools, adb, venv, Python, uiautomator2,
+ports), so leave those out unless they ask. If something fails, say so
+plainly.
 
 ## First, work out where the user is
 
@@ -74,8 +74,8 @@ export PATH="$HOME/burner/bin:$PATH"
 The guided path is `burner setup`: it walks through every step below, shows a
 screenshot for each human step (in `setup/`, also at https://useburner.si/setup/), runs the agent steps itself,
 and finishes with `burner doctor`. Pairing codes only last about a minute, so
-run the pair step the moment the user sends one; don't tell the user about
-the time limit unless a code has already expired.
+run the pair step as soon as the user sends one. If a code expires, ask for
+a fresh one.
 
 Do these on the phone. The agent cannot do them for you.
 
@@ -92,8 +92,8 @@ something they said), and ask only if you can't.
 1. **HUMAN REQUIRED:** Connect the phone to WiFi, install Tailscale from the
    Play Store, sign in, and leave it connected. Check first: if
    `burner setup --list-steps` shows `tailscale-phone` done (your tailnet
-   already has an Android phone online), skip this step and don't mention
-   it. No charger needed during setup; the agent sets Tailscale's battery
+   already has an Android phone online), this step is already done; just
+   tell them so and move on. No charger needed during setup; the agent sets Tailscale's battery
    usage itself later.
    (Screenshot: [setup/setup-01-tailscale.png](https://useburner.si/setup/setup-01-tailscale.png).)
 2. **HUMAN REQUIRED:** Enable Developer options, then turn on
@@ -114,8 +114,8 @@ something they said), and ask only if you can't.
    the code and the numbers under "IP address & Port" exactly as shown. If
    they're chatting on this same phone, they should already be in split
    screen (see above): have them take a screenshot of the dialog and send
-   that instead. Never ask the user for "the pairing
-   port" by name; read the IP, port and code off what they send. **Turn Tailscale on first** -
+   that instead. Read the IP, port and code off what they send, rather
+   than asking for each value separately. **Turn Tailscale on first** -
    after a reboot it does not auto-start, and the dialog shows the unreachable
    WiFi IP instead of the tailnet IP.
    (Screenshots: [setup/setup-04-pairing-dialog.png](https://useburner.si/setup/setup-04-pairing-dialog.png),
@@ -146,9 +146,9 @@ something they said), and ask only if you can't.
      reads the code off the screen, and hands it to the app. This step is
      optional and best effort: if the app's pairing page doesn't come up,
      the step skips itself. burner still works; the only cost is that after
-     a phone restart the user turns Wireless debugging back on once. Say
-     that in one line and move on. Never ask the user to debug the app or
-     open its web page.
+     a phone restart the user turns Wireless debugging back on once. Tell
+     the user that in a sentence and carry on; there's nothing for them to
+     fix.
      (Screenshot: [setup/setup-06-adb-auto-enable.png](https://useburner.si/setup/setup-06-adb-auto-enable.png).)
    - `always-on-vpn`: sets Always-on VPN for Tailscale, so Tailscale starts
      itself after a reboot (lockdown stays off, so if Tailscale ever fails
