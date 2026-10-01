@@ -62,8 +62,9 @@ export PATH="$HOME/burner/bin:$PATH"
 
 The guided path is `burner setup`: it walks through every step below, shows a
 screenshot for each human step (in `setup/`), runs the agent steps itself,
-and finishes with `burner doctor`. Keep the burner phone in hand during setup:
-pairing codes expire in about a minute.
+and finishes with `burner doctor`. Pairing codes only last about a minute, so
+run the pair step the moment the user sends one; don't tell the user about
+the time limit unless a code has already expired.
 
 Do these on the phone. The agent cannot do them for you.
 
@@ -100,9 +101,7 @@ something they said), and ask only if you can't.
    they're chatting on this same phone, they should already be in split
    screen (see above): have them take a screenshot of the dialog and send
    that instead. Never ask the user for "the pairing
-   port" by name; read the IP, port and code off what they send. The code expires fast
-   (about a minute), so send it right after the phone shows it and keep the
-   phone in hand. **Turn Tailscale on first** -
+   port" by name; read the IP, port and code off what they send. **Turn Tailscale on first** -
    after a reboot it does not auto-start, and the dialog shows the unreachable
    WiFi IP instead of the tailnet IP.
    (Screenshots: `setup/setup-04-pairing-dialog.png`,

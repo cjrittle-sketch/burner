@@ -2934,8 +2934,7 @@ SETUP_STEPS = [
          "Settings half and type the code in the chat half. Make sure Tailscale is ON first, or the dialog "
          "shows the wrong IP. Type the code and the IP address & Port line "
          "to the agent exactly as shown. On the same phone, in split screen, "
-         "send a screenshot of the dialog instead. Codes expire in about a minute, so send "
-         "them fast. Keep the phone in hand.")},
+         "send a screenshot of the dialog instead.")},
     {"name": "verify", "kind": "agent", "title": "Verify with burner doctor",
      "shot": None, "check": _check_verify, "run": _run_verify,
      "instruction": None},

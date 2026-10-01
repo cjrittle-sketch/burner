@@ -28,8 +28,8 @@ has no route to the phone. Same-LAN setups skip this.
 
 The guided path is `burner setup`: it walks every step, shows a screenshot for
 each human step (in `setup/`), runs the agent steps itself, and finishes with
-`burner doctor`. Keep the burner phone in hand during setup; pairing codes expire
-in about a minute. First work out which device the user is chatting from (infer it from the
+`burner doctor`. Pairing codes last about a minute: pair the moment one arrives,
+and don't mention the limit to the user unless one expires. First work out which device the user is chatting from (infer it from the
 client, platform or user agent, confirm in one line, ask only if unsure): if it's
 the burner phone itself, skip "use a spare phone" advice. Switching apps
 cancels the pairing code, so have them open Settings and the chat in split
@@ -40,7 +40,7 @@ giving the full Settings path for each tap (the wizard prints them).
 debugging, tap "Pair device with pairing code", and send the agent the
 code and IP & port line as shown, or on the same phone (in split screen) a
 screenshot of the dialog (never
-ask for "the pairing port" by name; the code expires fast; turn Tailscale on first so
+ask for "the pairing port" by name; turn Tailscale on first so
 the dialog shows the tailnet IP). After the one-time `adb pair`, the agent
 runs `burner setup --step verify` and gets burner green first. Then it
 finishes the phone with burner itself, nothing for the user to tap: screen
