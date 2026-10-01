@@ -54,6 +54,10 @@ pc amazon-status | pc doctor
 - The phone has no SIM: verification codes come from email (`gcode`/`vcode`),
   typed as plain text, never stored, never asked of the user.
 - Never buy anything without explicit human approval, every time.
+- **Stop before submission:** text entry and tapping Send/Post/Buy are two
+  separately authorized steps. Type, verify the rendered text via `pc shot`
+  or `pc dump`, then tap submit only with explicit approval for that specific
+  action. Never auto-submit in an unattended flow.
 - Keep the phone on its charger: dumps come back empty if the screen sleeps.
 - If wireless debugging toggles, the connection port changes: update `ADB_PORT`.
 - `pc ensure` heals a wedged stack (tunnel, adb, u2 daemon) in ~5s.

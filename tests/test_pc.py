@@ -1216,8 +1216,10 @@ class SnapTests(OfflineTestCase):
     def test_snap_numbers_handles(self):
         numbered = self._save()
         handles = [h for h, _ in numbered]
-        self.assertEqual(handles[0], "@e1")
+        # Handles are generation-pinned: @eN~s<gen>
+        self.assertTrue(handles[0].startswith("@e1~s"))
         self.assertTrue(all(h.startswith("@e") for h in handles))
+        self.assertTrue(all("~s" in h for h in handles))
         # 3 visible nodes: the empty FrameLayout root carries no label
         self.assertEqual(len(numbered), 3)
 
@@ -1277,7 +1279,8 @@ class SnapTests(OfflineTestCase):
             rc = pc.cmd_snap(args)
         self.assertEqual(rc, 0)
         lines = out.getvalue().strip().split("\n")
-        self.assertTrue(lines[0].startswith("@e1 "))
+        # Generation-pinned handle: @e1~s<gen>
+        self.assertTrue(lines[0].startswith("@e1~s"))
         self.assertIn("OK", lines[0])
 
     def test_tap_at_snap_handle(self):
@@ -1307,15 +1310,16 @@ class SettleTests(OfflineTestCase):
     def test_settle_unchanged(self):
         root = ET.fromstring(SETTLE_A_XML)
         self.allow("ui_dump", return_value=root)
-        added, removed = pc.settle_lines(self._lines(SETTLE_A_XML),
-                                         timeout=2, quiet=0.05, poll=0.01)
+        added, removed, final_fp = pc.settle_lines(self._lines(SETTLE_A_XML),
+                                                   timeout=2, quiet=0.05, poll=0.01)
         self.assertEqual((added, removed), ([], []))
+        self.assertIsNotNone(final_fp)
 
     def test_settle_detects_change(self):
         roots = [ET.fromstring(SETTLE_B_XML)] * 30
         self.allow("ui_dump", side_effect=roots)
-        added, removed = pc.settle_lines(self._lines(SETTLE_A_XML),
-                                         timeout=2, quiet=0.05, poll=0.01)
+        added, removed, final_fp = pc.settle_lines(self._lines(SETTLE_A_XML),
+                                                   timeout=2, quiet=0.05, poll=0.01)
         self.assertTrue(any("Results" in l for l in added))
         self.assertTrue(any("Loading" in l for l in removed))
 
@@ -1324,8 +1328,8 @@ class SettleTests(OfflineTestCase):
         tiny = SETTLE_A_XML  # 2 lines vs 13: <=20% of a 12+ screen
         roots = [ET.fromstring(tiny)] + [ET.fromstring(full)] * 6
         self.allow("ui_dump", side_effect=roots)
-        added, removed = pc.settle_lines(self._lines(full),
-                                         timeout=5, quiet=0.05, poll=0.01)
+        added, removed, final_fp = pc.settle_lines(self._lines(full),
+                                                   timeout=5, quiet=0.05, poll=0.01)
         # The partial read must not surface as a mass disappearance.
         self.assertEqual((added, removed), ([], []))
 
@@ -1335,8 +1339,8 @@ class SettleTests(OfflineTestCase):
         tc = self.allow("tap_center")
         args = self.parse(["tap", "--settle", "Not now"])
         with self.cap() as (out, err):
-            with mock.patch.object(pc, "settle_lines", return_value=([], [])) \
-                    as sl:
+            with mock.patch.object(pc, "settle_lines",
+                                   return_value=([], [], "rid:test123")) as sl:
                 rc = pc.cmd_tap(args)
         self.assertEqual(rc, 0)
         tc.assert_called_once()
@@ -1352,7 +1356,8 @@ class SettleTests(OfflineTestCase):
             with mock.patch.object(
                     pc, "settle_lines",
                     return_value=(["+ Results [TextView] (300,250)"],
-                                  ["- Loading [TextView] (300,250)"])):
+                                  ["- Loading [TextView] (300,250)"],
+                                  "rid:test123")):
                 rc = pc.cmd_tap(args)
         self.assertEqual(rc, 0)
         body = json.loads(out.getvalue())

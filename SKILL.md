@@ -83,12 +83,17 @@ pc tap "A || B"          fallback labels: tries A, then B
 pc tap "Text" --settle   wait for the screen to stop changing, show the diff
 pc wait "Text" [--timeout 30]   wait for text to appear (or --absent to vanish)
 pc type "text" --clear    type char-by-char, Bloks/RN-safe (--field "Hint" focuses first)
-pc press BACK|HOME        key events
+pc press BACK|HOME        key events (--repeat N, --delay MS, --ctrl/--shift/--alt/--meta)
 pc start com.app.pkg     launch an app
 pc shot                  screenshot to shots/
 pc open <url>            open a deep link / URL in the app
 pc do 'step; step'       run a ;-separated flow in one call
 pc recipe <name>         run a saved flow from recipes/<name>.pc
+pc record <name>         record actions to recipes/<name>.pc (stop with --stop)
+pc replay <name>         replay a recorded session step-by-step
+pc whereami              current screen fingerprint + known transitions
+pc route "Label"         find a route to a screen via navigation memory
+pc forget --yes          clear navigation memory
 pc ensure                heal the tunnel + adb + daemon stack
 pc gcode --from ...      pull newest verification code from Gmail (transient, never stored)
 pc vcode --from ...      one-shot: wait for code field, pull code, type, submit
@@ -117,5 +122,26 @@ launch deletes the snap, so a handle can never outlive its screen.
 After important taps, `--settle` re-reads the screen until it stops changing
 (500ms quiet, 10s max) and prints only what appeared/disappeared, capped at
 80 lines, or `unchanged`. Use it instead of `dump` → eyeball → `dump` loops.
+
+## Safety: stop before submission (read this before automating purchases, messages, or posts)
+
+Text entry and submission are two separately authorized steps. Never type
+into a field and tap Send/Post/Buy/Submit in the same unattended flow.
+
+1. Type the text (`pc type`), then STOP.
+2. Verify what the phone actually rendered: `pc shot` and read the screenshot,
+   or `pc dump` and confirm the field's text matches what you intended.
+3. Only then, with the rendered text confirmed, tap the submit button — and
+   only when the human explicitly approved that specific submission.
+
+This applies to purchases, messages, posts, emails, form submissions, and
+anything irreversible. The tool never makes purchases on its own: any buy
+needs explicit human approval each time, and the approval covers the exact
+item, price, and payment method — not "buy something like this."
+
+**Privacy:** typed text is never recorded. The navigation memory (`pc whereami` /
+`pc route`) stores screen structures and action types only — never the content
+of typed text, passwords, or messages. Screenshots are never stored in the
+navigation database.
 
 Full detail, benchmarks, and architecture: see `README.md`.

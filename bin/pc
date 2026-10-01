@@ -520,6 +520,45 @@ def compact_visible(n, include_all):
     return include_all or is_interactive(n) or bool(node_label(n))
 
 
+def screen_fingerprint(nodes):
+    """Hash screen STRUCTURE, not content (app-automating fingerprinting pattern).
+
+    Primary: sorted resource-id values of visible nodes. A cart with 2 items
+    and the same cart with 3 items hash identically — the map doesn't grow a
+    node per visit. Text is deliberately excluded (immune to badge counts,
+    timestamps, and dynamic content).
+
+    Fallback (Flutter/RN expose no resource-ids): hash the depth-tagged
+    class-name hierarchy shape instead. Coarser, but prevents the whole app
+    collapsing to one node.
+
+    Returns a hex digest string. Only stdlib (hashlib)."""
+    import hashlib
+    # Collect resource-ids from visible nodes
+    rids = sorted(n.get("rid") or "" for n in nodes
+                  if (n.get("class") or node_label(n) or n.get("clickable"))
+                  and n.get("rid"))
+    if rids:
+        # Structure hash: sorted resource-ids (content-independent)
+        h = hashlib.sha256()
+        h.update("\x00".join(rids).encode("utf-8"))
+        return "rid:" + h.hexdigest()[:16]
+
+    # Fallback: depth-tagged class hierarchy shape
+    # Depth from parent chain length
+    shapes = []
+    for n in nodes:
+        if not (n.get("class") or node_label(n) or n.get("clickable")):
+            continue
+        depth = len(n.get("parents", []))
+        cls = (n.get("class") or "").split(".")[-1]
+        shapes.append("{}:{}".format(depth, cls))
+    shapes.sort()
+    h = hashlib.sha256()
+    h.update("\x00".join(shapes).encode("utf-8"))
+    return "cls:" + h.hexdigest()[:16]
+
+
 def visible_lines(nodes, include_all=False):
     """Compact one-line-per-node rendering of walk() nodes, in screen order.
     Shared by dump, snap, and settle diffing so all three see the same rows."""
@@ -568,11 +607,21 @@ def snap_save(nodes, include_all=False):
     """Number the visible nodes @e1..@eN and persist handles to SNAP_PATH.
 
     Returns the list of (handle, line) pairs. Handles are single-use: any
-    mutating pc action deletes the snap file via snap_invalidate()."""
+    mutating pc action deletes the snap file via snap_invalidate().
+    Each snap gets a generation number; handles render as @eN~s<gen> so a
+    stale handle from an older snap is rejected with a clear error instead
+    of silently tapping the wrong coordinates (agent-device ref-pinning pattern)."""
     filt = [n for n in nodes
             if compact_visible(n, include_all)
             # drop the <hierarchy> root itself (no class/label/clickable)
             and (n["class"] or node_label(n) or n["clickable"])]
+    # Generation: monotonic counter persisted alongside the snap.
+    gen_path = os.path.join(SNAP_DIR, "snap.gen")
+    try:
+        with open(gen_path) as f:
+            gen = int(f.read().strip() or "0") + 1
+    except (OSError, ValueError):
+        gen = 1
     entries = {}
     numbered = []
     for i, n in enumerate(filt, 1):
@@ -580,22 +629,27 @@ def snap_save(nodes, include_all=False):
         entries[str(i)] = {"x": cx, "y": cy,
                            "label": node_label(n),
                            "class": (n.get("class") or "").split(".")[-1]}
-        numbered.append(("@e{}".format(i),
+        numbered.append(("@e{}~s{}".format(i, gen),
                          format_compact(n, show_bounds=include_all)))
     try:
         os.makedirs(SNAP_DIR, exist_ok=True)
         with open(SNAP_PATH, "w") as f:
-            json.dump({"ts": time.time(), "entries": entries}, f)
+            json.dump({"ts": time.time(), "gen": gen, "entries": entries}, f)
+        with open(gen_path, "w") as f:
+            f.write(str(gen))
     except OSError as e:
         print("warning: could not save snap: {}".format(e), file=sys.stderr)
     return numbered
 
 
 def snap_resolve(handle):
-    """Resolve '@eN' to (x, y) pixel coords from the last pc snap.
+    """Resolve '@eN' or '@eN~s<gen>' to (x, y) pixel coords from the last pc snap.
 
-    Returns (x, y) or raises ValueError with a human-readable reason."""
-    m = re.fullmatch(r"@e(\d+)", (handle or "").strip())
+    Returns (x, y) or raises ValueError with a human-readable reason.
+    A pinned handle (@eN~s<gen>) whose generation does not match the current
+    snap is rejected explicitly — the coordinates may belong to a different
+    screen."""
+    m = re.fullmatch(r"@e(\d+)(?:~s(\d+))?", (handle or "").strip())
     if not m:
         raise ValueError('not a snap handle: "{}"'.format(handle))
     try:
@@ -605,6 +659,12 @@ def snap_resolve(handle):
         raise ValueError("no snap saved (run `pc snap` first)")
     if time.time() - snap.get("ts", 0) > SNAP_TTL:
         raise ValueError("snap expired (run `pc snap` again)")
+    cur_gen = snap.get("gen", 0)
+    want_gen = m.group(2)
+    if want_gen is not None and int(want_gen) != cur_gen:
+        raise ValueError(
+            "handle {} is from snap generation {}, current snap is generation {} "
+            "(run `pc snap` again for fresh handles)".format(handle, want_gen, cur_gen))
     entry = snap.get("entries", {}).get(m.group(1))
     if entry is None:
         raise ValueError("no such handle {} in current snap".format(handle))
@@ -662,11 +722,65 @@ def cmd_snap(args):
     return 0
 
 
+def _capture_evidence(tag):
+    """Capture failure evidence: screenshot + compact dump. Returns a dict
+    with 'screenshot' (path or None) and 'screen' (list of top dump lines).
+    Best-effort: never raises, never blocks the error report."""
+    ev = {"screenshot": None, "screen": []}
+    try:
+        # Screenshot via the repo's screenshot.sh (wakes screen, saves to shots/).
+        r = subprocess.run([os.path.join(ROOT, "screenshot.sh")],
+                           capture_output=True, text=True, timeout=30)
+        out = (r.stdout or "").strip().splitlines()
+        # screenshot.sh prints the saved path on its last line.
+        for line in reversed(out):
+            if line.endswith(".png") and os.path.exists(line):
+                ev["screenshot"] = line
+                break
+    except Exception:
+        pass
+    try:
+        nodes = walk(ui_dump())
+        # Top 15 nodes with text/desc, compact one-line format.
+        for n in nodes[:50]:
+            label = n.get("text") or n.get("desc") or ""
+            if label:
+                cls = (n.get("class") or "").split(".")[-1]
+                ev["screen"].append("{} [{}]".format(label[:60], cls))
+            if len(ev["screen"]) >= 15:
+                break
+    except Exception:
+        pass
+    return ev
+
+
+def _format_evidence(ev):
+    """Human-readable evidence block for stderr."""
+    lines = []
+    if ev.get("screenshot"):
+        lines.append("  screenshot: {}".format(ev["screenshot"]))
+    if ev.get("screen"):
+        lines.append("  screen was showing:")
+        for s in ev["screen"][:10]:
+            lines.append("    - {}".format(s))
+    return "\n".join(lines)
+
+
 def _tap_fail(args, msg):
-    """Report a tap failure: human text on stderr, pure JSON on stdout with --json."""
+    """Report a tap failure: human text on stderr, pure JSON on stdout with --json.
+    Attaches failure evidence (screenshot + screen contents) unless --no-evidence."""
+    ev = None
+    if not getattr(args, "no_evidence", False):
+        ev = _capture_evidence("tap-fail")
+        ev_txt = _format_evidence(ev)
+        if ev_txt:
+            msg = msg + "\n" + ev_txt
     print(msg, file=sys.stderr)
     if as_json(args):
-        print(json.dumps({"ok": False, "error": msg}))
+        out = {"ok": False, "error": msg}
+        if ev:
+            out["evidence"] = ev
+        print(json.dumps(out))
     return 1
 
 
@@ -692,36 +806,50 @@ def _tap_refused(args, x, y, cover):
     return _tap_fail(args, msg)
 
 
-def settle_lines(prev_lines, timeout=10, quiet=0.5, poll=0.3):
+def settle_lines(prev_lines, timeout=10, quiet=0.5, poll=0.3, prev_fp=None):
     """Re-read the screen until it stops changing.
 
-    Returns (added, removed): compact lines that appeared/disappeared
-    relative to prev_lines (the pre-action screen). Reads every `poll`
-    seconds; stops after `quiet` seconds with no change (minimum two
-    reads, so an action that changes nothing reports "unchanged" instead
-    of racing an animation) or at `timeout` seconds. A read that shrinks
-    to <=20% of a 12+ element screen is a partial mid-transition dump and
-    is retried at 250/400/600ms before being trusted."""
+    Returns (added, removed, final_fp): compact lines that appeared/disappeared
+    relative to prev_lines (the pre-action screen), plus the fingerprint of
+    the final screen. Reads every `poll` seconds; stops after `quiet` seconds
+    with no change (minimum two reads, so an action that changes nothing
+    reports "unchanged" instead of racing an animation) or at `timeout`
+    seconds. A read that shrinks to <=20% of a 12+ element screen is a
+    partial mid-transition dump and is retried at 250/400/600ms before being
+    trusted.
+
+    The screen fingerprint (structure hash, see screen_fingerprint) is used
+    as a cheaper "same screen" signal: if the fingerprint matches, the
+    structure is unchanged even when text content (badges, timestamps)
+    differs. Pass prev_fp (fingerprint of the pre-action screen) to enable."""
     deadline = time.time() + timeout
     cur = list(prev_lines)
+    cur_fp = prev_fp
     quiet_start = None
     reads = 0
     while True:
         time.sleep(poll)
         if time.time() > deadline:
             break
-        nxt = visible_lines(walk(ui_dump()))
+        nodes = walk(ui_dump())
+        nxt = visible_lines(nodes)
+        nxt_fp = screen_fingerprint(nodes)
         reads += 1
         if len(cur) >= 12 and len(nxt) * 5 <= len(cur):
             # Partial dump mid-transition: retry at 250/400/600ms.
             for wait in (0.25, 0.15, 0.2):
                 time.sleep(wait)
-                retry = visible_lines(walk(ui_dump()))
+                nodes = walk(ui_dump())
+                retry = visible_lines(nodes)
                 reads += 1
                 nxt = retry
+                nxt_fp = screen_fingerprint(nodes)
                 if not (len(cur) >= 12 and len(nxt) * 5 <= len(cur)):
                     break
-        if nxt == cur:
+        # Same screen if EITHER text lines match OR structure fingerprint matches.
+        # Fingerprint is immune to badge counts/timestamps that change text.
+        same = (nxt == cur) or (prev_fp and nxt_fp == prev_fp and nxt_fp == cur_fp)
+        if same:
             if quiet_start is None:
                 quiet_start = time.time()
             if time.time() - quiet_start >= quiet and reads >= 2:
@@ -729,9 +857,10 @@ def settle_lines(prev_lines, timeout=10, quiet=0.5, poll=0.3):
         else:
             quiet_start = None
         cur = nxt
+        cur_fp = nxt_fp
     added = [l for l in cur if l not in prev_lines]
     removed = [l for l in prev_lines if l not in cur]
-    return added, removed
+    return added, removed, cur_fp
 
 
 def _print_settle_diff(added, removed, cap=80):
@@ -821,10 +950,16 @@ def cmd_tap(args):
             if cover is not None:
                 return _tap_refused(args, x, y, cover)
         prev_lines = visible_lines(nodes) if args.settle else None
+        prev_fp = screen_fingerprint(nodes)  # for nav memory (no extra dump)
+        from_nodes = nodes  # for nav recording
         tap_center(x, y)
         if args.settle:
-            return _tap_settled_ok(args, tap_label, (x, y),
-                                   *settle_lines(prev_lines))
+            added, removed, final_fp = settle_lines(prev_lines, prev_fp=prev_fp)
+            # Record full transition: we know both from and to screens
+            nav_record_action(from_nodes, 'tap "{}"'.format(tap_label), to_fp=final_fp, ok=True)
+            return _tap_settled_ok(args, tap_label, (x, y), added, removed, final_fp)
+        # No settle: record action taken, destination unknown (no extra round-trip)
+        nav_record_action(from_nodes, 'tap "{}"'.format(tap_label), to_fp=None, ok=True)
         return _tap_ok(args, tap_label, (x, y))
 
     # Fallback selectors: "a || b" tries each label in order (first hit wins).
@@ -864,14 +999,39 @@ def cmd_tap(args):
                 return _tap_refused(args, xy[0], xy[1], cover)
     tap_label = node["text"] or node["class"]
     prev_lines = visible_lines(nodes) if args.settle else None
+    prev_fp = screen_fingerprint(nodes)  # for nav memory (no extra dump)
+    from_nodes = nodes  # for nav recording
     tap_center(*xy)
     if args.settle:
-        return _tap_settled_ok(args, tap_label, xy, *settle_lines(prev_lines))
+        added, removed, final_fp = settle_lines(prev_lines, prev_fp=prev_fp)
+        # Record full transition: we know both from and to screens
+        nav_record_action(from_nodes, 'tap "{}"'.format(tap_label), to_fp=final_fp, ok=True)
+        return _tap_settled_ok(args, tap_label, xy, added, removed, final_fp)
+    # No settle: record action taken, destination unknown (no extra round-trip)
+    nav_record_action(from_nodes, 'tap "{}"'.format(tap_label), to_fp=None, ok=True)
     return _tap_ok(args, tap_label, xy)
 
 
-def _tap_settled_ok(args, label, xy, added, removed):
+def nav_record_action(from_nodes, action_desc, to_fp=None, ok=True):
+    """Record a navigation action. from_nodes is the walk() output from the
+    pre-action dump (already taken, no extra round-trip). to_fp is the
+    destination fingerprint if known (e.g., from settle), else None.
+    
+    Typed text content is NEVER recorded — action_desc for type operations
+    must be "type" or "type <field-hint>", never the actual text."""
+    try:
+        from_fp = screen_fingerprint(from_nodes)
+        nav_record(from_fp, action_desc, to_fp, ok=ok)
+    except Exception:
+        pass
+
+
+def _tap_settled_ok(args, label, xy, added, removed, final_fp=None):
     """Report a successful tap plus its settle diff."""
+    # Record navigation memory: we know the from-screen (prev_fp was passed
+    # to settle_lines) and the to-screen (final_fp from settle).
+    # Note: prev_fp isn't passed here, so we record with from_fp=None.
+    # The full transition is recorded by the caller via nav_record.
     if as_json(args):
         print(json.dumps({"ok": True,
                           "tapped": {"text": label, "x": xy[0], "y": xy[1]},
@@ -884,10 +1044,20 @@ def _tap_settled_ok(args, label, xy, added, removed):
 
 
 def _wait_fail(args, msg):
-    """Wait failure: human text on stderr, pure JSON on stdout with --json."""
+    """Wait failure: human text on stderr, pure JSON on stdout with --json.
+    Attaches failure evidence (screenshot + screen contents) unless --no-evidence."""
+    ev = None
+    if not getattr(args, "no_evidence", False):
+        ev = _capture_evidence("wait-fail")
+        ev_txt = _format_evidence(ev)
+        if ev_txt:
+            msg = msg + "\n" + ev_txt
     print(msg, file=sys.stderr)
     if as_json(args):
-        print(json.dumps({"ok": False, "error": msg}))
+        out = {"ok": False, "error": msg}
+        if ev:
+            out["evidence"] = ev
+        print(json.dumps(out))
     return 1
 
 
@@ -1033,6 +1203,14 @@ def type_via_adbkeyboard(text, field_xy=None, clear=False, clear_keys=20):
 
 
 def cmd_type(args):
+    # Nav memory: record that a field was filled (NEVER the content).
+    # The action string is "type" or "type <field-hint>", never the actual text.
+    try:
+        field_hint = args.field if getattr(args, "field", None) else "field"
+        # Use nodes if available for from_fp, else None (no extra round-trip)
+        nav_record(None, 'type {}'.format(field_hint), None, ok=True)
+    except Exception:
+        pass
     # Route selection: --ascii forces the legacy path, --unicode forces the
     # ADBKeyboard path, otherwise auto-detect on non-ASCII content.
     if args.ascii:
@@ -1115,17 +1293,54 @@ def cmd_type(args):
 
 
 def cmd_press(args):
-    try:
-        if scrcpy_send("key {}".format(args.key)):
-            u2_invalidate()
-            print("pressed {}".format(args.key))
-            return 0
-    except Exception as e:
-        print("scrcpy key failed, falling back: {}".format(e), file=sys.stderr)
-    wake()
-    adb_or_ensure("shell", "input", "keyevent", args.key)
+    # Key combos: --ctrl/--shift/--alt/--meta send the modifier keyevent
+    # before the main key (Android tracks the modifier state).
+    mods = []
+    if getattr(args, "ctrl", False):
+        mods.append("KEYCODE_CTRL_LEFT")
+    if getattr(args, "shift", False):
+        mods.append("KEYCODE_SHIFT_LEFT")
+    if getattr(args, "alt", False):
+        mods.append("KEYCODE_ALT_LEFT")
+    if getattr(args, "meta", False):
+        mods.append("KEYCODE_META_LEFT")
+    repeat = max(1, getattr(args, "repeat", 1) or 1)
+    delay_ms = getattr(args, "delay", 120) or 0
+
+    def send_one(key):
+        try:
+            if scrcpy_send("key {}".format(key)):
+                return True
+        except Exception as e:
+            print("scrcpy key failed, falling back: {}".format(e), file=sys.stderr)
+        wake()
+        adb_or_ensure("shell", "input", "keyevent", key)
+        return True
+
+    for i in range(repeat):
+        for m in mods:
+            send_one(m)
+        send_one(args.key)
+        # Release modifiers in reverse order (best-effort; Android usually
+        # clears the modifier state after the combo is consumed).
+        for m in reversed(mods):
+            send_one(m)
+        if delay_ms and i < repeat - 1:
+            time.sleep(delay_ms / 1000.0)
     u2_invalidate()
-    print("pressed {}".format(args.key))
+    label = args.key
+    if mods:
+        label = "+".join(m.replace("KEYCODE_", "").replace("_LEFT", "") for m in mods) + "+" + label
+    if repeat > 1:
+        label += " x{}".format(repeat)
+    # Nav memory: record the press action (no pre-dump available, so from_fp
+    # is None — the action is still useful for the action vocabulary).
+    # No extra device round-trip for bookkeeping.
+    try:
+        nav_record(None, 'press {}'.format(label), None, ok=True)
+    except Exception:
+        pass
+    print("pressed {}".format(label))
     return 0
 
 
@@ -1148,6 +1363,11 @@ def cmd_start(args):
     adb_or_ensure("shell", "monkey", "-p", args.package,
                   "-c", "android.intent.category.LAUNCHER", "1")
     u2_invalidate()
+    # Nav memory: record app launch (no pre-dump, so from_fp is None)
+    try:
+        nav_record(None, 'start {}'.format(args.package), None, ok=True)
+    except Exception:
+        pass
     print("launched {}".format(args.package))
     return 0
 
@@ -1296,14 +1516,16 @@ def cmd_vcode(args):
 
 # ------------------------------------------------------------------ doctor
 
-def _doctor_check(name, fn):
+def _doctor_check(name, fn, fix=None):
     """Run one doctor check, catching everything. Returns a
-    {"name":..., "ok":..., "detail":...} dict."""
+    {"name":..., "ok":..., "detail":..., "fix":...} dict. The fix hint tells
+    the user how to resolve a failure (app-automating check_environment pattern)."""
     try:
         ok, detail = fn()
     except Exception as e:
         ok, detail = False, "{}: {}".format(type(e).__name__, e)
-    return {"name": name, "ok": bool(ok), "detail": str(detail)}
+    return {"name": name, "ok": bool(ok), "detail": str(detail),
+            "fix": fix}
 
 
 def cmd_doctor(args):
@@ -1353,12 +1575,27 @@ def cmd_doctor(args):
             return False, "fast_dump returned nothing"
         return True, "{} nodes".format(len(walk(root)))
 
-    checks.append(_doctor_check("adb binary", check_adb_binary))
-    checks.append(_doctor_check("adb server", check_adb_server))
-    checks.append(_doctor_check("tunnel target", check_tunnel))
-    checks.append(_doctor_check("u2 daemon", check_u2_daemon))
-    checks.append(_doctor_check("device state", check_device_state))
-    checks.append(_doctor_check("dump pipeline", check_dump_pipeline))
+    checks.append(_doctor_check(
+        "adb binary", check_adb_binary,
+        fix="Run ./install.sh to download platform-tools to .android-tools/"))
+    checks.append(_doctor_check(
+        "adb server", check_adb_server,
+        fix="Run `pc ensure` to restart the adb server"))
+    checks.append(_doctor_check(
+        "tunnel target", check_tunnel,
+        fix="Check config.env ADB_PORT matches the phone's Wireless debugging "
+            "screen; run ./tunnel.sh start; ensure Tailscale is connected on the phone"))
+    checks.append(_doctor_check(
+        "u2 daemon", check_u2_daemon,
+        fix="Run `pc ensure` to restart the u2 daemon (~5s)"))
+    checks.append(_doctor_check(
+        "device state", check_device_state,
+        fix="If 'unauthorized', re-run pairing (fresh code from phone). "
+            "If 'offline', run `adb kill-server` then `pc ensure`"))
+    checks.append(_doctor_check(
+        "dump pipeline", check_dump_pipeline,
+        fix="Keep the phone screen awake (charger + `svc power stayon true`); "
+            "run `pc ensure` to restart the u2 stack"))
 
     # Latency: one cached dump round-trip through the daemon socket.
     t0 = time.time()
@@ -1386,10 +1623,330 @@ def cmd_doctor(args):
         for c in checks:
             print("  [{}] {}: {}".format("ok" if c["ok"] else "FAIL",
                                          c["name"], c["detail"]))
+            if not c["ok"] and c.get("fix"):
+                print("        fix: {}".format(c["fix"]))
         if not allok:
             print("run `pc ensure` to heal the tunnel, adb server, and daemons",
                   file=sys.stderr)
     return 0 if allok else 1
+
+
+# ------------------------------------------------------- navigation memory
+"""
+Navigation memory: a SQLite transition graph of screens the agent has visited.
+
+Inspired by app-automating's navigation_memory module (MIT). Every interaction
+is recorded as (from_screen, action, to_screen, ok) so the agent can ask
+"how do I get to the Checkout screen?" instead of rediscovering routes.
+
+PRIVACY POLICY (explicit, from app-automating):
+- Typed text is NEVER recorded. Only the fact that "a field was filled" is
+  stored, never the content. Passwords, card numbers, and messages stay on
+  the device.
+- Screenshots are never stored in the database.
+- The database is local-only (~/.cache/pc/nav-memory.db), never synced.
+
+Screens are fingerprinted by STRUCTURE (see screen_fingerprint), not content,
+so a cart with 2 items and the same cart with 3 items are the same node.
+"""
+
+NAV_DB = os.path.join(os.path.expanduser("~"), ".cache", "pc", "nav-memory.db")
+
+
+def nav_init():
+    """Create the navigation memory tables if they don't exist."""
+    import sqlite3
+    os.makedirs(os.path.dirname(NAV_DB), exist_ok=True)
+    con = sqlite3.connect(NAV_DB)
+    try:
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS screen (
+                fingerprint TEXT PRIMARY KEY,
+                first_seen REAL NOT NULL,
+                last_seen REAL NOT NULL,
+                label TEXT
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS transition (
+                from_fp TEXT NOT NULL,
+                action TEXT NOT NULL,
+                to_fp TEXT,
+                ok INTEGER NOT NULL DEFAULT 1,
+                count INTEGER NOT NULL DEFAULT 1,
+                last_used REAL NOT NULL,
+                PRIMARY KEY (from_fp, action, to_fp)
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS run (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at REAL NOT NULL
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS step (
+                run_id INTEGER NOT NULL,
+                seq INTEGER NOT NULL,
+                from_fp TEXT,
+                action TEXT NOT NULL,
+                to_fp TEXT,
+                ok INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (run_id, seq)
+            )
+        """)
+        con.commit()
+    finally:
+        con.close()
+
+
+def nav_record_screen(fingerprint, label=None):
+    """Record a screen visit (upsert). Never raises."""
+    import sqlite3
+    try:
+        nav_init()
+        now = time.time()
+        con = sqlite3.connect(NAV_DB)
+        try:
+            cur = con.execute("SELECT fingerprint FROM screen WHERE fingerprint = ?",
+                              (fingerprint,))
+            if cur.fetchone():
+                con.execute("UPDATE screen SET last_seen = ?, label = COALESCE(?, label) "
+                            "WHERE fingerprint = ?",
+                            (now, label, fingerprint))
+            else:
+                con.execute("INSERT INTO screen (fingerprint, first_seen, last_seen, label) "
+                            "VALUES (?, ?, ?, ?)",
+                            (fingerprint, now, now, label))
+            con.commit()
+        finally:
+            con.close()
+    except Exception:
+        pass
+
+
+def nav_record(from_fp, action, to_fp, ok=True):
+    """Record a transition (from_screen, action, to_screen, ok).
+
+    Failed gestures are recorded too (ok=False): "tapping this here does
+    nothing" is knowledge. Typed text content is NEVER recorded — the action
+    string for type operations is "type <field-hint>" or "type", never the
+    actual text.
+    """
+    import sqlite3
+    try:
+        nav_init()
+        now = time.time()
+        # Record both screens (skip if fingerprint is None)
+        if from_fp:
+            nav_record_screen(from_fp)
+        if to_fp:
+            nav_record_screen(to_fp)
+        con = sqlite3.connect(NAV_DB)
+        try:
+            # Upsert the transition: increment count, update ok and last_used
+            # Handle NULL from_fp/to_fp in the WHERE clause
+            cur = con.execute(
+                "SELECT count FROM transition "
+                "WHERE ((from_fp = ?) OR (from_fp IS NULL AND ? IS NULL)) "
+                "AND action = ? AND "
+                "((to_fp = ?) OR (to_fp IS NULL AND ? IS NULL))",
+                (from_fp, from_fp, action, to_fp, to_fp))
+            row = cur.fetchone()
+            if row:
+                con.execute(
+                    "UPDATE transition SET count = count + 1, ok = ?, last_used = ? "
+                    "WHERE ((from_fp = ?) OR (from_fp IS NULL AND ? IS NULL)) "
+                    "AND action = ? AND "
+                    "((to_fp = ?) OR (to_fp IS NULL AND ? IS NULL))",
+                    (1 if ok else 0, now, from_fp, from_fp, action, to_fp, to_fp))
+            else:
+                con.execute(
+                    "INSERT INTO transition (from_fp, action, to_fp, ok, count, last_used) "
+                    "VALUES (?, ?, ?, ?, 1, ?)",
+                    (from_fp, action, to_fp, 1 if ok else 0, now))
+            con.commit()
+        finally:
+            con.close()
+    except Exception:
+        pass
+
+
+def nav_whereami(fingerprint):
+    """Get info about a screen fingerprint. Returns dict or None."""
+    import sqlite3
+    try:
+        nav_init()
+        con = sqlite3.connect(NAV_DB)
+        try:
+            cur = con.execute(
+                "SELECT fingerprint, first_seen, last_seen, label FROM screen "
+                "WHERE fingerprint = ?", (fingerprint,))
+            row = cur.fetchone()
+            if not row:
+                return None
+            # Get outgoing transitions
+            cur = con.execute(
+                "SELECT action, to_fp, ok, count FROM transition "
+                "WHERE from_fp = ? ORDER BY count DESC LIMIT 20",
+                (fingerprint,))
+            transitions = [{"action": r[0], "to_fp": r[1], "ok": bool(r[2]), "count": r[3]}
+                           for r in cur.fetchall()]
+            return {
+                "fingerprint": row[0],
+                "first_seen": row[1],
+                "last_seen": row[2],
+                "label": row[3],
+                "transitions": transitions,
+            }
+        finally:
+            con.close()
+    except Exception:
+        return None
+
+
+def nav_route(from_fp, target_label, max_hops=10):
+    """Best-first search from from_fp to a screen containing target_label.
+
+    Scored by edge reliability (success rate), ties broken by fewer hops.
+    Returns a list of (action, to_fp) tuples, or None if no route found.
+    """
+    import sqlite3
+    import heapq
+    try:
+        nav_init()
+        con = sqlite3.connect(NAV_DB)
+        try:
+            # Find target screens containing the label
+            # Label matching: check screen labels and transition actions
+            cur = con.execute("SELECT fingerprint, label FROM screen")
+            targets = set()
+            for fp, label in cur.fetchall():
+                if label and target_label.lower() in label.lower():
+                    targets.add(fp)
+            # Also check if any transition action mentions the label
+            # (actions like 'tap "Checkout"' contain the label)
+            cur = con.execute(
+                "SELECT DISTINCT to_fp FROM transition WHERE to_fp IS NOT NULL")
+            for (to_fp,) in cur.fetchall():
+                if to_fp:
+                    # Get the screen label
+                    cur2 = con.execute("SELECT label FROM screen WHERE fingerprint = ?",
+                                       (to_fp,))
+                    row = cur2.fetchone()
+                    if row and row[0] and target_label.lower() in row[0].lower():
+                        targets.add(to_fp)
+            if not targets:
+                return None
+
+            # Best-first search: (negative_reliability, hops, fp, path)
+            # Reliability = product of edge success rates along path
+            visited = {from_fp: 1.0}
+            heap = [(-1.0, 0, from_fp, [])]
+            while heap:
+                neg_rel, hops, fp, path = heapq.heappop(heap)
+                rel = -neg_rel
+                if fp in targets:
+                    return path
+                if hops >= max_hops:
+                    continue
+                cur = con.execute(
+                    "SELECT action, to_fp, ok, count FROM transition "
+                    "WHERE from_fp = ? AND to_fp IS NOT NULL",
+                    (fp,))
+                for action, to_fp, ok, count in cur.fetchall():
+                    if not to_fp or to_fp in visited:
+                        continue
+                    # Edge reliability: ok (1 or 0) weighted by count
+                    # Simple: if ok=1, reliability=0.9 + 0.1*min(count,10)/10
+                    # If ok=0, reliability=0.1 (might work this time)
+                    edge_rel = (0.9 + 0.1 * min(count, 10) / 10) if ok else 0.1
+                    new_rel = rel * edge_rel
+                    # Only visit if this path is better than previous
+                    if to_fp not in visited or new_rel > visited[to_fp]:
+                        visited[to_fp] = new_rel
+                        new_path = path + [(action, to_fp)]
+                        heapq.heappush(heap, (-new_rel, hops + 1, to_fp, new_path))
+            return None
+        finally:
+            con.close()
+    except Exception:
+        return None
+
+
+def nav_forget():
+    """Clear all navigation memory. Returns True on success."""
+    import sqlite3
+    try:
+        if os.path.exists(NAV_DB):
+            os.remove(NAV_DB)
+        return True
+    except Exception:
+        return False
+
+
+def cmd_whereami(args):
+    """Show current screen fingerprint and known transitions."""
+    root = ui_dump()
+    nodes = walk(root)
+    fp = screen_fingerprint(nodes)
+    info = nav_whereami(fp)
+    if as_json(args):
+        print(json.dumps({"ok": True, "fingerprint": fp, "info": info}))
+        return 0
+    print("fingerprint: {}".format(fp))
+    if not info:
+        print("unknown screen (not in navigation memory yet)")
+        print("visit it via tap/press/type to start building the map")
+        return 0
+    print("first seen: {}".format(time.strftime("%Y-%m-%d %H:%M",
+                                                time.localtime(info["first_seen"]))))
+    print("last seen: {}".format(time.strftime("%Y-%m-%d %H:%M",
+                                               time.localtime(info["last_seen"]))))
+    if info["label"]:
+        print("label: {}".format(info["label"]))
+    if info["transitions"]:
+        print("known actions from here ({}):".format(len(info["transitions"])))
+        for t in info["transitions"][:10]:
+            status = "ok" if t["ok"] else "FAILED"
+            print("  - {} -> {} [{} x{}]".format(
+                t["action"], (t["to_fp"] or "?")[:12], status, t["count"]))
+    else:
+        print("no recorded actions from this screen yet")
+    return 0
+
+
+def cmd_route(args):
+    """Find a route to a screen containing the target label."""
+    root = ui_dump()
+    nodes = walk(root)
+    from_fp = screen_fingerprint(nodes)
+    route = nav_route(from_fp, args.target)
+    if as_json(args):
+        print(json.dumps({"ok": route is not None, "route": route}))
+        return 0 if route else 1
+    if not route:
+        print('no route found to "{}" from current screen'.format(args.target))
+        print("the navigation memory may not have seen that screen yet")
+        return 1
+    print('route to "{}" ({} steps):'.format(args.target, len(route)))
+    for i, (action, to_fp) in enumerate(route, 1):
+        print("  {}. {} -> {}".format(i, action, to_fp[:12]))
+    return 0
+
+
+def cmd_forget(args):
+    """Clear navigation memory (with confirmation unless --yes)."""
+    if not args.yes:
+        print("this will delete all navigation memory ({} screens, transitions, runs)".format(
+            "all"))
+        print("run with --yes to confirm")
+        return 1
+    if nav_forget():
+        print("navigation memory cleared")
+        return 0
+    print("failed to clear navigation memory", file=sys.stderr)
+    return 1
 
 
 # ------------------------------------------------------------------- main
@@ -1486,6 +2043,8 @@ def build_parser():
     p.add_argument("--settle", action="store_true",
                    help="after tapping, wait for the screen to stop changing "
                         "and show what appeared/disappeared")
+    p.add_argument("--no-evidence", action="store_true",
+                   help="skip screenshot+dump capture on failure")
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                    help="machine-readable JSON on stdout")
     p.set_defaults(fn=cmd_tap)
@@ -1496,6 +2055,8 @@ def build_parser():
     p.add_argument("--fuzzy", action="store_true")
     p.add_argument("--absent", action="store_true",
                    help="wait until the text disappears")
+    p.add_argument("--no-evidence", action="store_true",
+                   help="skip screenshot+dump capture on failure")
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                    help="machine-readable JSON on stdout")
     p.set_defaults(fn=cmd_wait)
@@ -1514,6 +2075,14 @@ def build_parser():
 
     p = sub.add_parser("press", help="keyevent (BACK, HOME, 224, 67, ...)")
     p.add_argument("key")
+    p.add_argument("--repeat", type=int, default=1,
+                   help="repeat the keypress N times (e.g. --repeat 5 for backspace x5)")
+    p.add_argument("--delay", type=int, default=120,
+                   help="ms between repeats (default 120)")
+    p.add_argument("--ctrl", action="store_true", help="hold Ctrl (KEYCODE_CTRL_LEFT)")
+    p.add_argument("--shift", action="store_true", help="hold Shift (KEYCODE_SHIFT_LEFT)")
+    p.add_argument("--alt", action="store_true", help="hold Alt (KEYCODE_ALT_LEFT)")
+    p.add_argument("--meta", action="store_true", help="hold Meta/Win (KEYCODE_META_LEFT)")
     p.set_defaults(fn=cmd_press)
 
     p = sub.add_parser("state", help="focused app + top screen texts")
@@ -1562,6 +2131,19 @@ def build_parser():
     p.add_argument("name")
     p.set_defaults(fn=cmd_recipe)
 
+    p = sub.add_parser("record", help="record actions to recipes/<name>.pc")
+    p.add_argument("name", nargs="?", default=None,
+                   help="recipe name (omit with --stop)")
+    p.add_argument("--stop", action="store_true",
+                   help="stop the active recording")
+    p.add_argument("--force", action="store_true",
+                   help="overwrite existing recipe")
+    p.set_defaults(fn=cmd_record)
+
+    p = sub.add_parser("replay", help="replay a recorded session")
+    p.add_argument("name")
+    p.set_defaults(fn=cmd_replay)
+
     p = sub.add_parser("amazon-status",
                        help="latest Amazon order status (one-shot, stops at order list)")
     p.set_defaults(fn=cmd_amazon_status)
@@ -1570,6 +2152,22 @@ def build_parser():
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                    help="machine-readable JSON on stdout")
     p.set_defaults(fn=cmd_doctor)
+
+    p = sub.add_parser("whereami", help="show current screen fingerprint + known transitions")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_whereami)
+
+    p = sub.add_parser("route", help="find a route to a screen (via navigation memory)")
+    p.add_argument("target", help="label to route to (e.g. \"Checkout\")")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_route)
+
+    p = sub.add_parser("forget", help="clear navigation memory")
+    p.add_argument("--yes", action="store_true",
+                   help="confirm deletion without prompting")
+    p.set_defaults(fn=cmd_forget)
 
     return ap
 
@@ -1605,9 +2203,134 @@ def cmd_recipe(args):
     return cmd_do(argparse.Namespace(flow="; ".join(steps)))
 
 
+# ------------------------------------------------------- record / replay
+"""
+Session recording: `pc record <name>` captures every action command to
+recipes/<name>.pc, which can be replayed with `pc replay <name>`.
+
+Recording captures the actual commands issued (tap, press, type, wait, start,
+open), not just outcomes. The recipe file is a plain text list of pc
+subcommands, human-readable and editable.
+"""
+
+RECORD_STATE = os.path.join(os.path.expanduser("~"), ".cache", "pc", "recording.json")
+
+
+def record_active():
+    """Check if recording is active. Returns (name, path) or (None, None)."""
+    try:
+        if os.path.exists(RECORD_STATE):
+            with open(RECORD_STATE) as f:
+                st = json.load(f)
+                return st.get("name"), st.get("path")
+    except Exception:
+        pass
+    return None, None
+
+
+def record_log(command_line):
+    """Append a command to the active recording, if any. Never raises."""
+    try:
+        name, path = record_active()
+        if not name or not path:
+            return
+        # Don't record the record command itself, or non-action commands
+        # that would pollute the recipe (dump, snap, doctor, etc.)
+        with open(path, "a") as f:
+            f.write(command_line + "\n")
+    except Exception:
+        pass
+
+
+def record_command_line(args):
+    """Reconstruct the pc subcommand line from parsed args for recording.
+    Returns the command string (without 'pc' prefix), or None if not recordable."""
+    # Map of command -> how to reconstruct
+    # We use sys.argv to get the original, stripping the 'pc' prefix
+    try:
+        argv = sys.argv[1:]  # skip 'pc'
+        if not argv:
+            return None
+        # Skip non-action commands
+        non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
+                          "route", "forget", "record", "replay", "recipe", "do",
+                          "ensure", "gcode", "vcode", "amazon-status"}
+        if argv[0] in non_recordable:
+            return None
+        # Reconstruct with proper quoting
+        return " ".join(shlex.quote(a) for a in argv)
+    except Exception:
+        return None
+
+
+def cmd_record(args):
+    """Start or stop recording a session to recipes/<name>.pc."""
+    if args.stop:
+        name, path = record_active()
+        if not name:
+            print("not recording")
+            return 0
+        try:
+            os.remove(RECORD_STATE)
+        except OSError:
+            pass
+        print("stopped recording '{}' -> {}".format(name, path))
+        return 0
+    # Start recording
+    name = args.name
+    if not name:
+        print("usage: pc record <name> | pc record --stop", file=sys.stderr)
+        return 1
+    # Check if already recording
+    active_name, _ = record_active()
+    if active_name:
+        print("already recording '{}' (stop with `pc record --stop`)".format(active_name),
+              file=sys.stderr)
+        return 1
+    path = os.path.join(ROOT, "recipes", name + ".pc")
+    # Don't overwrite existing without --force
+    if os.path.exists(path) and not args.force:
+        print("recipe '{}' exists (use --force to overwrite)".format(name),
+              file=sys.stderr)
+        return 1
+    # Initialize the file with a header
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write("# Recorded session: {}\n".format(name))
+        f.write("# Started: {}\n".format(time.strftime("%Y-%m-%d %H:%M:%S")))
+    # Save recording state
+    os.makedirs(os.path.dirname(RECORD_STATE), exist_ok=True)
+    with open(RECORD_STATE, "w") as f:
+        json.dump({"name": name, "path": path, "started": time.time()}, f)
+    print("recording to '{}' (stop with `pc record --stop`)".format(path))
+    return 0
+
+
+def cmd_replay(args):
+    """Replay a recorded session. Same as `pc recipe`, but with step-by-step output."""
+    path = os.path.join(ROOT, "recipes", args.name + ".pc")
+    if not os.path.exists(path):
+        print("no recording: {}".format(path), file=sys.stderr)
+        return 1
+    steps = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                steps.append(line)
+    print("replaying '{}' ({} steps)".format(args.name, len(steps)))
+    return cmd_do(argparse.Namespace(flow="; ".join(steps)))
+
+
 def main():
     ap = build_parser()
     args = ap.parse_args()
+    # Session recording: log action commands to the active recipe file.
+    # This happens before execution so the command is captured even if it fails.
+    # (The record/replay commands themselves are not recorded.)
+    cmd_line = record_command_line(args)
+    if cmd_line:
+        record_log(cmd_line)
     sys.exit(args.fn(args))
 
 
