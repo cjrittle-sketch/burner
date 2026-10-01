@@ -34,10 +34,14 @@ plainly.
 Work out which device they are talking to you from before asking. Use what
 you already know: the app or client they're chatting in, its platform or
 user agent, or anything they've said (a mobile app on Android usually means
-they're holding a phone, a desktop or web client means a computer). If you
-can tell, say it in one line and let them correct you ("Looks like you're
-on an Android phone, is this the spare one?"). Ask outright only when you
-can't tell. Then follow that path:
+they're holding a phone, a desktop or web client means a computer). Then
+always ask with these three choices, putting your best guess first:
+
+- This is my spare phone (the one I'm setting up)
+- I'm on my everyday phone
+- I'm on a computer
+
+If your app can show tappable choices, use them. Then follow that path:
 
 - **From the spare phone itself:** that phone is the burner phone. Skip any
   "find a spare phone" advice and do the human steps below on the phone they

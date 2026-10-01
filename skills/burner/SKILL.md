@@ -32,7 +32,8 @@ The guided path is `burner setup`: it walks every step, runs the agent steps its
 and ask for a fresh one if it expires. Talk to the user in plain, non-technical words during setup: say what's
 happening for them ("Installing burner on my side"), leave out installer
 output and part names (adb, venv, Python, ports) unless they ask. First work out which device the user is chatting from (infer it from the
-client, platform or user agent, confirm in one line, ask only if unsure): if it's
+client, platform or user agent, then always offer three choices with your
+guess first: my spare phone, my everyday phone, a computer): if it's
 the burner phone itself, skip "use a spare phone" advice. Switching apps
 cancels the pairing code, so have them open Settings and the chat in split
 screen (Recent apps > Settings icon > Split screen) before tapping Pair. Walk the human steps one at a time,
