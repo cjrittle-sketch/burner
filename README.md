@@ -103,11 +103,10 @@ Thanks. Let me know on X: [@tropoFarmer](https://x.com/tropoFarmer).
 
 - It's your phone on your own Wi-Fi. Only computers signed in to your own
   Tailscale can reach it.
-- Sign-in codes get read, typed and forgotten. They're never saved.
 - Your phone's address lives in `config.env` on your computer and is kept out
   of GitHub. Pairing codes are never saved anywhere.
-- Screenshots stay in the `shots/` folder and are kept out of GitHub too,
-  since they show your personal stuff.
+- Nothing is ever sent or communicated outside of your private Tailscale
+  network.
 
 ## Gotchas
 
