@@ -1,0 +1,12 @@
+# Install the free app whose Play Store listing is open right now.
+# Usage: burner recipe play-install-current   (after play-search and a tap)
+#
+# Same install steps as play-install, without needing the package name.
+wait "Install" --timeout 45
+# Already installed: the listing shows "Uninstall" + "Open"; stop before any tap.
+wait "Uninstall" --absent --timeout 2
+# Paid apps show a price instead of "Install", so the wait above times out and
+# nothing is tapped. Never add a purchase step to this recipe.
+tap "Install"
+# Downloads are slow. "Uninstall" only appears once the install finishes.
+wait "Uninstall" --timeout 600

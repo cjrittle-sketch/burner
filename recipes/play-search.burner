@@ -1,0 +1,10 @@
+# Open Play Store search results for an app name, skipping the Search tab.
+# Usage: APP_QUERY=Vinted burner recipe play-search
+#        (spaces as %20, e.g. APP_QUERY=Uber%20Eats)
+#
+# Stops on the results list. Look at it (burner shot --out .), tap the right
+# app by name (burner tap "Vinted" --index 0), check its listing is the one
+# you want, then run play-install-current. Pick the app yourself: the first
+# result is sometimes an ad or a lookalike.
+open market://search?q=$APP_QUERY&c=apps com.android.vending
+wait "Install" --timeout 30

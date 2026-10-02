@@ -25,7 +25,7 @@ isn't green, go to [Setup](#setup) first.
 | "What's on my burner?" or "Take a screenshot of my burner" | They mean the screen right now, not the installed apps. Take a screenshot and send the image (see below). |
 | "Check my Amazon order" | `burner amazon-status` does it in one step. |
 | "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed. |
-| "Install Snapchat" (any free app) | Find its package name (e.g. `com.snapchat.android`; if you don't know it, look it up on the web: a Play Store link ends in `?id=<package>`), then `PLAY_PACKAGE=<package> burner recipe play-install`. It opens the Play Store listing directly, taps Install and waits for the download. Don't search the Play Store or tap by screen coordinates. It stops on paid apps; never buy one. |
+| "Install Snapchat" (any free app) | See "Installing apps" below. Never search the Play Store by tapping, and never tap by screen coordinates. |
 | "Check my burner" / "is my burner on?" / battery, storage | `burner status` answers it in one call. Don't dig through `dumpsys`, which can expose accounts and other personal details. |
 | "Update my burner" | Run `burner update`, then say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
@@ -40,6 +40,35 @@ there and prints its path. Attach that file. Don't reuse a file name: chat
 apps cache images by name and keep showing the old screenshot. Plain
 `burner shot` saves under `~/burner/shots/`, which many chat apps can't
 display.
+
+## Installing apps
+
+Free apps only; never buy one. If the Play Store shows a price instead of
+Install, stop and tell the user.
+
+- **Know the package** (like `com.snapchat.android`), or look it up on the web
+  (a Play Store link ends in `?id=<package>`): `PLAY_PACKAGE=<package> burner
+  recipe play-install`. It opens the listing, taps Install and waits.
+- **Only know the name:** `APP_QUERY=Vinted burner recipe play-search` opens
+  the Play Store results (spaces as `%20`). Check the right app is listed
+  (take a screenshot, results can be ads or lookalikes), `burner tap "Vinted"
+  --index 0`, confirm the listing is the one you want, then `burner recipe
+  play-install-current`.
+
+## Working fast
+
+Every screen read costs several seconds, so skip screens when you can.
+
+- **Search with a link, not the keyboard.** Many sites and apps take the
+  search in the address: `burner open "https://www.vinted.com/catalog?search_text=nike%20sneakers&price_to=35"`.
+  If the app is installed, the link usually opens inside it.
+- **Prefer the app, but don't fight a wall.** If an app stops you at a
+  sign-in or onboarding screen you can't get past without signing in, you may
+  browse the site in the phone's browser instead (`burner open <url>`), as
+  long as it's read-only. Tell the user you did.
+- **Say what you saw, not what you guess.** "These three sneakers are listed
+  under $35" is something you saw; "these are underpriced" needs prices to
+  compare against, so say what you couldn't check.
 
 ## Rules
 
