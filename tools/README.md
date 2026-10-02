@@ -69,7 +69,8 @@ every round.
 2. Tailscale must be running on Windows. Inside WSL, check the phone answers:
    `ping -c1 <phone's tailnet IP>`. If it doesn't, add `networkingMode=mirrored`
    under `[wsl2]` in `%UserProfile%\.wslconfig` and run `wsl --shutdown`.
-3. Inside WSL, run
+3. Inside WSL, run `sudo apt-get install -y socat` (the tunnel uses it;
+   with no `HTTPS_PROXY` set it goes straight to the phone), then
    `git clone https://github.com/useburner/burner ~/burner && cd ~/burner && bash install.sh`,
    then `bin/burner setup`. If `install.sh` fails with `$'\r': command not
    found`, the clone predates `.gitattributes`: run

@@ -979,6 +979,10 @@ def snap_resolve(handle):
 
 
 def cmd_dump(args):
+    if getattr(args, "fresh", False):
+        # The UI helper reuses a read for 2s and only burner's own actions
+        # clear it, so a screen changed some other way can read stale.
+        u2_invalidate()
     root = ui_dump()
     if getattr(args, "save", None):
         # The raw screen, for tests/fixtures/: replay it offline with
@@ -2963,6 +2967,9 @@ def build_parser():
                    help="machine-readable JSON on stdout (with --all: bounds, ids)")
     p.add_argument("--save", metavar="FILE",
                    help="also save the raw screen XML (for tests/fixtures/)")
+    p.add_argument("--fresh", action="store_true",
+                   help="read the screen now, not a read from the last 2s "
+                        "(after the screen changed without burner)")
     p.set_defaults(fn=cmd_dump)
 
     p = sub.add_parser("snap", help="numbered UI snapshot (@e1..@eN handles for tap)")
@@ -3759,21 +3766,28 @@ def _run_pair(args):
         return 1
     pair_local = 15556
     proxy_host = os.environ.get("HTTPS_PROXY", "")
-    proxy_host = proxy_host.split("://")[-1]
-    proxy_auth = proxy_host.split("@")[0] if "@" in proxy_host else ""
-    proxy_host = proxy_host.split("@")[-1].split(":")[0]
-    socat_cmd = ["socat",
-                 "TCP-LISTEN:{},bind=127.0.0.1,reuseaddr".format(pair_local),
-                 "PROXY:{}:{}:{},proxyport=3130,proxyauth={}".format(
-                     proxy_host, args.ip, args.pair_port, proxy_auth)]
-    socat = _setup_popen(socat_cmd)
-    time.sleep(1)
+    socat = None
+    if proxy_host:
+        # A sandbox reaches the tailnet only through its proxy (tunnel.sh).
+        proxy_host = proxy_host.split("://")[-1]
+        proxy_auth = proxy_host.split("@")[0] if "@" in proxy_host else ""
+        proxy_host = proxy_host.split("@")[-1].split(":")[0]
+        socat_cmd = ["socat",
+                     "TCP-LISTEN:{},bind=127.0.0.1,reuseaddr".format(pair_local),
+                     "PROXY:{}:{}:{},proxyport=3130,proxyauth={}".format(
+                         proxy_host, args.ip, args.pair_port, proxy_auth)]
+        socat = _setup_popen(socat_cmd)
+        time.sleep(1)
+        pair_addr = "127.0.0.1:{}".format(pair_local)
+    else:  # on the tailnet itself: pair with the phone directly
+        pair_addr = "{}:{}".format(args.ip, args.pair_port)
     try:
-        r = _setup_spawn([ADB_BIN, "pair", "127.0.0.1:{}".format(pair_local)],
+        r = _setup_spawn([ADB_BIN, "pair", pair_addr],
                          input_text=code + "\n", timeout=30)
         paired = r.returncode == 0
     finally:
-        socat.terminate()
+        if socat is not None:
+            socat.terminate()
     if not paired:
         print("pairing failed. The code probably expired; get a fresh one "
               "from the phone and retry.", file=sys.stderr)

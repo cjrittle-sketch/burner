@@ -1416,6 +1416,33 @@ class SetupWizardTests(OfflineTestCase):
         self._sp.start()
         self.addCleanup(self._sp.stop)
 
+    def _pair(self, proxy):
+        """Run _run_pair with adb pair failing; return (spawn argv, popen)."""
+        args = SimpleNamespace(code="123456", ip="100.1.2.3", pair_port="41000",
+                               connect_port=None)
+        env = {k: v for k, v in os.environ.items() if k != "HTTPS_PROXY"}
+        if proxy:
+            env["HTTPS_PROXY"] = proxy
+        failed = SimpleNamespace(returncode=1, stdout="", stderr="")
+        with mock.patch.dict(os.environ, env, clear=True), \
+                mock.patch.object(pc, "_setup_spawn", return_value=failed) as sp, \
+                mock.patch.object(pc, "_setup_popen") as po, \
+                mock.patch.object(pc.time, "sleep"), \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(pc._run_pair(args), 1)
+        return sp.call_args[0][0], po
+
+    def test_pair_direct_without_proxy(self):
+        argv, popen = self._pair(None)
+        self.assertEqual(argv[1:], ["pair", "100.1.2.3:41000"])
+        popen.assert_not_called()
+
+    def test_pair_through_sandbox_proxy(self):
+        argv, popen = self._pair("http://user@10.0.0.1:8080")
+        self.assertEqual(argv[1:], ["pair", "127.0.0.1:15556"])
+        self.assertIn("PROXY:10.0.0.1:100.1.2.3:41000", " ".join(popen.call_args[0][0]))
+        popen.return_value.terminate.assert_called_once()
+
     def _adb(self, table):
         """Build a mock for pc.adb from {(cmd tuple): stdout}."""
         def fake(*args, **kwargs):
