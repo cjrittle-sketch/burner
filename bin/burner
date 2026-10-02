@@ -3595,6 +3595,8 @@ def cmd_update(args):
         print("update failed (see above).", file=sys.stderr)
         return r.returncode
     _stop_helper_daemons()
+    print("Updated. Re-read {} now: the instructions may have changed.".format(
+        os.path.join(ROOT, "SKILL.md")))
     return 0
 
 
