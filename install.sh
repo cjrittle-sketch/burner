@@ -9,6 +9,8 @@ cd "$ROOT"
 die() { echo "install.sh: ERROR: $*" >&2; exit 1; }
 info() { echo "install.sh: $*"; }
 
+info "works with Muse and Android phones for now. iPhone support is coming later."
+
 # --- 1. python3 >= 3.10 -------------------------------------------------------
 command -v python3 >/dev/null 2>&1 || die "python3 not found. Install Python 3.10+ first."
 PYVER="$(python3 -c 'import sys; print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')"

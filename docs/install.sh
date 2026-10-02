@@ -16,6 +16,8 @@ MARKER=".burner-web-install"
 die() { echo "burner: ERROR: $*" >&2; exit 1; }
 info() { echo "burner: $*"; }
 
+info "works with Muse and Android phones for now. iPhone support is coming later."
+
 [ -n "${HOME:-}" ] || [ -n "${BURNER_DIR:-}" ] || die "neither HOME nor BURNER_DIR is set."
 command -v tar >/dev/null 2>&1 || die "tar not found. Install tar and re-run."
 
