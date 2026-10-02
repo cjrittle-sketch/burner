@@ -1957,9 +1957,43 @@ def cmd_forget(args):
 
 # ------------------------------------------------------------------- main
 
+def _scroll_swipe(direction):
+    w, h = screen_dims()
+    cx, cy = w // 2, h // 2
+    dx, dy = w * 3 // 10, h * 3 // 10
+    x1, y1, x2, y2 = {
+        "down": (cx, cy + dy, cx, cy - dy),
+        "up": (cx, cy - dy, cx, cy + dy),
+        "right": (cx + dx, cy, cx - dx, cy),
+        "left": (cx - dx, cy, cx + dx, cy),
+    }[direction]
+    wake()
+    adb_or_ensure("shell", "input", "swipe", x1, y1, x2, y2, 350)
+    u2_invalidate()
+    time.sleep(0.6)
+
+
+def _scroll_to_end(direction, max_scrolls=15):
+    """Scroll the current app until the screen stops changing. Stays in the
+    app: swipes start mid-screen, never from an edge (which would open the
+    notification shade or app drawer)."""
+    before = visible_lines(walk(ui_dump()))
+    for n in range(1, max_scrolls + 1):
+        _scroll_swipe(direction)
+        after = visible_lines(walk(ui_dump()))
+        if after == before:
+            print("at the {}".format("top" if direction == "up" else "bottom"))
+            return 0
+        before = after
+    print("still moving after {} scrolls".format(max_scrolls))
+    return 0
+
+
 def cmd_scroll(args):
     """Scroll like a finger would. `down` reveals content below (the finger
     swipes up). With --to, stop as soon as the text is visible."""
+    if args.direction in ("top", "bottom"):
+        return _scroll_to_end("up" if args.direction == "top" else "down")
     times = args.times if (args.times != 1 or not args.to) else 10
     root = ui_dump()  # also refreshes the screen size
     for i in range(times + 1):
@@ -1968,19 +2002,7 @@ def cmd_scroll(args):
             return 0
         if i == times:
             break
-        w, h = screen_dims()
-        cx, cy = w // 2, h // 2
-        dx, dy = w * 3 // 10, h * 3 // 10
-        x1, y1, x2, y2 = {
-            "down": (cx, cy + dy, cx, cy - dy),
-            "up": (cx, cy - dy, cx, cy + dy),
-            "right": (cx + dx, cy, cx - dx, cy),
-            "left": (cx - dx, cy, cx + dx, cy),
-        }[args.direction]
-        wake()
-        adb_or_ensure("shell", "input", "swipe", x1, y1, x2, y2, 350)
-        u2_invalidate()
-        time.sleep(0.6)
+        _scroll_swipe(args.direction)
         root = ui_dump()
     if args.to:
         print("not found after {} scrolls: {}".format(times, args.to),
@@ -2119,7 +2141,7 @@ def build_parser():
 
     p = sub.add_parser("scroll", help="scroll the screen (down shows more below)")
     p.add_argument("direction", nargs="?", default="down",
-                   choices=["down", "up", "left", "right"])
+                   choices=["down", "up", "left", "right", "top", "bottom"])
     p.add_argument("--times", type=int, default=1, help="how many scrolls")
     p.add_argument("--to", metavar="TEXT",
                    help="keep scrolling until TEXT is on screen (max --times, "
