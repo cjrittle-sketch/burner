@@ -298,6 +298,11 @@ Python, ports and so on) unless they ask. If something fails, say so plainly.
 Walk them through their steps one at a time: say what to tap, then wait for
 them to say it's done. Never hand them a list to do "meanwhile". Once the phone
 is paired, don't go quiet: post a short line as each finishing step completes.
+**Don't stop early.** Once the phone is paired, keep going without waiting for
+the user to say "continue": run every remaining step and step 8 in the same
+turn. Setup isn't finished until you have sent the closing message from step 8
+(the screenshot and the "Use my burner to…" examples). A line like "Tailscale
+will keep running" is not the end.
 
 ### 1. Install
 
