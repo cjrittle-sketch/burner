@@ -165,6 +165,10 @@ changing (half a second quiet, 10 seconds at most) and prints only what
 appeared or disappeared, or `unchanged`. Use it instead of dumping the screen
 again and again.
 
+A plain `burner dump` can reuse a read from the last 2 seconds. When the
+screen changes on its own (a page loading, an app updating, someone using the
+phone), use `burner dump --fresh` to read it as it is now.
+
 ## Commands
 
 Run `burner <command> --help` for every option.
@@ -180,7 +184,7 @@ Look at the screen
   burner shot [--out PATH]          screenshot (--out . to send it in chat)
   burner status                     is it up? battery, charging, screen, storage, apps
   burner state                      open app + the main text on screen
-  burner dump [--all]               every item on screen: text, type, position
+  burner dump [--all] [--fresh]     every item on screen: text, type, position
   burner snap [--all]               numbered list (@e1…) for exact taps
 
 Act
