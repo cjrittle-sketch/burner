@@ -49,7 +49,7 @@ Use my burner to turn off the lamps I left on. I'm already at the airport.
 Paste this to your AI assistant:
 
 ```
-Set up burner for me. Read the guide at https://useburner.si/skill.md and do everything in it. Walk me through the parts that need me.
+Connect to https://useburner.si/skill.md
 ```
 
 Your AI assistant reads the guide and walks you through the rest. Setup takes
