@@ -23,7 +23,7 @@ t bin/burner shot --out "${TMPDIR:-/tmp}/burner-bench.png"
 t bin/burner notifications
 t bin/burner apps
 t bin/burner start com.android.settings
-t bin/burner tap --xy 0.5,0.5
+t bin/burner tap "Search settings"
 t bin/burner press back
 t bin/burner scroll down
 t bin/burner scroll up
