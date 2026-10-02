@@ -2307,28 +2307,40 @@ def cmd_dismiss(args):
     return 0
 
 
-def parse_notifications(root):
-    """Notifications visible in the pulled-down shade, as one line each:
-    "App: title - text". Pure function over a uiautomator dump, no adb."""
-    items, cur = [], None
+NOTIFICATION_NOISE = re.compile(
+    r"^(•|reply|collapse|expand|clear all|manage|silent|now|"
+    r"\d+ (min|mins|minute|minutes|hour|hours|day|days) ago)$", re.I)
+
+
+def notification_rows(root):
+    """(text, bottom_y) for each notification in the pulled-down shade.
+
+    A notification is a wide clickable row in the shade; its words are the
+    text inside it, minus times and buttons ("2 hours ago", "Reply"). Pure
+    function over a uiautomator dump, no adb."""
+    rows = []
     for n in root.iter("node"):
         if n.attrib.get("package") != "com.android.systemui":
             continue
-        rid = n.attrib.get("resource-id", "").rsplit("/", 1)[-1]
-        text = (n.attrib.get("text") or "").strip()
-        if not text:
+        m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]",
+                     n.attrib.get("bounds", ""))
+        if not m or n.attrib.get("clickable") != "true":
             continue
-        if rid == "app_name_text":
-            cur = {"app": text}
-            items.append(cur)
-        elif cur is not None and rid in ("title", "text", "big_text"):
-            key = "title" if rid == "title" else "text"
-            cur.setdefault(key, text)
-    out = []
-    for it in items:
-        body = " - ".join(x for x in (it.get("title"), it.get("text")) if x)
-        out.append("{}: {}".format(it["app"], body) if body else it["app"])
-    return out
+        x1, y1, x2, y2 = map(int, m.groups())
+        if x2 - x1 < 800 or y2 - y1 < 80:
+            continue
+        words = []
+        for d in n.iter("node"):
+            t = (d.attrib.get("text") or "").strip()
+            if t and not NOTIFICATION_NOISE.match(t):
+                words.append(t)
+        if words and not any(r[0] == " - ".join(words) for r in rows):
+            rows.append((" - ".join(words), y2))
+    return rows
+
+
+def parse_notifications(root):
+    return [t for t, _ in notification_rows(root)]
 
 
 def cmd_notifications(args):
@@ -2342,11 +2354,13 @@ def cmd_notifications(args):
     lines = []
     try:
         for _ in range(4):
-            fresh = [l for l in parse_notifications(ui_dump()) if l not in lines]
+            rows = notification_rows(ui_dump())
+            fresh = [t for t, _y in rows if t not in lines]
             if not fresh:
                 break
             lines += fresh
-            if len(lines) < 4:  # a short list fits on screen: skip the rescan
+            # Rows reaching the bottom of the screen mean there may be more.
+            if max(y for _t, y in rows) < screen_dims()[1] * 0.7:
                 break
             _scroll_swipe("down")
             time.sleep(0.6)
@@ -2356,13 +2370,7 @@ def cmd_notifications(args):
     if not lines:
         print("no notifications")
         return 0
-    apps = []
-    for l in lines:
-        a = l.split(":", 1)[0]
-        if a not in apps:
-            apps.append(a)
-    print("{} notification{} from {}".format(
-        len(lines), "" if len(lines) == 1 else "s", ", ".join(apps)))
+    print("{} notification{}".format(len(lines), "" if len(lines) == 1 else "s"))
     for line in lines:
         print("- " + line)
     return 0

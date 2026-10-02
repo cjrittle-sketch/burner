@@ -1663,19 +1663,26 @@ class SetupWizardTests(OfflineTestCase):
         self.assertIn("messaging", "com.google.android.apps.messaging")
 
     def test_parse_notifications(self):
-        def node(rid, text, pkg="com.android.systemui"):
-            return '<node package="{}" resource-id="{}" text="{}"/>'.format(
-                pkg, rid, text)
+        def row(y1, y2, *texts, clickable="true"):
+            kids = "".join('<node package="com.android.systemui" text="{}"'
+                           ' bounds="[231,{}][996,{}]"/>'.format(t, y1, y2)
+                           for t in texts)
+            return ('<node package="com.android.systemui" clickable="{}"'
+                    ' bounds="[42,{}][1038,{}]">{}</node>'.format(
+                        clickable, y1, y2, kids))
         xml = "<hierarchy>" + "".join([
-            node("com.android.systemui:id/app_name_text", "Messenger"),
-            node("android:id/title", "Sam"),
-            node("android:id/text", "are you free?"),
-            node("com.android.systemui:id/app_name_text", "Gmail"),
-            node("android:id/title", "Receipt"),
-            node("android:id/title", "ignored", pkg="com.other"),
+            row(622, 1069, "Muse", "Stopped.", "Reply", "2 hours ago"),
+            row(1116, 1305, "Reduce screen timeout", "•", "2 hours ago",
+                "Long timeout drains battery"),
+            row(1400, 1500, "Reduce screen timeout", "Long timeout drains battery"),
+            row(1600, 1700, "ignored", clickable="false"),
+            '<node package="com.other" clickable="true" bounds="[42,0][1038,300]">'
+            '<node package="com.other" text="not mine"/></node>',
         ]) + "</hierarchy>"
-        self.assertEqual(pc.parse_notifications(ET.fromstring(xml)),
-                         ["Messenger: Sam - are you free?", "Gmail: Receipt"])
+        self.assertEqual(pc.parse_notifications(ET.fromstring(xml)), [
+            "Muse - Stopped.",
+            "Reduce screen timeout - Long timeout drains battery"])
+        self.assertEqual(pc.notification_rows(ET.fromstring(xml))[-1][1], 1305)
         self.assertEqual(pc.parse_notifications(ET.fromstring("<hierarchy/>")), [])
 
     def test_parse_status(self):
