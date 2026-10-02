@@ -16,7 +16,9 @@ helping. When the user says "use my burner", "use my burner phone" or "do it on
 my burner", they mean this phone.
 
 **Not set up yet?** If the `burner` command isn't installed, or `burner doctor`
-isn't green, go to [Setup](#setup) first.
+isn't green, go to [Setup](#setup) first. If the user only pointed you at this
+guide ("Connect to useburner.si/skill.md", "set up burner"), they want it set
+up: start Setup now, without asking whether they meant it.
 
 ## Common requests
 
