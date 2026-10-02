@@ -54,22 +54,22 @@ def run_once(argv):
     return ms, r.returncode, r.stderr
 
 
-def phone_model():
+def json_field(argv, key, timeout):
+    """One field of a `burner ... --json` reply, or None if it can't be read."""
     try:
-        r = subprocess.run([sys.executable, BURNER, "status", "--json"],
-                           capture_output=True, text=True, timeout=60)
-        return (json.loads(r.stdout) or {}).get("model")
+        r = subprocess.run([sys.executable, BURNER] + argv + ["--json"],
+                           capture_output=True, text=True, timeout=timeout)
+        return (json.loads(r.stdout) or {}).get(key)
     except (ValueError, OSError, subprocess.SubprocessError):
         return None
+
+
+def phone_model():
+    return json_field(["status"], "model", 60)
 
 
 def commit():
-    try:
-        r = subprocess.run([sys.executable, BURNER, "version", "--json"],
-                           capture_output=True, text=True, timeout=30)
-        return (json.loads(r.stdout) or {}).get("commit")
-    except (ValueError, OSError, subprocess.SubprocessError):
-        return None
+    return json_field(["version"], "commit", 30)
 
 
 def main():

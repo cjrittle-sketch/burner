@@ -28,6 +28,11 @@ sys.modules["burner_fixtures"] = burner
 _loader.exec_module(burner)
 
 
+def load_cases():
+    with open(os.path.join(FIXTURES, "cases.json")) as f:
+        return json.load(f)
+
+
 def plan(case):
     root = ET.parse(os.path.join(FIXTURES, case["screen"])).getroot()
     burner._update_screen_from_dump(root)
@@ -41,9 +46,7 @@ def plan(case):
 
 class FixtureTapTests(unittest.TestCase):
     def test_cases(self):
-        with open(os.path.join(FIXTURES, "cases.json")) as f:
-            cases = json.load(f)
-        for case in cases:
+        for case in load_cases():
             with self.subTest(screen=case["screen"],
                               tap=case.get("tap") or case.get("xy")):
                 p = plan(case)
@@ -52,8 +55,7 @@ class FixtureTapTests(unittest.TestCase):
                     self.assertEqual(list(p["xy"]), case["at"])
 
     def test_every_screen_has_a_case(self):
-        with open(os.path.join(FIXTURES, "cases.json")) as f:
-            used = {c["screen"] for c in json.load(f)}
+        used = {c["screen"] for c in load_cases()}
         screens = {n for n in os.listdir(FIXTURES) if n.endswith(".xml")}
         self.assertEqual(screens - used, set(), "screens with no case in cases.json")
 

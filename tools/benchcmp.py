@@ -31,10 +31,10 @@ def compare(base, head):
     """Rows of (name, base_ms, head_ms, delta_ms, flag). Pure: unit-testable."""
     rows = []
     for name, h in head["results"].items():
-        b = base["results"].get(name)
-        bm, hm = (b or {}).get("median"), h.get("median")
+        b = base["results"].get(name) or {}
+        bm, hm = b.get("median"), h.get("median")
         flag = ""
-        if h.get("exit", 0) != 0 and (b or {}).get("exit", 0) == 0:
+        if h.get("exit", 0) != 0 and b.get("exit", 0) == 0:
             flag = "FAILS NOW"
         elif bm is not None and hm is not None:
             if hm - bm >= ABS_MS and hm >= bm * (1 + PCT):
@@ -67,7 +67,8 @@ def main():
     elif args.base is not None:
         base = hist[args.base]
     else:
-        base = hist[hist.index(head) - 1] if hist.index(head) > 0 else hist[0]
+        i = hist.index(head)
+        base = hist[i - 1] if i > 0 else hist[0]
 
     print("base {} {}  ->  head {} {}".format(
         (base.get("commit") or "?")[:7], base.get("t"),

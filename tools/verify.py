@@ -188,8 +188,8 @@ def check_landscape():
         time.sleep(1.0)
         rc, out, err = burner("tap", "Search settings || Search")
         if rc != 0:
-            return "SKIP" if "no match" in err + out else "FAIL", \
-                (err or out).strip()[-160:]
+            status = "SKIP" if "no match" in err + out else "FAIL"
+            return status, (err or out).strip()[-160:]
         time.sleep(1.0)
         if not any("EditText" in (n.get("class") or "") for n in dump()):
             return "FAIL", "tap returned ok but the search screen didn't open"
