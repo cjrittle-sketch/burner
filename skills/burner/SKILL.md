@@ -166,7 +166,7 @@ with no re-matching. Handles only last for one screen: any tap, key press,
 typing or app launch throws them away.
 
 When you need to know what a tap did, add `--settle`. It waits until the screen
-stops changing (half a second quiet, 10 seconds at most) and prints only what
+stops changing (a third of a second quiet, 10 seconds at most) and prints only what
 appeared or disappeared, or `unchanged`. It re-reads the screen at least twice,
 so it adds about 3 seconds: use it on taps whose result you must see, not on
 every tap, and don't follow it with `burner state` or a screenshot (it already

@@ -1142,7 +1142,7 @@ def _tap_refused(args, x, y, cover):
     return _tap_fail(args, msg)
 
 
-def settle_lines(prev_lines, timeout=10, quiet=0.5, poll=0.3, prev_fp=None):
+def settle_lines(prev_lines, timeout=10, quiet=0.3, poll=0.1, prev_fp=None):
     """Re-read the screen until it stops changing.
 
     Returns (added, removed, final_fp): compact lines that appeared/disappeared
