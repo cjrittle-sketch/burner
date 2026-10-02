@@ -1334,6 +1334,7 @@ class SettleTests(OfflineTestCase):
 
     def test_settle_unchanged(self):
         root = ET.fromstring(SETTLE_A_XML)
+        self.allow("u2sock", return_value=None)  # old helper: polling path
         self.allow("ui_dump", return_value=root)
         added, removed, final_fp = pc.settle_lines(self._lines(SETTLE_A_XML),
                                                    timeout=2, quiet=0.05, poll=0.01)
@@ -1342,6 +1343,7 @@ class SettleTests(OfflineTestCase):
 
     def test_settle_detects_change(self):
         roots = [ET.fromstring(SETTLE_B_XML)] * 30
+        self.allow("u2sock", return_value=None)
         self.allow("ui_dump", side_effect=roots)
         added, removed, final_fp = pc.settle_lines(self._lines(SETTLE_A_XML),
                                                    timeout=2, quiet=0.05, poll=0.01)
@@ -1352,11 +1354,21 @@ class SettleTests(OfflineTestCase):
         full = _twelve_line_xml()
         tiny = SETTLE_A_XML  # 2 lines vs 13: <=20% of a 12+ screen
         roots = [ET.fromstring(tiny)] + [ET.fromstring(full)] * 6
+        self.allow("u2sock", return_value=None)
         self.allow("ui_dump", side_effect=roots)
         added, removed, final_fp = pc.settle_lines(self._lines(full),
                                                    timeout=5, quiet=0.05, poll=0.01)
         # The partial read must not surface as a mass disappearance.
         self.assertEqual((added, removed), ([], []))
+
+    def test_settle_waits_on_the_phone_then_reads_once(self):
+        sock = self.allow("u2sock", return_value="620")
+        dump = self.allow("ui_dump", return_value=ET.fromstring(SETTLE_B_XML))
+        added, removed, _fp = pc.settle_lines(self._lines(SETTLE_A_XML), timeout=2)
+        self.assertEqual(sock.call_args[0][0], "idle")
+        self.assertEqual(dump.call_count, 1)
+        self.assertTrue(any("Results" in l for l in added))
+        self.assertTrue(any("Loading" in l for l in removed))
 
     def test_tap_settle_reports_unchanged(self):
         self.allow("wake_async")

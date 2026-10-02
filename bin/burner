@@ -1158,6 +1158,20 @@ def settle_lines(prev_lines, timeout=10, quiet=0.3, poll=0.1, prev_fp=None):
     as a cheaper "same screen" signal: if the fingerprint matches, the
     structure is unchanged even when text content (badges, timestamps)
     differs. Pass prev_fp (fingerprint of the pre-action screen) to enable."""
+    # Fast path: wait on the phone until the UI goes quiet, then read the
+    # screen once. Falls back to polling below if the helper can't, or if
+    # the one read looks like a half-drawn screen.
+    t0 = time.time()
+    waited = u2sock("idle", str(int(min(timeout, 3) * 1000)), timeout=timeout + 5)
+    if waited not in (None, U2_NOT_FOUND):
+        nodes = walk(ui_dump())
+        nxt = visible_lines(nodes)
+        _trace("settle idle {}ms, read {:.2f}s".format(
+            waited, time.time() - t0))
+        if not (len(prev_lines) >= 12 and len(nxt) * 5 <= len(prev_lines)):
+            added = [l for l in nxt if l not in prev_lines]
+            removed = [l for l in prev_lines if l not in nxt]
+            return added, removed, screen_fingerprint(nodes)
     deadline = time.time() + timeout
     cur = list(prev_lines)
     cur_fp = prev_fp

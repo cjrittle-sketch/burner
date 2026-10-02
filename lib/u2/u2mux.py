@@ -439,6 +439,19 @@ class U2Daemon:
         self.invalidate()
         return b""
 
+    def cmd_idle(self, arg):
+        """arg: timeout in ms. Waits on the phone until the UI has had no
+        accessibility events for about 0.5s (or the timeout), then drops the
+        dump cache. One RPC instead of re-reading the screen over and over
+        to see whether it stopped changing. Returns the ms it waited."""
+        timeout = int(arg.strip() or "1500")
+        t0 = _time.monotonic()
+        with self._lock:
+            with _t("idle rpc"):
+                self.d.jsonrpc.waitForIdle(timeout)
+        self.invalidate()
+        return str(int((_time.monotonic() - t0) * 1000)).encode()
+
     def cmd_screen(self, _):
         """"w h pkg": the screen at its current rotation and the app in
         front, from one small deviceInfo RPC (a full dump costs ~0.8s)."""
