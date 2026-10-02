@@ -214,7 +214,7 @@ appears in a task summary or log never reaches them.
 
 **How to talk to the user during setup.** Keep updates short, plain and about
 them: "Installing burner on my side, this takes a minute" or "Done, now one
-thing on your phone." Leave out installer output and the names of parts (adb,
+thing on your phone." Leave out installer output, step numbers ("12 of 14 steps") and the names of parts (adb,
 Python, ports and so on) unless they ask. If something fails, say so plainly.
 Walk them through their steps one at a time: say what to tap, then wait for
 them to say it's done. Never hand them a list to do "meanwhile". Once the phone
