@@ -9,7 +9,8 @@ t() {
   s=$(date +%s%N)
   "$@" >/dev/null 2>"${TMPDIR:-/tmp}/burner-bench.err"
   e=$(date +%s%N)
-  printf '%-34s %5.2fs\n' "$*" "$(echo "$e - $s" | bc)"
+  printf '%-34s %6d ms
+' "$*" "$(( (e - s) / 1000000 ))"
   [ -n "$BURNER_TRACE" ] && sed 's/^/    /' "${TMPDIR:-/tmp}/burner-bench.err"
 }
 t python3 bin/burner --help
