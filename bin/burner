@@ -2569,16 +2569,21 @@ def notification_rows(root):
         if not m or n.attrib.get("clickable") != "true":
             continue
         x1, y1, x2, y2 = map(int, m.groups())
-        if x2 - x1 < 800 or y2 - y1 < 80:
-            continue
+        if x2 - x1 < 800 or y2 - y1 < 80 or y2 - y1 > 700:
+            continue  # not a notification row (a sliver, or a whole group)
         words = []
         for d in n.iter("node"):
             t = (d.attrib.get("text") or "").strip()
             if t and not NOTIFICATION_NOISE.match(t):
                 words.append(t)
-        if words and not any(r[0] == " - ".join(words) for r in rows):
+        if words:
             rows.append((" - ".join(words), y2))
-    return rows
+    # A row, its group header and its collapsed copy repeat each other's
+    # words: keep the longest and drop any row whose text is inside another.
+    texts = [t for t, _ in rows]
+    return [(t, y) for i, (t, y) in enumerate(rows)
+            if not any(t in o and (len(o) > len(t) or j < i)
+                       for j, o in enumerate(texts) if j != i)]
 
 
 def parse_notifications(root):

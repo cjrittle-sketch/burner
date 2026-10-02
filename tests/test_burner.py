@@ -1676,6 +1676,8 @@ class SetupWizardTests(OfflineTestCase):
                 "Long timeout drains battery"),
             row(1400, 1500, "Reduce screen timeout", "Long timeout drains battery"),
             row(1600, 1700, "ignored", clickable="false"),
+            row(100, 1900, "Whole group"),
+            row(1800, 1900, "Muse - Stopped."),
             '<node package="com.other" clickable="true" bounds="[42,0][1038,300]">'
             '<node package="com.other" text="not mine"/></node>',
         ]) + "</hierarchy>"
