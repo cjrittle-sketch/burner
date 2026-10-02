@@ -69,8 +69,10 @@ def adb(*args, timeout=30):
         capture_output=True, text=True, timeout=timeout)
 
 
-def ensure():
-    """Make sure the tunnel is up and adb is connected. Returns True if usable."""
+def ensure(heal_fast_paths=True):
+    """Make sure the tunnel is up and adb is connected. Returns True if usable.
+    heal_fast_paths=False skips restarting the scrcpy/u2 helpers (up to ~45s),
+    for plain adb commands that don't use them."""
     subprocess.run([os.path.join(ROOT, "tunnel.sh"), "start"],
                    capture_output=True, timeout=45)
     adb("connect", TARGET)
@@ -87,6 +89,8 @@ def ensure():
     if not ok:
         print("phone not reachable (state: {}). Check wireless debugging + Tailscale.".format(
             r.stdout.strip() or "none"), file=sys.stderr)
+    if not heal_fast_paths:
+        return ok
     # Heal the fast paths too (best effort — legacy adb still works without them).
     try:
         scrcpy_send("ping")
@@ -104,7 +108,8 @@ def adb_or_ensure(*args, **kwargs):
     err = (r.stderr or "")
     if ("device offline" in err or "no devices" in err
             or "not found" in err or "no device" in err.lower()):
-        if ensure():
+        # Only adb is needed here; the UI helpers heal themselves on use.
+        if ensure(heal_fast_paths=False):
             r = adb(*args, **kwargs)
     return r
 
@@ -3382,6 +3387,33 @@ def cmd_uninstall(args):
     return 0
 
 
+# Commands that legitimately run long or set their own time limit.
+WATCHDOG_EXEMPT = {"setup", "update", "do", "recipe", "replay", "wait", "vcode",
+                   "gcode", "record", "sleep", "amazon-status", "uninstall",
+                   "doctor", "ensure"}
+
+
+def _arm_watchdog(args):
+    """Fail a stuck command instead of hanging forever: after BURNER_TIMEOUT
+    seconds (default 60) print what happened and exit 124."""
+    import signal
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    try:
+        limit = int(os.environ.get("BURNER_TIMEOUT", "60"))
+    except ValueError:
+        limit = 60
+    if cmd in WATCHDOG_EXEMPT or limit <= 0 or not hasattr(signal, "SIGALRM"):
+        return
+
+    def fire(signum, frame):
+        print("burner {}: no result after {}s, stopped. The phone may be "
+              "asleep or unreachable: run `burner ensure`, then try again."
+              .format(cmd, limit), file=sys.stderr)
+        os._exit(124)
+    signal.signal(signal.SIGALRM, fire)
+    signal.alarm(limit)
+
+
 def main():
     ap = build_parser()
     args = ap.parse_args()
@@ -3391,6 +3423,7 @@ def main():
     cmd_line = record_command_line(args)
     if cmd_line:
         record_log(cmd_line)
+    _arm_watchdog(args)
     sys.exit(args.fn(args))
 
 

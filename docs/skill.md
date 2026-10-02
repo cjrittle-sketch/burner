@@ -65,6 +65,22 @@ paste one.
 whereami`, `burner route`) stores screen layouts and the kind of action taken,
 never typed text, passwords or messages. Screenshots are never stored in it.
 
+**Never sign in, sign up or pick an account for the user.** If an app isn't
+signed in, or shows "Continue with Google", "Sign in" or an account picker,
+stop and tell them plainly ("Tinder isn't signed in on your burner. Want to
+sign in, or should I stop here?"). Signing in is always their call.
+
+**Keep the user posted, and don't get stuck.** Say in a line what you're
+about to do on the phone. If a command takes more than about 15 seconds,
+tell them what you're waiting on. burner stops any command that gets no
+result in 60 seconds (exit code 124). If one fails or times out, run
+`burner ensure` once and try again; if it still fails, tell the user plainly
+what's wrong instead of retrying quietly.
+
+**Only look at what the task needs.** Don't read the phone's accounts, email
+addresses or other personal details (for example with `adb shell dumpsys`)
+unless the user asks for them.
+
 **Keep the phone on its charger.** The screen only stays on while charging,
 and when it goes dark `burner dump` comes back empty.
 
@@ -89,6 +105,12 @@ again and again.
 ## Commands
 
 Run `burner <command> --help` for every option.
+
+If `burner` isn't found, call it by its full path, `~/burner/bin/burner`,
+rather than relying on an `export PATH=...` from an earlier command (many
+assistants start each command in a fresh shell). If `~/burner` doesn't exist,
+this is a new computer: do setup steps 1 and 3, then `burner doctor`. A
+computer the phone hasn't seen before also needs pairing once (step 5).
 
 ```
 Look at the screen
