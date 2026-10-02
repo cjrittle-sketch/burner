@@ -1479,6 +1479,17 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(rc, 0)
         sw.assert_not_called()
 
+    def test_screen_size_and_package_from_dump(self):
+        xml = ('<hierarchy rotation="0">'
+               '<node package="com.android.systemui" bounds="[0,0][1080,100]"/>'
+               '<node package="com.android.settings" bounds="[0,0][1080,2400]"/>'
+               '<node package="com.android.settings" bounds="[0,100][1080,300]"/>'
+               '</hierarchy>')
+        root = pc.ET.fromstring(xml)
+        pc._update_screen_from_dump(root)
+        self.assertEqual(pc.screen_dims(), (1080, 2400))
+        self.assertEqual(pc.dump_package(root), "com.android.settings")
+
     def test_parse_status(self):
         nl = chr(10)
         st = pc.parse_status(
