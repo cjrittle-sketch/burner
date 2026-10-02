@@ -73,10 +73,8 @@ wherever you are.
 
 **Is my stuff private?**
 Yes. It runs on your own phone, on your own Wi-Fi at home, not in someone
-else's data center. There's no burner account and no burner server, so once
-it's set up nothing you do ever passes through us. Only you and your AI
-assistant can reach the phone. Sign-in codes come from your email and are never
-stored.
+else's data center. There's no burner account and no burner server. Only you
+and your AI assistant can reach the phone.
 
 **Will apps see it as coming from my home?**
 Yes. The phone uses your own Wi-Fi, so apps see a regular phone at your house,
