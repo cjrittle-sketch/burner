@@ -66,9 +66,15 @@ def snap_invalidate():
 
 
 def adb(*args, timeout=30):
-    return subprocess.run(
+    t0 = time.time()
+    r = subprocess.run(
         [ADB_BIN, "-s", TARGET] + [str(a) for a in args],
         capture_output=True, text=True, timeout=timeout)
+    if os.environ.get("BURNER_TRACE"):
+        print("trace adb {:.2f}s {}".format(
+            time.time() - t0, " ".join(str(a) for a in args)[:70]),
+            file=sys.stderr)
+    return r
 
 
 def ensure(heal_fast_paths=True):
@@ -248,7 +254,10 @@ def u2_invalidate():
 
 def fast_dump():
     """UI hierarchy XML via uiautomator2 mux. None on failure."""
+    t0 = time.time()
     xml = u2sock("dump", timeout=40)
+    if os.environ.get("BURNER_TRACE"):
+        print("trace u2 dump {:.2f}s".format(time.time() - t0), file=sys.stderr)
     if xml and ("<hierarchy" in xml or "<?xml" in xml):
         try:
             root = ET.fromstring(xml)
