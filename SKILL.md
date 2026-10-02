@@ -17,8 +17,9 @@ burner", that means this phone: use the `burner` commands below.
 | "Scroll to the top" / "scroll down" | Means inside the app that's open now. Use `burner scroll top`, `burner scroll down`, etc. Don't press HOME or swipe from a screen edge; that leaves the app or opens the app drawer. |
 
 To send a screenshot, save it where your chat can show files from, usually
-your working folder: `burner shot --out ./burner-screen.png`, then attach
-that file. Plain `burner shot` saves under `~/burner/shots/`, which many chat
+your working folder: `burner shot --out .` saves a new, uniquely named file
+there and prints its path; attach that file. Don't reuse one file name:
+chat apps cache images by name and show the old screenshot. Plain `burner shot` saves under `~/burner/shots/`, which many chat
 apps can't display.
 
 ## Prerequisites
