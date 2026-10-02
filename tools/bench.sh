@@ -11,7 +11,7 @@ t() {
   e=$(date +%s%N)
   printf '%-34s %6d ms
 ' "$*" "$(( (e - s) / 1000000 ))"
-  [ -n "$BURNER_TRACE" ] && sed 's/^/    /' "${TMPDIR:-/tmp}/burner-bench.err"
+  [ -z "$BURNER_TRACE" ] || sed 's/^/    /' "${TMPDIR:-/tmp}/burner-bench.err"
 }
 t python3 bin/burner --help
 t bin/burner status
