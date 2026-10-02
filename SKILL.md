@@ -30,17 +30,6 @@ isn't green, go to [Setup](#setup) first.
 | "Update my burner" | Run `burner update`, then re-read `~/burner/SKILL.md` (the instructions change with updates), and say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
-`burner apps` matches package names, not app names. Most match the app
-(`com.tinder`), but some don't (X is `com.twitter.android`). If nothing
-matches, run `burner apps` and read the full list.
-
-**Sending a screenshot.** Save it where your chat can show files from, usually
-your working folder: `burner shot --out .` saves a new, uniquely named file
-there and prints its path. Attach that file. Don't reuse a file name: chat
-apps cache images by name and keep showing the old screenshot. Plain
-`burner shot` saves under `~/burner/shots/`, which many chat apps can't
-display.
-
 ## Installing apps
 
 Free apps only; never buy one. If the Play Store shows a price instead of
@@ -70,6 +59,19 @@ Every screen read costs several seconds, so skip screens when you can.
   ("Don't allow"), tips ("Got it") and upsells ("Not now", "Close") without
   agreeing to anything. Refuse permissions and free trials unless the task
   needs them, and tell the user what you declined.
+
+## Details
+
+`burner apps` matches package names, not app names. Most match the app
+(`com.tinder`), but some don't (X is `com.twitter.android`). If nothing
+matches, run `burner apps` and read the full list.
+
+**Sending a screenshot.** Save it where your chat can show files from, usually
+your working folder: `burner shot --out .` saves a new, uniquely named file
+there and prints its path. Attach that file. Don't reuse a file name: chat
+apps cache images by name and keep showing the old screenshot. Plain
+`burner shot` saves under `~/burner/shots/`, which many chat apps can't
+display.
 
 ## Rules
 
