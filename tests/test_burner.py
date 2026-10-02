@@ -1891,5 +1891,49 @@ class SetupWizardTests(OfflineTestCase):
         self.assertIn("RED", err.getvalue())
 
 
+
+# ------------------------------------------------------- fast paths via u2 mux
+
+class FastPathTests(OfflineTestCase):
+    def unguard(self, name):
+        self._guards[name].stop()
+
+    def test_tap_uses_mux_and_skips_adb(self):
+        self.unguard("tap_center")
+        self.allow("wake")
+        u2 = self.allow("u2sock", return_value="")
+        adb = self.allow("adb_or_ensure")
+        pc.tap_center(10, 20)
+        u2.assert_called_once_with("tap", "10 20", timeout=10)
+        adb.assert_not_called()
+
+    def test_tap_falls_back_to_adb(self):
+        self.unguard("tap_center")
+        self.allow("wake")
+        self.allow("u2sock", return_value=None)
+        adb = self.allow("adb_or_ensure")
+        self.allow("u2_invalidate")
+        pc.tap_center(10, 20)
+        adb.assert_called_once_with("shell", "input", "tap", 10, 20)
+
+    def test_shot_fast_writes_png_when_asked(self):
+        import base64
+        waker = mock.Mock()
+        self.allow("wake_async", return_value=waker)
+        u2 = self.allow("u2sock", return_value=base64.b64encode(b"\x89PNGdata").decode())
+        with tempfile.TemporaryDirectory() as d:
+            out = os.path.join(d, "s.png")
+            self.assertEqual(pc.shot_fast(out), out)
+            with open(out, "rb") as f:
+                self.assertEqual(f.read(), b"\x89PNGdata")
+        u2.assert_called_once_with("shot", "png", timeout=30)
+        waker.join.assert_called_once()
+
+    def test_shot_fast_none_when_mux_down(self):
+        self.allow("wake_async", return_value=mock.Mock())
+        self.allow("u2sock", return_value=None)
+        self.assertIsNone(pc.shot_fast(os.path.join(tempfile.gettempdir(), "x.jpg")))
+
+
 if __name__ == "__main__":
     unittest.main()

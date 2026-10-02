@@ -397,6 +397,43 @@ class U2Daemon:
                 raise U2NotFound("timeout waiting for %r" % text)
             _time.sleep(POLL_S)
 
+    def cmd_tap(self, arg):
+        """arg: "x y". One click RPC on the open stream instead of spawning
+        `adb shell input tap`. Coordinates are current-rotation screen
+        pixels, the same space as dump bounds."""
+        x, y = (int(v) for v in arg.split())
+        with self._lock:
+            with _t("tap rpc"):
+                self.d.jsonrpc.click(x, y)
+        self.invalidate()
+        return b""
+
+    def cmd_swipe(self, arg):
+        """arg: "x1 y1 x2 y2 ms". One swipe RPC (5ms per step)."""
+        x1, y1, x2, y2, ms = (int(v) for v in arg.split())
+        with self._lock:
+            with _t("swipe rpc"):
+                self.d.jsonrpc.swipe(x1, y1, x2, y2, max(2, ms // 5))
+        self.invalidate()
+        return b""
+
+    def cmd_shot(self, arg):
+        """Screenshot as base64. One RPC returning a JPEG (a few hundred KB)
+        instead of a 1.5MB PNG over adb. arg "png" re-encodes it as PNG."""
+        import base64
+        with self._lock:
+            with _t("shot rpc"):
+                data = self.d.jsonrpc.takeScreenshot(1, 85)
+        if not data:
+            raise RuntimeError("takeScreenshot returned nothing")
+        if arg.strip() == "png":
+            import io
+            from PIL import Image
+            buf = io.BytesIO()
+            Image.open(io.BytesIO(base64.b64decode(data))).save(buf, "PNG")
+            data = base64.b64encode(buf.getvalue()).decode()
+        return data.encode()
+
     def cmd_set_text(self, arg):
         """arg: JSON {"text": "...", "selector": {...} (optional)}.
         Atomic ACTION_SET_TEXT on the focused EditText (or selector match)."""
