@@ -65,6 +65,12 @@ def snap_invalidate():
         pass
 
 
+def _trace(msg):
+    """Timing/debug line on stderr when BURNER_TRACE is set."""
+    if os.environ.get("BURNER_TRACE"):
+        print("trace " + msg, file=sys.stderr)
+
+
 def adb(*args, timeout=30):
     t0 = time.time()
     r = subprocess.run(
