@@ -7,7 +7,7 @@ Replaces the old dump -> inline-python -> tap -> sleep loop with one-liners:
     burner wait "Enter code" --timeout 30
     burner type "42327079" --clear       char-by-char typing (works on Bloks/RN fields)
     burner gcode --from "security@example.com"
-    burner vcode --from "security@example.com"     # full code-entry flow, one shot
+    burner vcode --from "security@example.com"     # wait for code box, fetch, type (--submit to tap it)
 
 Verification codes are transient: pulled, typed, never stored.
 """
@@ -2066,7 +2066,9 @@ def wait_enabled_button(nodes, text, timeout=15):
 
 
 def cmd_vcode(args):
-    """End-to-end: wait for a code field, pull the email code, type it, submit."""
+    """Wait for a code field, pull the email code and type it. Taps the submit
+    button only when --submit names it, so typing and submitting stay two
+    separate steps unless the caller asks for both."""
     print("waiting for code field...", flush=True)
     deadline = time.time() + args.timeout
     field = None
@@ -2103,6 +2105,10 @@ def cmd_vcode(args):
         time.sleep(0.25)
     u2_invalidate()
 
+    if not args.submit:
+        print("code typed, not submitted (add --submit \"Continue\" to tap it)",
+              flush=True)
+        return 0
     print("waiting for '{}' button...".format(args.submit), flush=True)
     btn = wait_enabled_button(walk(ui_dump()), args.submit, timeout=20)
     if btn is None:
@@ -3088,12 +3094,13 @@ def build_parser():
     p.add_argument("--mins", type=int, default=15)
     p.set_defaults(fn=cmd_gcode)
 
-    p = sub.add_parser("vcode", help="one-shot: wait for code field, pull email code, type, submit")
+    p = sub.add_parser("vcode", help="wait for code field, pull email code, type it (--submit to tap the button too)")
     p.add_argument("--from", dest="query", required=True)
     p.add_argument("--mins", type=int, default=15)
     p.add_argument("--timeout", type=int, default=60,
                    help="how long to wait for the code field")
-    p.add_argument("--submit", default="Continue", help="submit button text")
+    p.add_argument("--submit", default=None,
+                   help="submit button text to tap after typing; omit to only type")
     p.set_defaults(fn=cmd_vcode)
 
     p = sub.add_parser("open", help="open URL/deep link via VIEW intent")

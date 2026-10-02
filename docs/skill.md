@@ -1,4 +1,4 @@
-> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev 30628b9a: if `burner version` shows a different rev, run `burner update`.
+> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev 29bd0bf9: if `burner version` shows a different rev, run `burner update`.
 
 # burner
 
@@ -27,7 +27,7 @@ isn't green, go to [Setup](#setup) first.
 | "Check my notifications" / "anything new?" | `burner notifications` prints a count, then each notification (title and text), and changes nothing. Summarise what it printed for the user. |
 | "Check my messages" | Open the Messages app (`burner apps messages`, then `burner start <package>`), read it with `burner state` or a screenshot, and open a conversation only to read it. Don't query `dumpsys` or the SMS database: Android hides the words there, and it can expose accounts. |
 | "Do this every time" / "save that" / a task they repeat | See "Saving a task the user repeats" below: `burner save`. |
-| A short word or name you don't recognize ("about", "weekly-orders") | It may be a saved recipe. Run `burner recipes`; if one matches, `burner recipe <name>`. |
+| A short word or name you don't recognize ("about", "weekly-orders") | It may be a saved recipe. Run `burner recipes`. If one matches, tell the user which one and what it does, and run it (`burner recipe <name>`) once they say yes. If they said "run <name>", just run it. |
 | "Update my burner" | Run `burner update`, then re-read `~/burner/SKILL.md` (the instructions change with updates), and say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
@@ -119,7 +119,9 @@ like this".
 SIM, so a screen that sends a code by text message is a dead end. `burner
 gcode` and `burner vcode` read the code from the user's connected Gmail and
 type it as plain text. Codes are never stored, and you never ask the user to
-paste one.
+paste one. Use them only for a sign-in or check the user started and asked you
+to finish. `vcode` stops after typing; add `--submit "Continue"` only when the
+user has OK'd submitting that code.
 
 **Privacy.** Typed text is never recorded. Navigation memory (`burner
 whereami`, `burner route`) stores screen layouts and the kind of action taken,
@@ -214,7 +216,7 @@ Flows
 
 Verification codes
   burner gcode --from 'from:sender@example.com'   newest code from Gmail (--mins 15)
-  burner vcode --from 'from:sender@example.com'   wait for the code box, fetch, type, submit (--submit "Continue")
+  burner vcode --from 'from:sender@example.com'   wait for the code box, fetch, type (--submit "Continue" to tap it too)
 
 Shortcuts
   burner amazon-status              latest Amazon order status
@@ -224,7 +226,7 @@ Health and upkeep
   burner ensure                     reconnect everything (takes about 5 seconds)
   burner setup                      phone setup (see Setup)
   burner update [recipes]           update burner, or only its built-in recipes
-  burner version                    this build and its skill rev (compare with skill.md's header)
+  burner version                    this build and its skill rev (compare with the Skill rev line at the top of useburner.si/skill.md)
   burner uninstall [--yes]          undo the phone changes setup made (lists them without --yes)
 ```
 
@@ -469,7 +471,7 @@ to", and say how to keep it up to date. Something like:
 >
 > Whenever you want me to use it, just say "Use my burner to..." For example:
 > - "Use my burner to check my Amazon order."
-> - "Use my burner to keep my Snapchat streaks alive while I'm away."
+> - "Use my burner to see if my Vinted listing sold."
 > - "Use my burner to find me a cabin on Airbnb for next weekend."
 > - "What's on my burner?" shows you its screen.
 >
