@@ -90,9 +90,19 @@ def main():
         cmds = [c for c in COMMANDS if c[0] in want]
     trace = bool(os.environ.get("BURNER_TRACE"))
 
+    uses_settings = any(argv[0] in ("start", "tap", "press", "scroll") for _, argv in cmds)
+
+    def reset(fn):  # one adb hiccup mustn't lose the run
+        if not uses_settings:
+            return
+        try:
+            fn()
+        except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+            print("bench: couldn't reset Settings: {}".format(e), file=sys.stderr)
+
     results = {name: {"runs": [], "exit": 0} for name, _ in cmds}
     for p in range(args.runs + 1):  # pass 0 is the cold/warm-up pass
-        verify.stop_settings()
+        reset(verify.stop_settings)
         for name, argv in cmds:
             ms, rc, err = run_once(argv)
             if p == 0:
@@ -123,7 +133,7 @@ def main():
         os.makedirs(os.path.dirname(HISTORY), exist_ok=True)
         with open(HISTORY, "a") as f:
             f.write(json.dumps(record) + "\n")
-    verify.open_settings()  # leave the phone on Settings home
+    reset(verify.open_settings)  # leave the phone on Settings home
     # A failing command is a failed round, even if it failed last round too
     # (benchcmp only flags commands that newly fail).
     return 1 if any(r["exit"] != 0 for r in results.values()) else 0

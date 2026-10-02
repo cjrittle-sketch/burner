@@ -79,6 +79,16 @@ class VerifyTests(unittest.TestCase):
         after = bar + [{"text": "A", "y": 301}, {"text": "B", "y": 495}]
         self.assertAlmostEqual(verify.movement(before, after, 2400), 1419 / 2400)
 
+    def test_only_fixed_labels_shared_means_moved_a_screen(self):
+        bar = [{"text": "All apps", "y": 191}]
+        before = bar + [{"text": "A", "y": 1000}]
+        after = bar + [{"text": "Z", "y": 1000}]
+        self.assertIsNone(verify.movement(before, after, 2400))
+
+    def test_biggest_box_sees_a_dialog_only_read(self):
+        dialog = [{"bounds": "[84,900][996,1700]"}, {"bounds": "[120,1000][960,1100]"}]
+        self.assertEqual(verify.biggest_box(dialog), 912 * 800)
+
     def test_nothing_moved_is_zero(self):
         same = [{"text": "A", "y": 500}]
         self.assertEqual(verify.movement(same, same, 2400), 0.0)

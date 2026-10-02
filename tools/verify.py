@@ -135,14 +135,44 @@ def movement(before, after, h):
     if not common or not h:
         return None
     shifts = [a[k] - b[k] for k in common if a[k] != b[k]]
-    return abs(statistics.median(shifts)) / h if shifts else 0.0
+    if not shifts:  # only fixed labels shared: new rows means a whole screen
+        return None if set(b) - set(a) else 0.0
+    return abs(statistics.median(shifts)) / h
+
+
+def biggest_box(nodes):
+    """Area of the largest node: the whole screen, unless the read holds
+    only a dialog's window."""
+    best = 0
+    for n in nodes:
+        try:
+            x1, y1, x2, y2 = (int(v) for v in
+                              n.get("bounds", "").replace("][", ",").strip("[]").split(","))
+        except ValueError:
+            continue
+        best = max(best, (x2 - x1) * (y2 - y1))
+    return best
+
+
+def settled_dump(timeout=5.0):
+    """Read until two reads in a row agree, so a list still loading after a
+    cold start isn't mistaken for a scroll."""
+    prev = dump()
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(0.5)
+        cur = dump()
+        if labelled(cur) == labelled(prev):
+            return cur
+        prev = cur
+    return prev
 
 
 # ------------------------------------------------------------------ checks
 
 def check_scroll():
     open_settings("android.settings.MANAGE_ALL_APPLICATIONS_SETTINGS")
-    d0 = dump()
+    d0 = settled_dump()
     if len(labelled(d0)) < 6:
         return "SKIP", "the all-apps list is too short to scroll"
     rc, _, err = burner("scroll", "down")
@@ -185,29 +215,36 @@ def check_dialog():
     burner("tap", "Device name")
     time.sleep(1.0)
     during = dump()
-    if labelled(during) == labelled(before):
+    ys, now = labelled(before), labelled(during)
+    if now == ys:
         return "SKIP", "the Device name dialog didn't open"
-    # A row of the About list the dialog doesn't show itself ("Pixel 7a" is
-    # also its text field). The status bar and toolbar sit outside the
-    # dialog's scrim, so a tap there rightly goes through.
-    ys, top, shown = labelled(before), screen_height(before) * 0.15, labelled(during)
-    behind = next((l for l in labels if l not in ("Device name", "About phone")
-                   and l not in shown and len(l) > 3 and ys[l] > top), None)
-    if behind is None:
+    # Rows of the About list (the status bar and toolbar sit outside the
+    # dialog's scrim, so a tap there rightly goes through). A row still at
+    # its place in the read is behind the dialog; one that moved is the
+    # dialog's own text ("Pixel 7a" is also its text field).
+    top = screen_height(before) * 0.15
+    rows = [l for l in labels if l not in ("Device name", "About phone")
+            and len(l) > 3 and ys[l] > top]
+    visible = [l for l in rows if now.get(l) == ys[l]]
+    hidden = [l for l in rows if l not in now]
+    if visible:
+        # The read holds the screen behind: burner must refuse the tap.
+        behind, want, how = visible[0], "tap refused", "refused"
+    elif hidden and biggest_box(during) < 0.9 * biggest_box(before):
+        # Some phones' reads hold only the dialog's window: the row can't
+        # be found, which also keeps the tap off the screen behind.
+        behind, want, how = hidden[0], "no match", "not found (the read holds only the dialog)"
+    else:
         burner("press", "BACK")
-        return "SKIP", "no label behind the dialog to tap"
+        return "SKIP", "Device name opened a full screen, not a dialog"
     rc, out, err = burner("tap", behind)
     burner("press", "BACK")
     if rc == 0:
         return "FAIL", "tap on '{}' behind the dialog went through".format(behind)
-    # Either answer keeps the tap off the screen behind: refused (covered),
-    # or no match (some phones' reads hold only the dialog's window). A
-    # dropped phone also exits 1, so anything else fails.
-    for said, how in (("tap refused", "refused"), ("no match", "not found")):
-        if said in err + out:
-            return "PASS", "tap on '{}' behind the dialog {}".format(behind, how)
-    return "FAIL", "tap on '{}' failed, but not as a refusal: {}".format(
-        behind, ((err or out).strip().splitlines() or [""])[0][:120])
+    if want in err + out:  # a dropped phone also exits 1
+        return "PASS", "tap on '{}' behind the dialog {}".format(behind, how)
+    return "FAIL", "tap on '{}' failed, but not with {!r}: {}".format(
+        behind, want, ((err or out).strip().splitlines() or [""])[0][:120])
 
 
 def check_landscape():
