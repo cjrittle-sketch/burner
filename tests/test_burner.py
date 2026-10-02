@@ -1769,6 +1769,18 @@ class SetupWizardTests(OfflineTestCase):
         self.assertIsNone(f(""))
         self.assertIsNone(f("something else"))
 
+    def test_main_reports_a_timed_out_phone_without_a_traceback(self):
+        fake = SimpleNamespace(fn=mock.Mock(
+            side_effect=subprocess.TimeoutExpired("adb", 30)))
+        err = io.StringIO()
+        with mock.patch.object(pc, "build_parser") as bp,                 mock.patch.object(pc, "record_command_line", return_value=None),                 mock.patch.object(pc, "_arm_watchdog"),                 mock.patch.object(sys, "argv", ["burner", "status"]),                 contextlib.redirect_stderr(err):
+            bp.return_value.parse_args.return_value = fake
+            with self.assertRaises(SystemExit) as cm:
+                pc.main()
+        self.assertEqual(cm.exception.code, 1)
+        self.assertIn("didn't answer in time", err.getvalue())
+        self.assertNotIn("Traceback", err.getvalue())
+
     def test_parse_status(self):
         nl = chr(10)
         st = pc.parse_status(
