@@ -451,8 +451,10 @@ class DoctorTests(OfflineTestCase):
         self.allow("fast_dump", side_effect=fd)
 
     def _run_doctor(self, argv, fail=None, raise_dep=None):
-        self._doctor_mocks(fail=fail, raise_dep=raise_dep)
+        # Parse before mocking: raise_dep="exists" breaks os.path.exists,
+        # which argparse's gettext lookup calls on some Pythons.
         args = self.parse(argv)
+        self._doctor_mocks(fail=fail, raise_dep=raise_dep)
         with self.cap() as (out, err):
             rc = pc.cmd_doctor(args)
         return rc, out.getvalue(), err.getvalue()
