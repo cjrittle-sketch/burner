@@ -212,10 +212,12 @@ def _update_screen_from_dump(root):
 
 def _screen_for_tap():
     """screen_dims() for a tap's maths. When the last dump only had a
-    dialog in it, the size is a 1080x2400 guess: ask the phone instead, so
-    --xy and the occlusion check are right on other screen sizes."""
-    if _screen_guessed:
-        live_screen_dims()  # keeps the guess if the helper can't answer
+    dialog in it, the size is a guess from the rotation (1080x2400 or
+    2400x1080): ask the phone instead, so --xy and the occlusion check are
+    right on other screen sizes."""
+    if _screen_guessed and live_screen_dims() is None:
+        _trace("screen size guessed {} (UI helper: {})".format(
+            _screen_wh, _u2_status))
     return screen_dims()
 
 

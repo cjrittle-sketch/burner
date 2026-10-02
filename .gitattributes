@@ -4,3 +4,4 @@
 *.py text eol=lf
 bin/* text eol=lf
 tools/hooks/* text eol=lf
+config.env.example text eol=lf

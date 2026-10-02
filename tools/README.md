@@ -71,7 +71,10 @@ every round.
    under `[wsl2]` in `%UserProfile%\.wslconfig` and run `wsl --shutdown`.
 3. Inside WSL, run
    `git clone https://github.com/useburner/burner ~/burner && cd ~/burner && bash install.sh`,
-   then `bin/burner setup`. This computer is new to the phone, so it pairs
+   then `bin/burner setup`. If `install.sh` fails with `$'\r': command not
+   found`, the clone predates `.gitattributes`: run
+   `git rm -q --cached -r . && git reset -q --hard` in `~/burner` to check
+   the scripts out again with LF line endings. This computer is new to the phone, so it pairs
    once: someone taps Pair on the phone.
 4. Bench any commit, including unpushed work in the Windows folder:
 
