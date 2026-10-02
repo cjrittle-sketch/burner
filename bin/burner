@@ -2236,6 +2236,43 @@ def cmd_scroll(args):
     return 0
 
 
+# Labels that close a pop-up without agreeing to anything, safest first.
+DISMISS_LABELS = ["not now", "no thanks", "no, thanks", "maybe later", "skip",
+                  "later", "don't allow", "deny", "dismiss", "got it", "close"]
+
+
+def pick_dismiss(nodes):
+    """The node to tap to close a pop-up, or None. Prefers the safest label
+    (Not now, No thanks, Skip... Don't allow, then Got it and Close).
+    Pure function: no adb, unit-testable."""
+    for label in DISMISS_LABELS:
+        for n in nodes:
+            text = (n.get("text") or n.get("desc") or "").strip().lower()
+            if text == label and n.get("center", (None,))[0] is not None:
+                return n
+    return None
+
+
+def cmd_dismiss(args):
+    """Close pop-ups that get in the way: permission asks, 'Got it' tips,
+    upsells. Taps only close-without-agreeing labels, never OK/Allow/Accept.
+    Prints what it closed so the user can be told."""
+    closed = []
+    for _ in range(max(1, args.max)):
+        node = pick_dismiss(walk(ui_dump()))
+        if node is None:
+            break
+        x, y = clickable_target(node)
+        tap_center(x, y)
+        closed.append(node.get("text") or node.get("desc"))
+        time.sleep(1.2)
+    if closed:
+        print("closed: {}".format(", ".join(closed)))
+    else:
+        print("nothing to close")
+    return 0
+
+
 def cmd_apps(args):
     """List installed app packages, so the agent can prefer an installed app
     over a website. Exit 1 if a match was asked for and nothing matched."""
@@ -2408,6 +2445,11 @@ def build_parser():
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                    help="machine-readable JSON on stdout")
     p.set_defaults(fn=cmd_state)
+
+    p = sub.add_parser("dismiss", help="close pop-ups (Not now, Skip, Don't allow...)")
+    p.add_argument("--max", type=int, default=4,
+                   help="most pop-ups to close in a row (default 4)")
+    p.set_defaults(fn=cmd_dismiss)
 
     p = sub.add_parser("apps", help="list apps installed on the phone")
     p.add_argument("match", nargs="?",
@@ -2623,7 +2665,7 @@ def record_command_line(args):
         non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
                           "route", "forget", "record", "replay", "recipe", "do",
                           "ensure", "gcode", "vcode", "amazon-status", "setup",
-                          "uninstall", "update", "apps", "status"}
+                          "uninstall", "update", "apps", "status", "dismiss"}
         if argv[0] in non_recordable:
             return None
         # Reconstruct with proper quoting
@@ -3625,7 +3667,7 @@ def cmd_uninstall(args):
 
 
 LOCKED_COMMANDS = {"tap", "type", "press", "scroll", "start", "open", "do",
-                   "recipe", "replay"}
+                   "recipe", "replay", "dismiss"}
 
 
 def _acquire_lock(path=None, timeout=120):

@@ -21,7 +21,7 @@ isn't green, go to [Setup](#setup) first.
 |---|---|
 | "What's on my burner?" or "Take a screenshot of my burner" | They mean the screen right now, not the installed apps. Take a screenshot and send the image (see below). |
 | "Check my Amazon order" | `burner amazon-status` does it in one step. |
-| "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed. |
+| "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed or walls you at sign-in (see "Working fast"). |
 | "Install Snapchat" (any free app) | See "Installing apps" below. Never search the Play Store by tapping, and never tap by screen coordinates. |
 | "Check my burner" / "is my burner on?" / battery, storage | `burner status` answers it in one call. Don't dig through `dumpsys`, which can expose accounts and other personal details. |
 | "Update my burner" | Run `burner update`, then say in one line that it's up to date. |
@@ -63,6 +63,10 @@ Every screen read costs several seconds, so skip screens when you can.
   sign-in or onboarding screen you can't get past without signing in, you may
   browse the site in the phone's browser instead (`burner open <url>`), as
   long as it's read-only. Tell the user you did.
+- **Close pop-ups in one go.** `burner dismiss` closes permission asks
+  ("Don't allow"), tips ("Got it") and upsells ("Not now", "Close") without
+  agreeing to anything. Refuse permissions and free trials unless the task
+  needs them, and tell the user what you declined.
 - **Say what you saw, not what you guess.** "These three sneakers are listed
   under $35" is something you saw; "these are underpriced" needs prices to
   compare against, so say what you couldn't check.
@@ -152,6 +156,7 @@ Look at the screen
   burner snap [--all]               numbered list (@e1…) for exact taps
 
 Act
+  burner dismiss                    close pop-ups: Not now, Skip, Don't allow, Got it, Close
   burner tap "Text"                 tap by label (--index N, --fuzzy, --settle, "A || B")
   burner tap @e3                    tap a snap handle
   burner tap --xy 0.5,0.8           tap a spot (0 to 1 across and down)

@@ -1593,6 +1593,17 @@ class SetupWizardTests(OfflineTestCase):
         self.assertIs(pc.is_point_covered([label, scrim], 540, 1230, label),
                       scrim)
 
+    def test_pick_dismiss_prefers_the_safest_label(self):
+        def n(text, cx=500, cy=900):
+            return {"text": text, "desc": "", "center": (cx, cy)}
+        nodes = [n("Close"), n("Got it"), n("Not now"), n("Allow")]
+        self.assertEqual(pc.pick_dismiss(nodes)["text"], "Not now")
+        self.assertEqual(pc.pick_dismiss([n("Close"), n("Got it")])["text"],
+                         "Got it")
+        # Never picks agreeing buttons.
+        self.assertIsNone(pc.pick_dismiss([n("Allow"), n("OK"), n("Accept")]))
+        self.assertIsNone(pc.pick_dismiss([]))
+
     def test_split_marked(self):
         nl = chr(10)
         text = nl.join(["@@a", "one", "two", "@@b", "three", ""])
