@@ -205,6 +205,13 @@ def ensure_server():
         return
     except Exception as e:
         log("server not responding (%s), (re)initing" % e)
+        # The old server process can linger half-dead (this is the
+        # "ApplicationSharedMemory not initialized" error). Stop it before
+        # pushing a new one so the restart is clean and happens once.
+        try:
+            u2.connect(TARGET).stop_uiautomator()
+        except Exception as e2:
+            log("stop_uiautomator failed (%s)" % e2)
     # Pass the serial: with one, init only pushes u2.jar. Without it, init
     # also installs the ATX keyboard app, which Android 14+ blocks as an
     # "unsafe app" (it targets an old Android). burner doesn't need it.
