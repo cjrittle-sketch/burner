@@ -1523,6 +1523,14 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(pc.screen_dims(), (1080, 2400))
         self.assertEqual(pc.dump_package(root), "com.android.settings")
 
+    def test_split_marked(self):
+        nl = chr(10)
+        text = nl.join(["@@a", "one", "two", "@@b", "three", ""])
+        parts = pc.split_marked(text)
+        self.assertEqual(parts["a"], "one" + nl + "two" + nl)
+        self.assertEqual(parts["b"], "three" + nl)
+        self.assertEqual(pc.split_marked(""), {})
+
     def test_parse_status(self):
         nl = chr(10)
         st = pc.parse_status(

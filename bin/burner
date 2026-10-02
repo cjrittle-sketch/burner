@@ -1410,6 +1410,22 @@ def parse_status(battery, power, window, df, packages, model, android):
             "installed_apps": len(apps)}
 
 
+def split_marked(text):
+    """Split output made of '@@name' marker lines into {name: text}."""
+    nl = chr(10)
+    out, name, buf = {}, None, []
+    for line in (text or "").splitlines():
+        if line.startswith("@@"):
+            if name is not None:
+                out[name] = nl.join(buf) + nl
+            name, buf = line[2:].strip(), []
+        elif name is not None:
+            buf.append(line)
+    if name is not None:
+        out[name] = nl.join(buf) + nl
+    return out
+
+
 def cmd_status(args):
     """One-call health summary, so nobody has to dig through dumpsys (which
     can also expose accounts and other personal details)."""
@@ -1421,15 +1437,22 @@ def cmd_status(args):
                   "Wi-Fi and Wireless debugging is on, then run `burner ensure`.")
         return 1
 
-    def sh(*a):
-        r = adb("shell", *a, timeout=20)
-        return r.stdout if r.returncode == 0 else ""
+    # One adb round trip instead of seven: each call through the tunnel costs
+    # a few seconds. grep on the phone keeps the big dumpsys output off the wire.
+    script = ("echo @@battery; dumpsys battery; "
+              "echo @@power; dumpsys power | grep mWakefulness=; "
+              "echo @@window; dumpsys window | grep mCurrentFocus; "
+              "echo @@df; df /data; "
+              "echo @@pkgs; pm list packages -3; "
+              "echo @@model; getprop ro.product.model; "
+              "echo @@android; getprop ro.build.version.release")
+    r = adb("shell", script, timeout=45)
+    parts = split_marked(r.stdout if r.returncode == 0 else "")
     st = parse_status(
-        sh("dumpsys", "battery"), sh("dumpsys", "power"),
-        sh("dumpsys", "window"), sh("df", "/data"),
-        sh("pm", "list", "packages", "-3"),
-        sh("getprop", "ro.product.model"),
-        sh("getprop", "ro.build.version.release"))
+        parts.get("battery", ""), parts.get("power", ""),
+        parts.get("window", ""), parts.get("df", ""),
+        parts.get("pkgs", ""), parts.get("model", ""),
+        parts.get("android", ""))
     if as_json(args):
         print(json.dumps(st))
         return 0
