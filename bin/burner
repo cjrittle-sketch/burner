@@ -3587,12 +3587,35 @@ def _check_prereqs():
     return r.returncode == 0
 
 
+def parse_plain_tailscale_status(text):
+    """Status dict from plain `tailscale status` text, for hosts whose
+    tailscale command has no --json (hosted assistants). Only says whether
+    this computer is on the tailnet. Pure function."""
+    t = (text or "").lower()
+    if not t.strip():
+        return None
+    bad = ("not connected", "disconnected", "stopped", "logged out",
+           "needs login", "needs machine auth", "no state")
+    if any(b in t for b in bad):
+        return {"BackendState": "Stopped"}
+    if "connected" in t or "running" in t:
+        return {"BackendState": "Running"}
+    return None
+
+
 def _setup_tailscale_status():
     try:
         r = _setup_spawn(["tailscale", "status", "--json"], timeout=15)
         return json.loads(r.stdout or "{}")
     except Exception:
-        return None
+        pass
+    try:  # some hosts' tailscale has no --json: read the plain text
+        r = _setup_spawn(["tailscale", "status"], timeout=15)
+        if r.returncode == 0:
+            return parse_plain_tailscale_status(r.stdout)
+    except Exception:
+        pass
+    return None
 
 
 def _check_tailnet():

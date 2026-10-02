@@ -1759,6 +1759,16 @@ class SetupWizardTests(OfflineTestCase):
                              "Timeout - Long", "Muse - Stopped."]),
             ["Muse - Stopped.", "Timeout - Long"])
 
+    def test_parse_plain_tailscale_status(self):
+        f = pc.parse_plain_tailscale_status
+        self.assertEqual(f("Connected"), {"BackendState": "Running"})
+        self.assertEqual(f("Tailscale is running"), {"BackendState": "Running"})
+        self.assertEqual(f("Logged out."), {"BackendState": "Stopped"})
+        self.assertEqual(f("Tailscale is stopped."), {"BackendState": "Stopped"})
+        self.assertEqual(f("Not connected"), {"BackendState": "Stopped"})
+        self.assertIsNone(f(""))
+        self.assertIsNone(f("something else"))
+
     def test_parse_status(self):
         nl = chr(10)
         st = pc.parse_status(
