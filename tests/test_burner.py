@@ -1658,6 +1658,10 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(parts["b"], "three" + nl)
         self.assertEqual(pc.split_marked(""), {})
 
+    def test_app_words_map_names_to_packages(self):
+        self.assertEqual(pc.APP_WORDS["messages"], "messaging")
+        self.assertIn("messaging", "com.google.android.apps.messaging")
+
     def test_parse_notifications(self):
         def node(rid, text, pkg="com.android.systemui"):
             return '<node package="{}" resource-id="{}" text="{}"/>'.format(

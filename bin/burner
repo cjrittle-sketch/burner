@@ -2351,6 +2351,13 @@ def cmd_notifications(args):
     return 0
 
 
+# What people call an app vs. the word in its package name.
+APP_WORDS = {"messages": "messaging", "texts": "messaging", "sms": "messaging",
+             "text": "messaging", "contacts": "contacts", "phone": "dialer",
+             "calls": "dialer", "clock": "deskclock", "email": "gm",
+             "gmail": "gm", "files": "documentsui"}
+
+
 def cmd_apps(args):
     """List installed app packages, so the agent can prefer an installed app
     over a website. Exit 1 if a match was asked for and nothing matched."""
@@ -2359,7 +2366,8 @@ def cmd_apps(args):
     pkgs = sorted(l.split(":", 1)[1].strip()
                   for l in (r.stdout or "").splitlines() if l.startswith("package:"))
     if args.match:
-        pkgs = [p for p in pkgs if args.match.lower() in p.lower()]
+        word = APP_WORDS.get(args.match.lower(), args.match.lower())
+        pkgs = [p for p in pkgs if word in p.lower()]
     for p in pkgs:
         print(p)
     return 0 if (pkgs or not args.match) else 1
