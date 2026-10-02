@@ -182,6 +182,11 @@ re-run skip ahead.
 - A free Tailscale account, or the computer and phone on the same Wi-Fi.
 - The user, once, for about 10 minutes.
 
+**Run setup in the conversation with the user**, not as a background task or
+scheduled job. Every question goes to them as a normal chat message they'll
+see right away, and you wait for their answer there. A question that only
+appears in a task summary or log never reaches them.
+
 **How to talk to the user during setup.** Keep updates short, plain and about
 them: "Installing burner on my side, this takes a minute" or "Done, now one
 thing on your phone." Leave out installer output and the names of parts (adb,
@@ -243,10 +248,12 @@ You can't do these for them. Give the full Settings path for every tap. After
 the user finishes each one, record it with `burner setup --step <name>
 --confirm`.
 
-1. **Tailscale** (`tailscale-phone`): connect the phone to Wi-Fi, install
-   Tailscale from the Play Store, sign in, and leave it on. If
+1. **Tailscale** (`tailscale-phone`): check before asking anything. If
    `burner setup --list-steps` already shows `tailscale-phone` done (the
-   tailnet has an Android phone online), tell them it's done and move on.
+   tailnet has an Android phone online), it's done: tell them so in a few
+   words and go to the next step, without asking whether Tailscale is on.
+   Otherwise: connect the phone to Wi-Fi, install Tailscale from the Play
+   Store, sign in, and leave it on.
 2. **Developer options** (`dev-options`): Settings > About phone > tap
    **Build number** 7 times until it says "You are now a developer" (enter the
    phone PIN if asked). Samsung: Settings > About phone > Software
