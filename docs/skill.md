@@ -1,4 +1,4 @@
-> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev d6bd45f1: if `burner version` shows a different rev, run `burner update`.
+> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev 0b784186: if `burner version` shows a different rev, run `burner update`.
 
 # burner
 
@@ -263,6 +263,7 @@ A few details:
 | First connection right after pairing fails | Run `burner ensure` once more. It usually works the second time. |
 | Phone shows "Unsafe app blocked: ATX" | An older burner tried to install a keyboard app it doesn't need. Tap OK, then `burner update`. |
 | No Wireless debugging in Developer options | It needs Android 11 or newer (Settings > About phone > Android version). On 11 or newer, search Settings for "Wireless debugging". On Android 10 or older, the phone can't be a burner phone. |
+| burner connects but apps say there's no internet (pages and apps won't load) | Tailscale on the phone may be sending name lookups to tailnet DNS servers that stopped answering. In the Tailscale app on the phone, turn off "Use Tailscale DNS settings" so it uses the Wi-Fi's DNS; apps work again at once. burner doesn't change DNS: this is Tailscale's default plus an offline DNS server on the user's tailnet. |
 | adb missing after install | The installer puts it in `.android-tools/` and burner uses it from there. Check `.android-tools/platform-tools/adb` exists, or re-run the installer. |
 
 ## Setup
