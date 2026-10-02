@@ -1,4 +1,4 @@
-> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev 29bd0bf9: if `burner version` shows a different rev, run `burner update`.
+> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev fb367ec2: if `burner version` shows a different rev, run `burner update`.
 
 # burner
 
@@ -28,6 +28,7 @@ isn't green, go to [Setup](#setup) first.
 | "Check my messages" | Open the Messages app (`burner apps messages`, then `burner start <package>`), read it with `burner state` or a screenshot, and open a conversation only to read it. Don't query `dumpsys` or the SMS database: Android hides the words there, and it can expose accounts. |
 | "Do this every time" / "save that" / a task they repeat | See "Saving a task the user repeats" below: `burner save`. |
 | A short word or name you don't recognize ("about", "weekly-orders") | It may be a saved recipe. Run `burner recipes`. If one matches, tell the user which one and what it does, and run it (`burner recipe <name>`) once they say yes. If they said "run <name>", just run it. |
+| "Uninstall burner" / "forget it" | Run `burner uninstall` first: it lists the phone changes it will undo (screen lock, stay awake, helper apps, Wireless debugging). Run it with `--yes` once the user agrees, then delete the `~/burner` folder and any notes you saved about burner. Don't search files or read the installer. |
 | "Update my burner" | Run `burner update`, then re-read `~/burner/SKILL.md` (the instructions change with updates), and say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
