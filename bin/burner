@@ -2460,9 +2460,6 @@ def _scrcpy_swipe(direction):
         return False
     _trace("scroll scrcpy swipe {:.2f}s".format(time.time() - t0))
     u2_invalidate()
-    # The helper's swipe holds still before lifting, so there is no fling
-    # to wait out; this only lets the list redraw.
-    time.sleep(0.15)
     return True
 
 
@@ -2544,6 +2541,12 @@ def _scroll_plain(direction, times):
             t0 = time.time()
             now = _screen_pkg if live_screen_dims() else None
             _trace("scroll front-app check {:.2f}s".format(time.time() - t0))
+            # The swipe's events reach the phone a moment after we send them,
+            # and the screen tree that dumps read updates later still: give
+            # it 0.6s from the swipe (the check above counts toward it), then
+            # drop any dump cached in the meantime.
+            time.sleep(max(0.0, 0.6 - (time.time() - t0)))
+            u2_invalidate()
             if now not in (None, pkg):
                 print("scroll left {} (now in {}); stopped.".format(pkg, now),
                       file=sys.stderr)
