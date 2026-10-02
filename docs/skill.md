@@ -67,9 +67,6 @@ Every screen read costs several seconds, so skip screens when you can.
   ("Don't allow"), tips ("Got it") and upsells ("Not now", "Close") without
   agreeing to anything. Refuse permissions and free trials unless the task
   needs them, and tell the user what you declined.
-- **Say what you saw, not what you guess.** "These three sneakers are listed
-  under $35" is something you saw; "these are underpriced" needs prices to
-  compare against, so say what you couldn't check.
 
 ## Rules
 
