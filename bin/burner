@@ -1690,6 +1690,10 @@ def cmd_doctor(args):
         return ok, out.splitlines()[0][:120] if out else "no output"
 
     def check_u2_daemon():
+        if not os.path.exists(U2_SOCK) or u2sock("health", timeout=10) is None:
+            # Not running, e.g. just after an update stopped it. u2ctl starts
+            # it on demand, so start it here rather than reporting a failure.
+            u2ctl("health", timeout=60)
         if not os.path.exists(U2_SOCK):
             return False, "socket missing: {}".format(U2_SOCK)
         r = u2sock("health", timeout=10)
@@ -2749,6 +2753,8 @@ def _setup_tailscale_status():
 
 
 def _check_tailnet():
+    if _setup_device_state() == "device":
+        return True  # the phone answers, however this computer gets there
     st = _setup_tailscale_status()
     if st is None:
         return None  # no Tailscale here (same-LAN setup) or can't tell
@@ -2759,6 +2765,11 @@ def _run_tailnet(args):
     """Join this computer to the user's tailnet, surfacing the approval link."""
     if _check_tailnet():
         print("this computer is on your tailnet.")
+        return 0
+    if _setup_device_state() == "device":
+        # Hosted assistants reach the phone through their host's tunnel
+        # instead of a Tailscale client of their own: nothing to approve.
+        print("this computer already reaches the phone; nothing to approve.")
         return 0
     if _setup_tailscale_status() is None:
         print("Tailscale isn't installed here. Install it, or put this "
