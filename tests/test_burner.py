@@ -1543,6 +1543,26 @@ class SetupWizardTests(OfflineTestCase):
         pc._update_screen_from_dump(pc.ET.fromstring(xml))
         self.assertEqual(pc.screen_dims(), (1080, 2400))
 
+    def test_dialog_only_dump_asks_the_phone_for_the_size(self):
+        def live():
+            pc._screen_wh = "1440 3120"
+            return 1440, 3120
+        dialog = ('<hierarchy rotation="0">'
+                  '<node package="com.android.settings" bounds="[84,900][1356,1700]"/>'
+                  '</hierarchy>')
+        full = '<hierarchy rotation="0"><node bounds="[0,0][1080,2400]"/></hierarchy>'
+        self.addCleanup(setattr, pc, "_screen_wh", pc._screen_wh)
+        self.addCleanup(setattr, pc, "_screen_guessed", pc._screen_guessed)
+        with mock.patch.object(pc, "live_screen_dims", side_effect=live) as m:
+            pc._update_screen_from_dump(pc.ET.fromstring(dialog))
+            self.assertEqual(pc._screen_for_tap(), (1440, 3120))
+            pc._update_screen_from_dump(pc.ET.fromstring(full))
+            self.assertEqual(pc._screen_for_tap(), (1080, 2400))
+        self.assertEqual(m.call_count, 1)  # only the dialog-only dump asked
+        with mock.patch.object(pc, "live_screen_dims", return_value=None):
+            pc._update_screen_from_dump(pc.ET.fromstring(dialog))
+            self.assertEqual(pc._screen_for_tap(), (1080, 2400))  # kept guess
+
     def test_commands_queue_behind_each_other(self):
         # A fake fcntl so the logic is tested on every platform: flock
         # raises OSError while another "process" holds the lock.

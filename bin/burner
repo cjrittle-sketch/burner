@@ -184,10 +184,11 @@ SCRCPY_DIR = os.path.join(ROOT, "lib", "scrcpy")
 U2CTL = os.path.join(ROOT, "bin", "u2ctl")
 _scrcpy_send = None
 _screen_wh = "1080 2400"  # updated from each dump's rotation attribute
+_screen_guessed = False  # True when the last dump showed only a dialog
 
 
 def _update_screen_from_dump(root):
-    global _screen_wh
+    global _screen_wh, _screen_guessed
     try:
         rot = int(root.attrib.get("rotation", "0") or 0)
     except ValueError:
@@ -204,8 +205,18 @@ def _update_screen_from_dump(root):
         m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds", ""))
         if m and (m.group(1) == "0" or m.group(2) == "0"):
             w, h = max(w, int(m.group(3))), max(h, int(m.group(4)))
-    if w >= 300 and h >= 300:
+    _screen_guessed = not (w >= 300 and h >= 300)
+    if not _screen_guessed:
         _screen_wh = "{} {}".format(w, h)
+
+
+def _screen_for_tap():
+    """screen_dims() for a tap's maths. When the last dump only had a
+    dialog in it, the size is a 1080x2400 guess: ask the phone instead, so
+    --xy and the occlusion check are right on other screen sizes."""
+    if _screen_guessed:
+        live_screen_dims()  # keeps the guess if the helper can't answer
+    return screen_dims()
 
 
 _screen_pkg = None  # app in front, from the last live_screen_dims()
@@ -1336,7 +1347,7 @@ def cmd_tap(args):
     nodes = walk(root)
 
     if args.xy is not None or snap_xy is not None:
-        w, h = screen_dims()
+        w, h = _screen_for_tap()
         if snap_xy is not None:
             x, y = snap_xy
             tap_label = args.text.strip()
@@ -1362,7 +1373,7 @@ def cmd_tap(args):
         nav_record_action(from_nodes, 'tap "{}"'.format(tap_label), to_fp=None, ok=True)
         return _tap_ok(args, tap_label, (x, y))
 
-    w, h = screen_dims()
+    w, h = _screen_for_tap()
     plan = plan_tap(nodes, w, h, text=args.text, fuzzy=args.fuzzy,
                     index=args.index, check=not args.no_occlusion_check)
     if plan["action"] == "nomatch":
