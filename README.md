@@ -53,13 +53,13 @@ Set up burner for me. Read the guide at https://useburner.si/skill.md and do eve
 ```
 
 Your AI assistant reads the guide and walks you through the rest. Setup takes
-about 10 minutes, once, and any spare Android phone works (iOS soon). After
+about 10 minutes, once, and any spare Android phone works (iPhone soon). After
 that, plug the phone in, leave it in a drawer, and never touch it again.
 
 ## Questions
 
 **What do I need?**
-A spare Android phone (iOS soon), a free Tailscale account and 10 minutes.
+A spare Android phone (iPhone soon), a free Tailscale account and 10 minutes.
 That's it. For now, burner works with Muse as your AI assistant.
 
 **Do I need to pay or sign up?**
