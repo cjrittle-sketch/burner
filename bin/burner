@@ -2058,7 +2058,8 @@ def cmd_amazon_status(args):
                            capture_output=True, text=True, timeout=90)
         return r.stdout or ""
 
-    run("open", "https://www.amazon.com/gp/css/order-history")
+    run("open", "https://www.amazon.com/gp/css/order-history",
+        "com.amazon.mShop.android.shopping")  # the app, not a browser
     time.sleep(8)
     # scroll once to force the WebView to expose order nodes
     subprocess.run([ADB_BIN, "-s", TARGET, "shell", "input", "swipe",
