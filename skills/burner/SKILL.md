@@ -26,6 +26,7 @@ isn't green, go to [Setup](#setup) first.
 | "Check my Amazon order" | `burner amazon-status` does it in one step. |
 | "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed. |
 | "Install Snapchat" (any free app) | Find its package name (e.g. `com.snapchat.android`), then `PLAY_PACKAGE=<package> burner recipe play-install`. It opens the Play Store listing directly, taps Install and waits for the download. Don't search the Play Store or tap by screen coordinates. It stops on paid apps; never buy one. |
+| "Check my burner" / "is my burner on?" / battery, storage | `burner status` answers it in one call. Don't dig through `dumpsys`, which can expose accounts and other personal details. |
 | "Update my burner" | Run `burner update`, then say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
@@ -119,6 +120,7 @@ computer the phone hasn't seen before also needs pairing once (step 5).
 ```
 Look at the screen
   burner shot [--out PATH]          screenshot (--out . to send it in chat)
+  burner status                     is it up? battery, charging, screen, storage, apps
   burner state                      open app + the main text on screen
   burner dump [--all]               every item on screen: text, type, position
   burner snap [--all]               numbered list (@e1…) for exact taps

@@ -1367,6 +1367,65 @@ def cmd_state(args):
     return 0
 
 
+def parse_status(battery, power, window, df, packages, model, android):
+    """Turn raw dumpsys/df/pm output into a small status dict."""
+    def num(pattern, text):
+        m = re.search(pattern, text or "")
+        return int(m.group(1)) if m else None
+    level = num(r"level:\s*(\d+)", battery)
+    plugged = bool(re.search(r"(AC|USB|Wireless) powered:\s*true", battery or ""))
+    screen = "on" if re.search(r"mWakefulness=Awake", power or "") else (
+        "off" if power else None)
+    m = re.search(r"mCurrentFocus=.*?\s([\w.]+)/", window or "")
+    used = None
+    for line in (df or "").splitlines()[1:]:
+        m2 = re.search(r"(\d+)%", line)
+        if m2:
+            used = int(m2.group(1))
+    apps = [l.split(":", 1)[1].strip() for l in (packages or "").splitlines()
+            if l.startswith("package:")]
+    return {"online": True, "model": (model or "").strip() or None,
+            "android": (android or "").strip() or None,
+            "battery_percent": level, "charging": plugged, "screen": screen,
+            "app": m.group(1) if m else None, "storage_used_percent": used,
+            "installed_apps": len(apps)}
+
+
+def cmd_status(args):
+    """One-call health summary, so nobody has to dig through dumpsys (which
+    can also expose accounts and other personal details)."""
+    if not ensure(heal_fast_paths=False):
+        if as_json(args):
+            print(json.dumps({"online": False}))
+        else:
+            print("offline: the phone isn't reachable. Check that it's on "
+                  "Wi-Fi and Wireless debugging is on, then run `burner ensure`.")
+        return 1
+
+    def sh(*a):
+        r = adb("shell", *a, timeout=20)
+        return r.stdout if r.returncode == 0 else ""
+    st = parse_status(
+        sh("dumpsys", "battery"), sh("dumpsys", "power"),
+        sh("dumpsys", "window"), sh("df", "/data"),
+        sh("pm", "list", "packages", "-3"),
+        sh("getprop", "ro.product.model"),
+        sh("getprop", "ro.build.version.release"))
+    if as_json(args):
+        print(json.dumps(st))
+        return 0
+    print("online: {} (Android {})".format(st["model"] or "phone", st["android"] or "?"))
+    if st["battery_percent"] is not None:
+        print("battery: {}%{}".format(st["battery_percent"],
+                                      ", charging" if st["charging"] else ", not charging"))
+    print("screen: {}".format(st["screen"] or "?"))
+    print("open app: {}".format(st["app"] or "home screen or unknown"))
+    if st["storage_used_percent"] is not None:
+        print("storage: {}% used".format(st["storage_used_percent"]))
+    print("apps installed by the user: {}".format(st["installed_apps"]))
+    return 0
+
+
 def cmd_start(args):
     adb_or_ensure("shell", "monkey", "-p", args.package,
                   "-c", "android.intent.category.LAUNCHER", "1")
@@ -2195,6 +2254,11 @@ def build_parser():
     p.add_argument("--meta", action="store_true", help="hold Meta/Win (KEYCODE_META_LEFT)")
     p.set_defaults(fn=cmd_press)
 
+    p = sub.add_parser("status", help="is the phone up? battery, charging, screen, apps")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_status)
+
     p = sub.add_parser("state", help="focused app + top screen texts")
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
                    help="machine-readable JSON on stdout")
@@ -2414,7 +2478,7 @@ def record_command_line(args):
         non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
                           "route", "forget", "record", "replay", "recipe", "do",
                           "ensure", "gcode", "vcode", "amazon-status", "setup",
-                          "uninstall", "update", "apps"}
+                          "uninstall", "update", "apps", "status"}
         if argv[0] in non_recordable:
             return None
         # Reconstruct with proper quoting

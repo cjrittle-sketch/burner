@@ -1479,6 +1479,26 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(rc, 0)
         sw.assert_not_called()
 
+    def test_parse_status(self):
+        nl = chr(10)
+        st = pc.parse_status(
+            nl.join(["  AC powered: false", "  USB powered: true",
+                     "  level: 78", ""]),
+            "  mWakefulness=Awake" + nl,
+            "  mCurrentFocus=Window{abc u0 com.snapchat.android/com.snap.Main}"
+            + nl,
+            nl.join(["Filesystem 1K-blocks Used Available Use% Mounted on",
+                     "/dev/x 100 41 59 41% /data", ""]),
+            nl.join(["package:com.a", "package:com.b", ""]),
+            "Pixel 7a" + nl, "16" + nl)
+        self.assertEqual(st["battery_percent"], 78)
+        self.assertTrue(st["charging"])
+        self.assertEqual(st["screen"], "on")
+        self.assertEqual(st["app"], "com.snapchat.android")
+        self.assertEqual(st["storage_used_percent"], 41)
+        self.assertEqual(st["installed_apps"], 2)
+        self.assertEqual(st["model"], "Pixel 7a")
+
     def test_read_pair_dialog(self):
         xml = ('<hierarchy><node text="Pair with device" bounds="[0,0][1,1]"/>'
                '<node text="Wi-Fi pairing code" bounds="[0,0][1,1]"/>'
