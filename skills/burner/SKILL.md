@@ -242,6 +242,10 @@ up Python packages in `.venv/`, and copies `config.env.example` to `config.env`
 (never overwriting one that exists). `BURNER_WORKSPACE` tells burner where its
 downloaded tools live.
 
+Many assistants start every command in a fresh shell, so the `export` lines
+won't carry over. Call burner by its full path, `~/burner/bin/burner`, from
+then on.
+
 ### 2. Find out where the user is
 
 Work out which device the user is chatting from: the app or client they're
@@ -375,9 +379,21 @@ on while charging", "Tailscale will now start by itself after a restart").
 
 ### 8. Wrap up
 
-Close with a short message about them, not the setup. Tell them to plug the
-phone in, give them a few things to try that start with "Use my burner to",
-and say how to keep it up to date. Something like:
+Before you close, do three quick things:
+
+1. Run `~/burner/bin/burner --help` once so you know every command, and
+   `burner status` to see whether the phone is charging.
+2. Show them their phone: `burner shot --out .`, and send the image with
+   "Here's your burner." It's the proof that setup worked.
+3. If you keep notes or memory (an AGENTS.md file, say), save just this:
+   burner lives in `~/burner`; run `burner --help` or read `~/burner/SKILL.md`
+   before using the phone; `burner update` updates it. Leave out workarounds
+   and guesses about how burner works. They go stale, and if something
+   misbehaves, telling the user lets it get fixed properly.
+
+Then close with a short message about them, not the setup. Tell them to plug
+the phone in, give them a few things to try that start with "Use my burner
+to", and say how to keep it up to date. Something like:
 
 > All done. Plug the phone into a charger and leave it there on Wi-Fi.
 >
