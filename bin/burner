@@ -12,6 +12,8 @@ Replaces the old dump -> inline-python -> tap -> sleep loop with one-liners:
 Verification codes are transient: pulled, typed, never stored.
 """
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
@@ -2536,6 +2538,20 @@ def build_parser():
     p.add_argument("name")
     p.set_defaults(fn=cmd_recipe)
 
+    p = sub.add_parser("recipes", help="list saved recipes and what they do")
+    p.set_defaults(fn=cmd_recipes)
+
+    p = sub.add_parser("save", help="save a repeatable task as a recipe")
+    p.add_argument("name", help="lowercase letters, digits, - and _")
+    p.add_argument("steps", nargs="*",
+                   help="one burner step per argument, e.g. 'tap \"Orders\"' "
+                        "(no 'burner' in front); read from stdin if omitted")
+    p.add_argument("--desc", default="", help="one line saying what it does")
+    p.add_argument("--force", action="store_true", help="overwrite")
+    p.add_argument("--allow-text", action="store_true",
+                   help="allow `type` with fixed text (default: use $VARIABLES)")
+    p.set_defaults(fn=cmd_save)
+
     p = sub.add_parser("record", help="record actions to recipes/<name>.burner")
     p.add_argument("name", nargs="?", default=None,
                    help="recipe name (omit with --stop)")
@@ -2645,6 +2661,95 @@ def cmd_recipe(args):
     return cmd_do(argparse.Namespace(flow="; ".join(steps)))
 
 
+def cmd_recipes(args):
+    """List recipes with the first comment line of each."""
+    d = os.path.join(ROOT, "recipes")
+    names = sorted(f[:-len(".burner")] for f in os.listdir(d)
+                   if f.endswith(".burner")) if os.path.isdir(d) else []
+    for n in names:
+        desc = ""
+        try:
+            with open(os.path.join(d, n + ".burner"), encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("#") and len(line) > 1:
+                        desc = line.lstrip("#").strip()
+                        break
+        except OSError:
+            pass
+        print("{:24s} {}".format(n, desc))
+    return 0
+
+
+SAVE_VERBS = {"tap", "type", "press", "wait", "start", "open", "scroll",
+              "shot", "state", "dump", "snap", "dismiss", "sleep", "apps"}
+
+
+def check_save_steps(steps, allow_text=False):
+    """Return an error message for the first bad step, or None. Pure apart
+    from building the parser, so it is unit-testable."""
+    ap = build_parser()
+    for i, step in enumerate(steps, 1):
+        try:
+            words = shlex.split(step)
+        except ValueError:
+            return "step {} has unbalanced quotes: {}".format(i, step)
+        if not words or words[0] not in SAVE_VERBS:
+            return "step {} must start with one of: {} (got: {})".format(
+                i, ", ".join(sorted(SAVE_VERBS)), step)
+        if re.search(r"(^|\s)@e\d+", step):
+            return ("step {} uses a snap handle (@eN). Handles last for one "
+                    "screen only; use the label instead, e.g. tap \"Orders\"."
+                    .format(i))
+        if words[0] == "type" and not allow_text \
+                and not re.search(r"\$\{?[A-Za-z_]", step):
+            return ("step {} types fixed text. Use a $VARIABLE (like type "
+                    "\"$QUERY\") so personal text isn't saved in the recipe, "
+                    "or pass --allow-text.".format(i))
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                ap.parse_args(words)
+        except SystemExit:
+            return "step {} isn't a valid burner command: {}".format(i, step)
+    return None
+
+
+def cmd_save(args):
+    """Save a repeatable task as recipes/<name>.burner, so it can be run
+    again with `burner recipe <name>`. Steps are checked first, so a typo
+    doesn't turn into a recipe that fails halfway through."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", args.name or ""):
+        print("save: name must be lowercase letters, digits, - and _",
+              file=sys.stderr)
+        return 1
+    steps = [s.strip() for s in args.steps if s.strip()]
+    if not steps and not sys.stdin.isatty():
+        steps = [l.strip() for l in sys.stdin.read().splitlines()
+                 if l.strip() and not l.strip().startswith("#")]
+    if not steps:
+        print("save: no steps. Pass one step per argument, or on stdin.",
+              file=sys.stderr)
+        return 1
+    err = check_save_steps(steps, args.allow_text)
+    if err:
+        print("save: " + err, file=sys.stderr)
+        return 1
+    path = os.path.join(ROOT, "recipes", args.name + ".burner")
+    if os.path.exists(path) and not args.force:
+        print("save: recipe '{}' exists (use --force to overwrite)".format(
+            args.name), file=sys.stderr)
+        return 1
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("# {}\n".format(args.desc.strip() or "Saved recipe: " + args.name))
+        f.write("# Run: burner recipe {}\n".format(args.name))
+        for step in steps:
+            f.write(step + "\n")
+    print("saved {} ({} steps). Run it with: burner recipe {}".format(
+        path, len(steps), args.name))
+    return 0
+
+
 # ------------------------------------------------------- record / replay
 """
 Session recording: `burner record <name>` captures every action command to
@@ -2697,7 +2802,8 @@ def record_command_line(args):
         non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
                           "route", "forget", "record", "replay", "recipe", "do",
                           "ensure", "gcode", "vcode", "amazon-status", "setup",
-                          "uninstall", "update", "apps", "status", "dismiss"}
+                          "uninstall", "update", "apps", "status", "dismiss",
+                          "recipes", "save"}
         if argv[0] in non_recordable:
             return None
         # Reconstruct with proper quoting

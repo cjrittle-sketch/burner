@@ -1617,6 +1617,39 @@ class SetupWizardTests(OfflineTestCase):
         # A different Install elsewhere on screen stays separate.
         self.assertEqual(len(pc.dedupe_same_control([view, text, other])), 2)
 
+    def test_check_save_steps(self):
+        ok = ['open "https://example.com/orders"', 'wait "Your Orders"',
+              'tap "Orders"', 'type "$QUERY"', 'press BACK']
+        self.assertIsNone(pc.check_save_steps(ok))
+        # Handles last for one screen only.
+        self.assertIn("snap handle", pc.check_save_steps(['tap @e3']))
+        # Fixed typed text would save personal text into the recipe.
+        self.assertIn("fixed text", pc.check_save_steps(['type "hunter2"']))
+        self.assertIsNone(pc.check_save_steps(['type "chill"'], allow_text=True))
+        # Only screen-driving verbs, and valid ones.
+        self.assertIn("must start with", pc.check_save_steps(['uninstall --yes']))
+        self.assertIn("unbalanced", pc.check_save_steps(['tap "Orders']))
+        self.assertIn("isn't a valid", pc.check_save_steps(['scroll sideways']))
+
+    def test_save_writes_a_recipe(self):
+        tmp = tempfile.mkdtemp()
+        with mock.patch.object(pc, "ROOT", tmp):
+            args = SimpleNamespace(name="weekly-orders", desc="Open my orders",
+                                   steps=['open "https://example.com"',
+                                          'wait "Orders"'],
+                                   force=False, allow_text=False)
+            with self.cap():
+                self.assertEqual(pc.cmd_save(args), 0)
+                self.assertEqual(pc.cmd_save(args), 1)  # exists, no --force
+            path = os.path.join(tmp, "recipes", "weekly-orders.burner")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            self.assertIn("# Open my orders", text)
+            self.assertIn('wait "Orders"', text)
+            args.name = "Bad Name"
+            with self.cap():
+                self.assertEqual(pc.cmd_save(args), 1)
+
     def test_split_marked(self):
         nl = chr(10)
         text = nl.join(["@@a", "one", "two", "@@b", "three", ""])

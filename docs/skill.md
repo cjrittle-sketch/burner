@@ -24,6 +24,7 @@ isn't green, go to [Setup](#setup) first.
 | "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed or walls you at sign-in (see "Working fast"). |
 | "Install Snapchat" (any free app) | See "Installing apps" below. Never search the Play Store by tapping, and never tap by screen coordinates. |
 | "Check my burner" / "is my burner on?" / battery, storage | `burner status` answers it in one call. Don't dig through `dumpsys`, which can expose accounts and other personal details. |
+| "Do this every time" / "save that" / a task they repeat | See "Saving a task the user repeats" below: `burner save`. |
 | "Update my burner" | Run `burner update`, then re-read `~/burner/SKILL.md` (the instructions change with updates), and say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
@@ -56,6 +57,28 @@ Every screen read costs several seconds, so skip screens when you can.
   ("Don't allow"), tips ("Got it") and upsells ("Not now", "Close") without
   agreeing to anything. Refuse permissions and free trials unless the task
   needs them, and tell the user what you declined.
+
+## Saving a task the user repeats
+
+When the user says "do this every time", "save that" or "make that a recipe",
+or does the same task again and again, turn what worked into a recipe.
+`burner recipes` lists the ones that exist.
+
+1. Do the task once, and note the steps that worked.
+2. Clean them up: use labels (`tap "Orders"`), not coordinates or `@e` handles;
+   put a `wait "Text"` after every step that loads a new screen; use a link
+   (`open "https://…"`) in place of tapping through menus; and write anything
+   that changes from run to run as a `$VARIABLE` (`type "$QUERY"`).
+3. Save it, one step per argument, with no `burner` in front:
+   `burner save weekly-orders --desc "Open my Amazon orders" 'open
+   "https://www.amazon.com/gp/css/order-history"' 'wait "Your Orders"'`.
+   `save` checks every step first and refuses fixed typed text (use a
+   `$VARIABLE`, or `--allow-text`) and `@e` handles.
+4. Run it once (`QUERY=shoes burner recipe weekly-orders`) to check it works,
+   and tell the user its name and what to say: "run weekly-orders".
+
+Pick a name that isn't one of burner's own (`burner recipes` shows them).
+Recipes you save are kept when burner updates.
 
 ## Details
 
@@ -173,6 +196,8 @@ Flows
   burner do 'step; step'            run several steps in one call, stopping at the first failure
   burner sleep <seconds>            pause between steps inside burner do
   burner recipe <name>              run a saved flow from recipes/<name>.burner
+  burner recipes                    list saved recipes and what they do
+  burner save <name> 'step' ...     save a repeatable task as a recipe (checks the steps)
   burner record <name>              record what you do into a recipe (burner record --stop)
   burner replay <name>              replay a recording step by step
   burner whereami                   which screen this is and where you can go from it
