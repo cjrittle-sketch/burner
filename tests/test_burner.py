@@ -1523,6 +1523,26 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(pc.screen_dims(), (1080, 2400))
         self.assertEqual(pc.dump_package(root), "com.android.settings")
 
+    def test_unlabeled_button_over_label_is_not_an_occluder(self):
+        # Play Store: the "Install" text sits under an unlabeled Button that
+        # is the real tap surface; burner used to refuse the tap as covered.
+        label = {"text": "Install", "desc": "", "class": "android.widget.TextView",
+                 "bounds": "[470,1200][610,1260]", "clickable": False}
+        button = {"text": "", "desc": "", "class": "android.widget.Button",
+                  "bounds": "[64,1176][1017,1281]", "clickable": True}
+        nodes = [label, button]
+        self.assertIsNone(pc.is_point_covered(nodes, 540, 1230, label))
+        # A real dialog covering the label still counts.
+        dialog = {"text": "Update?", "desc": "", "class": "android.app.Dialog",
+                  "bounds": "[64,1000][1017,1400]", "clickable": False}
+        self.assertIs(pc.is_point_covered([label, dialog], 540, 1230, label),
+                      dialog)
+        # A full-screen unlabeled button (a scrim) still counts too.
+        scrim = {"text": "", "desc": "", "class": "android.widget.Button",
+                 "bounds": "[0,0][1080,2400]", "clickable": True}
+        self.assertIs(pc.is_point_covered([label, scrim], 540, 1230, label),
+                      scrim)
+
     def test_split_marked(self):
         nl = chr(10)
         text = nl.join(["@@a", "one", "two", "@@b", "three", ""])
