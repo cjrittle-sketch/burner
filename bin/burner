@@ -2346,6 +2346,8 @@ def cmd_notifications(args):
             if not fresh:
                 break
             lines += fresh
+            if len(lines) < 4:  # a short list fits on screen: skip the rescan
+                break
             _scroll_swipe("down")
             time.sleep(0.6)
     finally:
