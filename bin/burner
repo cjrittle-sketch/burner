@@ -856,6 +856,10 @@ def _tap_refused(args, x, y, cover):
     msg = 'tap refused: point ({},{}) is covered by "{}" [{}] {}'.format(
         x, y, cover.get("text") or cover.get("desc") or "",
         (cover.get("class") or "").split(".")[-1], cover.get("bounds"))
+    msg += (chr(10) + "If the screenshot shows that button is really there "
+            "(web pages and some apps hide their controls from the dump), "
+            "retry with --no-occlusion-check. If a dialog or sheet is in "
+            "the way, close it first.")
     return _tap_fail(args, msg)
 
 
