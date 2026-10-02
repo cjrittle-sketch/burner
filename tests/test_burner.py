@@ -1566,6 +1566,11 @@ class SetupWizardTests(OfflineTestCase):
         view = {"text": "", "desc": "", "class": "android.view.View",
                 "bounds": "[432,2169][648,2337]", "clickable": False}
         self.assertIsNone(pc.is_point_covered([tab, view], 540, 2253, tab))
+        # Big unlabeled page content (a web page's container view) isn't a
+        # blocker either; it only ever hid the page's own controls.
+        page = {"text": "", "desc": "", "class": "android.view.View",
+                "bounds": "[0,200][1080,2200]", "clickable": False}
+        self.assertIsNone(pc.is_point_covered([label, page], 540, 1230, label))
         # A real dialog covering the label still counts.
         dialog = {"text": "Update?", "desc": "", "class": "android.app.Dialog",
                   "bounds": "[64,1000][1017,1400]", "clickable": False}

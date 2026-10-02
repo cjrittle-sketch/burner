@@ -348,28 +348,29 @@ def _bounds_rect(bounds):
     return tuple(map(int, m.groups())) if m else None
 
 
-def _is_own_click_surface(cover, target):
-    """True if `cover` is the unlabeled button that wraps the tap target.
+def _is_blocker(cover, target):
+    """True if `cover`, drawn after the tap target and covering its tap
+    point, would really steal the tap.
 
-    Play Store's Install button is a text node with an unlabeled Button drawn
-    after (on top of) it. That button is the real tap surface, not something
-    blocking it. It has no label of its own, fully contains the target, and
-    is button-sized (an unlabeled scrim that blocks taps spans the screen).
+    Most "covers" are harmless. Play Store's Install button is a text node
+    with an unlabeled Button drawn after it, which is the real tap surface;
+    Compose apps and web pages draw tabs, buttons and page content as
+    unlabeled Views. Refusing those made assistants waste minutes per tap.
+    Only these block: a dialog, sheet, popup or menu; something with its
+    own label (text or description) drawn on top; and a big clickable
+    unlabeled scrim that dims the screen behind a modal.
     Pure function: no adb, unit-testable."""
-    if target is None or cover.get("text") or cover.get("desc"):
-        return False
-    cr, tr = _bounds_rect(cover.get("bounds")), _bounds_rect(target.get("bounds"))
-    if not cr or not tr:
-        return False
-    contains = (cr[0] <= tr[0] and cr[1] <= tr[1]
-                and cr[2] >= tr[2] and cr[3] >= tr[3])
     cls = (cover.get("class") or "").lower()
-    # Compose apps draw buttons and tabs as plain android.view.View nodes,
-    # so don't insist on a Button class or a clickable flag. A dialog,
-    # sheet or popup is still a blocker.
     if any(k in cls for k in _OVERLAY_CLASS_HINTS):
+        return True
+    if cover.get("text") or cover.get("desc"):
+        return True
+    cr = _bounds_rect(cover.get("bounds"))
+    if not cr:
         return False
-    return contains and (cr[3] - cr[1]) <= 400 and cr[2] - cr[0] <= 1100
+    w, h = screen_dims()
+    area = max(0, cr[2] - cr[0]) * max(0, cr[3] - cr[1])
+    return bool(cover.get("clickable")) and area >= 0.4 * w * h
 
 
 def is_point_covered(nodes, x, y, exclude_node):
@@ -377,7 +378,8 @@ def is_point_covered(nodes, x, y, exclude_node):
 
     "Topmost" = latest in document order (walk() order: parents before
     children, siblings in order — later nodes paint on top). exclude_node is
-    skipped (the tap target itself); pass None to check every node.
+    skipped (the tap target itself); pass None to check every node. With a
+    target, only covers that would really steal the tap count (_is_blocker).
     Pure function: no adb, unit-testable."""
     idx = -1
     if exclude_node is not None:
@@ -389,7 +391,7 @@ def is_point_covered(nodes, x, y, exclude_node):
     for n in nodes[idx + 1:]:
         r = _bounds_rect(n.get("bounds"))
         if r and r[0] <= x <= r[2] and r[1] <= y <= r[3]:
-            if exclude_node is not None and _is_own_click_surface(n, exclude_node):
+            if exclude_node is not None and not _is_blocker(n, exclude_node):
                 continue
             cover = n
     return cover
