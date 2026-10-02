@@ -197,8 +197,10 @@ is paired, don't go quiet: post a short line as each finishing step completes.
 
 ### 1. Install
 
-Tell the user you're starting ("Setting up burner, I'll install it on my side
-first"), then run:
+Tell the user you're starting, and that they should leave the phone alone
+until you say it's their turn ("Setting up burner, I'll install it on my side
+first. Please don't touch the phone until I tell you it's your turn."), then
+run:
 
 ```bash
 curl -fsSL https://useburner.si/install.sh | bash
