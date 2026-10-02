@@ -1,0 +1,6 @@
+# Scripts run on Linux and macOS: keep them LF even when cloned with
+# core.autocrlf=true (WSL often inherits that from the Windows git config).
+*.sh text eol=lf
+*.py text eol=lf
+bin/* text eol=lf
+tools/hooks/* text eol=lf
