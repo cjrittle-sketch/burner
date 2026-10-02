@@ -90,6 +90,16 @@ fi
 chmod +x "$ROOT/bin/burner" || die "cannot chmod bin/burner"
 info "bin/burner is executable"
 
+# --- 7. restart the helpers --------------------------------------------------------
+# The scrcpy and u2 helpers keep running between commands. After an update they
+# would keep running the old code, so stop them; the next command restarts them.
+for name in scrcpy-mux u2-mux; do
+  if [ -f "$ROOT/run/$name.pid" ]; then
+    kill "$(cat "$ROOT/run/$name.pid")" 2>/dev/null || true
+  fi
+  rm -f "$ROOT/run/$name.pid" "$ROOT/run/$name.sock"
+done
+
 # --- next steps ------------------------------------------------------------------
 cat <<EOF
 

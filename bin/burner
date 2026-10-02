@@ -3467,7 +3467,28 @@ def cmd_update(args):
                        env=env)
     if r.returncode != 0:
         print("update failed (see above).", file=sys.stderr)
-    return r.returncode
+        return r.returncode
+    _stop_helper_daemons()
+    return 0
+
+
+def _stop_helper_daemons():
+    """Stop the long-running helpers (scrcpy mux, u2 mux) so the next command
+    starts them from the freshly updated code. Without this they keep
+    running the old code until killed by hand."""
+    import signal
+    for name in ("scrcpy-mux", "u2-mux"):
+        pidfile = os.path.join(ROOT, "run", name + ".pid")
+        try:
+            with open(pidfile) as f:
+                os.kill(int(f.read().strip()), signal.SIGTERM)
+        except (OSError, ValueError):
+            pass  # not running
+        for ext in (".pid", ".sock"):
+            try:
+                os.remove(os.path.join(ROOT, "run", name + ext))
+            except OSError:
+                pass
 
 
 UNINSTALL_STEPS = [
