@@ -964,15 +964,22 @@ def _capture_evidence(tag):
     Best-effort: never raises, never blocks the error report."""
     ev = {"screenshot": None, "screen": []}
     try:
-        # Screenshot via the repo's screenshot.sh (wakes screen, saves to shots/).
-        r = subprocess.run([os.path.join(ROOT, "screenshot.sh")],
-                           capture_output=True, text=True, timeout=30)
-        out = (r.stdout or "").strip().splitlines()
-        # screenshot.sh prints the saved path on its last line.
-        for line in reversed(out):
-            if line.endswith(".png") and os.path.exists(line):
-                ev["screenshot"] = line
-                break
+        # The UI helper's JPEG (~1s) first; screenshot.sh's adb PNG takes 3-4s.
+        ev["screenshot"] = shot_fast(os.path.join(ROOT, "shots", "{}-{}.jpg".format(
+            tag, time.strftime("%Y%m%d-%H%M%S"))))
+    except Exception:
+        pass
+    try:
+        if not ev["screenshot"]:
+            # Screenshot via the repo's screenshot.sh (wakes screen, saves to shots/).
+            r = subprocess.run([os.path.join(ROOT, "screenshot.sh")],
+                               capture_output=True, text=True, timeout=30)
+            out = (r.stdout or "").strip().splitlines()
+            # screenshot.sh prints the saved path on its last line.
+            for line in reversed(out):
+                if line.endswith(".png") and os.path.exists(line):
+                    ev["screenshot"] = line
+                    break
     except Exception:
         pass
     try:
@@ -2454,7 +2461,7 @@ def _scrcpy_swipe(direction):
     _trace("scroll wake {:.2f}s".format(time.time() - t0))
     t0 = time.time()
     try:
-        if not scrcpy_send("swipe {} {} {} {} 350".format(x1, y1, x2, y2)):
+        if not scrcpy_send("swipe {} {} {} {} 250".format(x1, y1, x2, y2)):
             return False
     except Exception:
         return False

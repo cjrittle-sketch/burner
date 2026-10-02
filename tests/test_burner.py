@@ -2002,7 +2002,7 @@ class FastPathTests(OfflineTestCase):
             rc = pc.cmd_scroll(SimpleNamespace(direction="down", times=3, to=None))
         self.assertEqual(rc, 1)
         self.assertEqual(sc.call_count, 2)
-        sc.assert_called_with("swipe 540 1920 540 480 350")
+        sc.assert_called_with("swipe 540 1920 540 480 250")
         adb.assert_not_called()
         self.assertIn("scroll left com.example", err.getvalue())
 
