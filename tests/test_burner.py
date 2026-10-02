@@ -1479,6 +1479,39 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(rc, 0)
         sw.assert_not_called()
 
+    def test_scrcpy_ping_sends_nothing_to_the_phone(self):
+        # ping used to send a BACK key-up, which pressed Back on the phone
+        # whenever a command healed the helpers.
+        sys.path.insert(0, os.path.join(pc.ROOT, "lib", "scrcpy"))
+        import scrcpy_ctl
+
+        class FakeSock:
+            def __init__(self, closed):
+                self.closed, self.sent = closed, []
+
+            def setblocking(self, flag):
+                pass
+
+            def settimeout(self, t):
+                pass
+
+            def recv(self, n, flags=0):
+                if self.closed:
+                    return b""
+                raise BlockingIOError()
+
+            def send(self, data):
+                self.sent.append(data)
+
+            sendall = send
+
+        ctl = scrcpy_ctl.ScrcpyControl.__new__(scrcpy_ctl.ScrcpyControl)
+        ctl.sock = FakeSock(closed=False)
+        self.assertTrue(ctl.ping())
+        self.assertEqual(ctl.sock.sent, [])  # nothing reached the phone
+        ctl.sock = FakeSock(closed=True)
+        self.assertFalse(ctl.ping())
+
     def test_screen_size_and_package_from_dump(self):
         xml = ('<hierarchy rotation="0">'
                '<node package="com.android.systemui" bounds="[0,0][1080,100]"/>'

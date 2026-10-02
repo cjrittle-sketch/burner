@@ -151,17 +151,28 @@ class ScrcpyControl:
         self._send(struct.pack(">BB", T_START_APP, len(name)) + name)
 
     def ping(self):
-        """Cheap liveness check: inject nothing, just verify the socket is open."""
+        """Liveness check that sends nothing to the phone.
+
+        It used to send BACK_OR_SCREEN_ON with ACTION_UP, but the scrcpy
+        server passes that straight to Android as a BACK key-up, which
+        pressed Back on the phone every time a command healed the helpers
+        (it ejected apps before a scroll or tap). Now: look at the socket
+        without reading it. A closed socket peeks as empty bytes; an idle
+        one has nothing to read.
+        """
         try:
-            self.sock.settimeout(2)
-            # BACK_OR_SCREEN_ON with ACTION_UP is a harmless no-op-ish probe;
-            # we only care that the send doesn't raise.
-            self._send(struct.pack(">BB", T_BACK_OR_SCREEN_ON, ACTION_UP))
-            return True
+            self.sock.setblocking(False)
+            try:
+                return self.sock.recv(1, socket.MSG_PEEK) != b""
+            except BlockingIOError:
+                return True  # open, nothing waiting
         except OSError:
             return False
         finally:
-            self.sock.settimeout(None)
+            try:
+                self.sock.settimeout(None)
+            except OSError:
+                pass
 
 
 def _mux_send(line, timeout=30):
