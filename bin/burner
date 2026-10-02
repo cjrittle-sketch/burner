@@ -3596,6 +3596,49 @@ def cmd_uninstall(args):
     return 0
 
 
+LOCKED_COMMANDS = {"tap", "type", "press", "scroll", "start", "open", "do",
+                   "recipe", "replay"}
+
+
+def _acquire_lock(path=None, timeout=120):
+    """Run one screen-changing burner command at a time per phone.
+
+    Assistants sometimes fire several burner commands at once (two taps, or a
+    tap and a swipe in parallel). They fight over the screen. Queue them
+    instead. Returns the held lock file, or None when locking isn't
+    available (Windows) or another burner command held it for `timeout`
+    seconds (then we run anyway rather than hang). Child burner processes
+    inherit BURNER_LOCK_HELD and skip the lock, so recipes can't deadlock."""
+    if os.environ.get("BURNER_LOCK_HELD"):
+        return None
+    try:
+        import fcntl
+    except ImportError:
+        return None
+    path = path or os.path.join(ROOT, "run", "burner.lock")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        f = open(path, "w")
+    except OSError:
+        return None
+    deadline = time.time() + timeout
+    told = False
+    while True:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            os.environ["BURNER_LOCK_HELD"] = "1"
+            return f
+        except OSError:
+            if time.time() >= deadline:
+                f.close()
+                return None
+            if not told:
+                print("waiting for another burner command to finish...",
+                      file=sys.stderr)
+                told = True
+            time.sleep(0.2)
+
+
 # Commands that legitimately run long or set their own time limit.
 WATCHDOG_EXEMPT = {"setup", "update", "do", "recipe", "replay", "wait", "vcode",
                    "gcode", "record", "sleep", "amazon-status", "uninstall",
@@ -3632,6 +3675,10 @@ def main():
     cmd_line = record_command_line(args)
     if cmd_line:
         record_log(cmd_line)
+    # Only commands that change the screen queue; reads (dump, shot, wait)
+    # stay free, so a `wait` can't hold back the tap it is waiting for.
+    _lock = (_acquire_lock() if sys.argv[1:2] and sys.argv[1] in
+             LOCKED_COMMANDS else None)  # noqa: F841 (held until exit)
     _arm_watchdog(args)
     sys.exit(args.fn(args))
 

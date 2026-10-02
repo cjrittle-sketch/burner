@@ -1523,6 +1523,33 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(pc.screen_dims(), (1080, 2400))
         self.assertEqual(pc.dump_package(root), "com.android.settings")
 
+    def test_commands_queue_behind_each_other(self):
+        # A fake fcntl so the logic is tested on every platform: flock
+        # raises OSError while another "process" holds the lock.
+        class FakeFcntl:
+            LOCK_EX, LOCK_NB = 2, 4
+            held = False
+
+            @classmethod
+            def flock(cls, f, flags):
+                if cls.held:
+                    raise OSError("locked")
+                cls.held = True
+
+        path = os.path.join(tempfile.mkdtemp(), "burner.lock")
+        env = {k: v for k, v in os.environ.items() if k != "BURNER_LOCK_HELD"}
+        with mock.patch.dict(os.environ, env, clear=True),                 mock.patch.dict(sys.modules, {"fcntl": FakeFcntl}):
+            first = pc._acquire_lock(path, timeout=1)
+            self.assertIsNotNone(first)
+            self.assertEqual(os.environ.get("BURNER_LOCK_HELD"), "1")
+            # Child burner processes inherit the flag and skip the lock.
+            self.assertIsNone(pc._acquire_lock(path, timeout=0.5))
+            # A second, separate command waits, then gives up and runs anyway.
+            os.environ.pop("BURNER_LOCK_HELD")
+            with self.cap():
+                self.assertIsNone(pc._acquire_lock(path, timeout=0.5))
+            first.close()
+
     def test_unlabeled_button_over_label_is_not_an_occluder(self):
         # Play Store: the "Install" text sits under an unlabeled Button that
         # is the real tap surface; burner used to refuse the tap as covered.
