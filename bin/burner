@@ -4452,9 +4452,15 @@ def cmd_update(args):
         print("update failed (see above).", file=sys.stderr)
         return r.returncode
     _stop_helper_daemons()
-    # Start the UI helper again now, so the next command isn't stuck on the
-    # slow adb path while it boots. (The scrcpy helper starts on first use.)
+    # Start both helpers again now, in the background, so the next command
+    # doesn't wait for them to boot (about 10s the first time).
     u2_start_background()
+    try:
+        subprocess.Popen([sys.executable, os.path.join(SCRCPY_DIR, "scrcpy_ctl.py"),
+                          "ping"], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        pass
     print("Updated. Re-read {} now: the instructions may have changed.".format(
         os.path.join(ROOT, "SKILL.md")))
     return 0
