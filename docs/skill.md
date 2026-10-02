@@ -22,6 +22,7 @@ isn't green, go to [Setup](#setup) first.
 | "What's on my burner?" or "Take a screenshot of my burner" | They mean the screen right now, not the installed apps. Take a screenshot and send the image (see below). |
 | "Check my Amazon order" | `burner amazon-status` does it in one step. |
 | "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed. |
+| "Update my burner" | Run `burner update`, then say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
 `burner apps` matches package names, not app names. Most match the app
@@ -337,9 +338,22 @@ on while charging", "Tailscale will now start by itself after a restart").
 
 ### 8. Wrap up
 
-Close with a short message about them, not the setup, e.g. "All done. Plug the
-phone into a charger and leave it there on Wi-Fi." (The screen only stays on
-while charging, which is why it lives on the charger.)
+Close with a short message about them, not the setup. Tell them to plug the
+phone in, give them a few things to try that start with "Use my burner to",
+and say how to keep it up to date. Something like:
+
+> All done. Plug the phone into a charger and leave it there on Wi-Fi.
+>
+> Whenever you want me to use it, just say "Use my burner to..." For example:
+> - "Use my burner to check my Amazon order."
+> - "Use my burner to keep my Snapchat streaks alive while I'm away."
+> - "Use my burner to find me a cabin on Airbnb for next weekend."
+> - "What's on my burner?" shows you its screen.
+>
+> Every so often, say "update my burner" and I'll grab the latest version.
+
+Pick examples that fit apps they've mentioned or that are on the phone. (The
+screen only stays on while charging, which is why it lives on the charger.)
 
 ## Security notes
 
