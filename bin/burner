@@ -469,10 +469,11 @@ def u2_invalidate():
     snap_invalidate()  # @eN handles from burner snap are now stale
 
 
-def fast_dump():
-    """UI hierarchy XML via uiautomator2 mux. None on failure."""
+def fast_dump(fresh=False):
+    """UI hierarchy XML via uiautomator2 mux. None on failure. fresh skips
+    the helper's 2-second cache (for re-reads that must see a change)."""
     t0 = time.time()
-    xml = u2sock("dump", timeout=40)
+    xml = u2sock("dump", "fresh" if fresh else "", timeout=40)
     if os.environ.get("BURNER_TRACE"):
         print("trace u2 dump {:.2f}s".format(time.time() - t0), file=sys.stderr)
     if xml is None and not os.path.exists(U2_SOCK):
@@ -491,10 +492,10 @@ def fast_dump():
 
 # ---------------------------------------------------------------- UI tree
 
-def ui_dump(retries=4):
+def ui_dump(retries=4, fresh=False):
     """Dump the UI hierarchy, retrying through app transitions/empty dumps.
     Fast path: uiautomator2 persistent server (~1s). Fallback: adb shell."""
-    root = fast_dump()
+    root = fast_dump(fresh=fresh)
     if root is not None:
         return root
     wake()  # screen timeout is 10s; dumps come back empty when asleep
@@ -1164,7 +1165,7 @@ def settle_lines(prev_lines, timeout=10, quiet=0.3, poll=0.1, prev_fp=None):
     t0 = time.time()
     waited = u2sock("idle", str(int(min(timeout, 3) * 1000)), timeout=timeout + 5)
     if waited not in (None, U2_NOT_FOUND):
-        nodes = walk(ui_dump())
+        nodes = walk(ui_dump(fresh=True))
         nxt = visible_lines(nodes)
         _trace("settle idle {}ms, read {:.2f}s".format(
             waited, time.time() - t0))
@@ -1181,7 +1182,7 @@ def settle_lines(prev_lines, timeout=10, quiet=0.3, poll=0.1, prev_fp=None):
         time.sleep(poll)
         if time.time() > deadline:
             break
-        nodes = walk(ui_dump())
+        nodes = walk(ui_dump(fresh=True))
         nxt = visible_lines(nodes)
         nxt_fp = screen_fingerprint(nodes)
         reads += 1
@@ -1189,13 +1190,16 @@ def settle_lines(prev_lines, timeout=10, quiet=0.3, poll=0.1, prev_fp=None):
             # Partial dump mid-transition: retry at 250/400/600ms.
             for wait in (0.25, 0.15, 0.2):
                 time.sleep(wait)
-                nodes = walk(ui_dump())
+                nodes = walk(ui_dump(fresh=True))
                 retry = visible_lines(nodes)
                 reads += 1
+                stable = retry == nxt and len(retry) > 0  # a real small screen
                 nxt = retry
                 nxt_fp = screen_fingerprint(nodes)
-                if not (len(cur) >= 12 and len(nxt) * 5 <= len(cur)):
+                if stable or not (len(cur) >= 12 and len(nxt) * 5 <= len(cur)):
                     break
+            else:
+                continue  # still half-drawn: don't report it as the screen
         # Same screen if EITHER text lines match OR structure fingerprint matches.
         # Fingerprint is immune to badge counts/timestamps that change text.
         same = (nxt == cur) or (prev_fp and nxt_fp == prev_fp and nxt_fp == cur_fp)
