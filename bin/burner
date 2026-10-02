@@ -2626,15 +2626,21 @@ def notification_rows(root):
             rows.append((" - ".join(words), y2))
     # A row, its group header and its collapsed copy repeat each other's
     # words: keep the longest and drop any row whose text is inside another.
-    keep = drop_repeats([t for t, _ in rows])
-    return [(t, y) for t, y in rows if t in keep]
+    texts = [t for t, _ in rows]
+    keep = set(i for i, t in enumerate(texts) if drop_repeats_at(texts, i))
+    return [r for i, r in enumerate(rows) if i in keep]
+
+
+def drop_repeats_at(texts, i):
+    """True if texts[i] is not repeated inside (or equal to) another text."""
+    t = texts[i]
+    return not any(t in o and (len(o) > len(t) or j < i)
+                   for j, o in enumerate(texts) if j != i)
 
 
 def drop_repeats(texts):
     """The texts that are not repeated inside (or equal to) another one."""
-    return [t for i, t in enumerate(texts)
-            if not any(t in o and (len(o) > len(t) or j < i)
-                       for j, o in enumerate(texts) if j != i)]
+    return [t for i, t in enumerate(texts) if drop_repeats_at(texts, i)]
 
 
 def parse_notifications(root):
