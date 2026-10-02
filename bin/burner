@@ -2655,6 +2655,7 @@ def cmd_notifications(args):
     # One adb call wakes the screen and pulls the shade down. The first dump
     # takes about as long as the shade does to open, so there is no sleep.
     adb_or_ensure("shell", "input keyevent 224; cmd statusbar expand-notifications")
+    u2_invalidate()  # a dump cached before the shade opened would show no rows
     lines = []
     try:
         for i in range(3):
