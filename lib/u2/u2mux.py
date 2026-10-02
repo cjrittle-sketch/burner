@@ -219,6 +219,10 @@ def ensure_server():
 DUMP_TTL = 2.0  # seconds a cached hierarchy dump stays valid
 
 
+# Commands that change the screen: never replayed after an error.
+NO_RETRY = {"tap", "swipe", "click_text", "set_text"}
+
+
 class U2Daemon:
     def __init__(self):
         import threading
@@ -472,6 +476,10 @@ class U2Daemon:
             # Return a sentinel; the caller decides what it means.
             return b"__NOT_FOUND__"
         except Exception as e:
+            if cmd in NO_RETRY:
+                # The phone may already have acted (the reply was lost, not
+                # the request). Replaying would tap or type twice.
+                raise
             # Maybe the on-device server died — reconnect once and retry.
             # The RLock makes concurrent handlers queue behind one reconnect.
             with self._lock:

@@ -208,13 +208,27 @@ U2_NOT_FOUND = "__NOT_FOUND__"
 
 U2_PID = os.path.join(ROOT, "run", "u2-mux.pid")
 U2_SRC = os.path.join(ROOT, "lib", "u2", "u2mux.py")
+U2_STARTING = os.path.join(ROOT, "run", "u2-mux.starting")
 _u2_checked = False
+# How the last u2sock call ended: "ok", "unsent" (never reached the daemon),
+# "err <msg>" (the daemon answered with an error) or "lost" (sent, but the
+# reply never came, so the phone may already have acted).
+_u2_status = "ok"
 
 
 def u2_start_background():
     """Start the u2 mux without waiting for it. Until it is up, callers use
-    the slower adb path; this call's successors get the fast one."""
+    the slower adb path; this call's successors get the fast one. Skipped if
+    a start began in the last 30s, so a burst of commands starts one."""
     try:
+        if time.time() - os.path.getmtime(U2_STARTING) < 30:
+            return
+    except OSError:
+        pass
+    try:
+        os.makedirs(os.path.dirname(U2_STARTING), exist_ok=True)
+        with open(U2_STARTING, "w"):
+            pass
         subprocess.Popen([U2CTL, "health"], stdout=subprocess.DEVNULL,
                          stderr=subprocess.DEVNULL, start_new_session=True)
     except OSError:
@@ -230,16 +244,25 @@ def u2_restart_if_stale():
         return
     _u2_checked = True
     try:
-        if os.path.getmtime(U2_SRC) <= os.path.getmtime(U2_PID):
+        src = os.path.getmtime(U2_SRC)
+        if src <= os.path.getmtime(U2_PID) or src > time.time():
             return
         with open(U2_PID) as f:
             pid = int(f.read().strip())
     except (OSError, ValueError):
         return
+    # The pid file outlives a crash or reboot; only signal our own daemon.
     try:
-        os.kill(pid, 15)
-    except OSError:
-        pass
+        cmdline = subprocess.run(["ps", "-o", "command=", "-p", str(pid)],
+                                 capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        cmdline = ""
+    if "u2mux.py" in cmdline:
+        try:
+            os.kill(pid, 15)
+        except OSError as e:
+            print("burner: couldn't stop the old UI helper ({})".format(e),
+                  file=sys.stderr)
     for path in (U2_SOCK, U2_PID):
         try:
             os.remove(path)
@@ -256,13 +279,16 @@ def u2sock(cmd, arg="", timeout=30):
     Returns payload str, None on transport failure, or U2_NOT_FOUND
     sentinel when the daemon reports an expected miss."""
     import socket
+    global _u2_status
     u2_restart_if_stale()
+    _u2_status = "unsent"
     s = None
     try:
         s = socket.socket(socket.AF_UNIX)
         s.settimeout(timeout)
         s.connect(U2_SOCK)
         s.sendall(("{} {}\n".format(cmd, arg)).encode())
+        _u2_status = "lost"
         buf = b""
         while b"\n" not in buf:
             chunk = s.recv(64)
@@ -271,7 +297,7 @@ def u2sock(cmd, arg="", timeout=30):
             buf += chunk
         head, rest = buf.split(b"\n", 1)
         parts = head.decode().strip().split(" ", 1)
-        if len(parts) != 2 or parts[0] != "ok":
+        if len(parts) != 2:
             return None
         n = int(parts[1])
         payload = rest
@@ -280,12 +306,31 @@ def u2sock(cmd, arg="", timeout=30):
             if not chunk:
                 return None
             payload += chunk
+        if parts[0] != "ok":
+            _u2_status = "err " + payload.decode("utf-8", "replace")
+            return None
+        _u2_status = "ok"
         return payload.decode()
     except Exception:
         return None
     finally:
         if s is not None:
             s.close()
+
+
+def u2_action(cmd, arg):
+    """Run a screen-changing command (tap, swipe) through the mux. True if
+    done or possibly done; False if the caller should use adb instead,
+    which is only safe when the mux never ran it: the mux wasn't reached,
+    or is an older one without the command. If the reply was lost, the
+    phone may already have acted, and a second try would act twice."""
+    if u2sock(cmd, arg, timeout=30) is not None:
+        return True
+    if _u2_status == "unsent" or _u2_status.startswith("err unknown command"):
+        return False
+    print("burner: the UI helper didn't confirm {} {} ({}); not retrying, "
+          "check the screen".format(cmd, arg, _u2_status[:80]), file=sys.stderr)
+    return True
 
 
 def u2_invalidate():
@@ -722,7 +767,7 @@ def tap_center(x, y, waker=None):
         waker.join()
     # One click RPC on the mux's open stream; adb spawns a client and a
     # shell per tap. Both use current-rotation pixels, like dump bounds.
-    if u2sock("tap", "{} {}".format(x, y), timeout=10) is not None:
+    if u2_action("tap", "{} {}".format(x, y)):
         snap_invalidate()
         return
     adb_or_ensure("shell", "input", "tap", x, y)
@@ -1507,8 +1552,15 @@ def cmd_state(args):
     # crosses the link) while the UI dump runs.
     import threading
     focus = {}
-    t = threading.Thread(target=lambda: focus.update(r=adb_or_ensure(
-        "shell", "dumpsys activity activities | grep mFocusedApp")), daemon=True)
+
+    def ask_focus():
+        try:
+            focus["r"] = adb_or_ensure(
+                "shell", "dumpsys activity activities | grep mFocusedApp")
+        except Exception as e:
+            print("couldn't read the focused app: {}".format(e), file=sys.stderr)
+
+    t = threading.Thread(target=ask_focus, daemon=True)
     t.start()
     nodes = walk(ui_dump())
     t.join()
@@ -1672,6 +1724,7 @@ def shot_fast(out):
 def cmd_shot(args):
     cmd = [os.path.join(ROOT, "screenshot.sh")]
     out = getattr(args, "out", None)
+    named = False  # True when we picked the file name ourselves
     if out:
         # screenshot.sh runs from the repo dir, so pass an absolute path.
         out = os.path.abspath(os.path.expanduser(out))
@@ -1680,6 +1733,7 @@ def cmd_shot(args):
             # would keep showing the old screenshot.
             out = os.path.join(out, "burner-{}.jpg".format(
                 time.strftime("%Y%m%d-%H%M%S")))
+            named = True
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     fast_out = out or os.path.join(ROOT, "shots", "shot-{}.jpg".format(
         time.strftime("%Y%m%d-%H%M%S")))
@@ -1687,6 +1741,8 @@ def cmd_shot(args):
         print(fast_out)
         return 0
     if out:
+        if named:
+            out = out[:-4] + ".png"  # our own name; the adb route makes PNGs
         cmd.append(out)
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     path = (r.stdout or "").strip().splitlines()[-1:] or [""]
@@ -2296,7 +2352,7 @@ def _scroll_swipe(direction):
     if os.environ.get("BURNER_DEBUG"):
         print("swipe {},{} -> {},{} on a {}x{} screen".format(
             x1, y1, x2, y2, w, h), file=sys.stderr)
-    if u2sock("swipe", "{} {} {} {} 350".format(x1, y1, x2, y2), timeout=10) is not None:
+    if u2_action("swipe", "{} {} {} {} 350".format(x1, y1, x2, y2)):
         snap_invalidate()
     else:
         adb_or_ensure("shell", "input", "swipe", x1, y1, x2, y2, 350)

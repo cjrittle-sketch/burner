@@ -1904,13 +1904,35 @@ class FastPathTests(OfflineTestCase):
         u2 = self.allow("u2sock", return_value="")
         adb = self.allow("adb_or_ensure")
         pc.tap_center(10, 20)
-        u2.assert_called_once_with("tap", "10 20", timeout=10)
+        u2.assert_called_once_with("tap", "10 20", timeout=30)
         adb.assert_not_called()
 
-    def test_tap_falls_back_to_adb(self):
+    def test_tap_falls_back_to_adb_when_mux_unreached(self):
         self.unguard("tap_center")
         self.allow("wake")
         self.allow("u2sock", return_value=None)
+        self.allow("_u2_status", new="unsent")
+        adb = self.allow("adb_or_ensure")
+        self.allow("u2_invalidate")
+        pc.tap_center(10, 20)
+        adb.assert_called_once_with("shell", "input", "tap", 10, 20)
+
+    def test_tap_lost_reply_does_not_tap_again(self):
+        self.unguard("tap_center")
+        self.allow("wake")
+        self.allow("u2sock", return_value=None)
+        self.allow("_u2_status", new="lost")
+        adb = self.allow("adb_or_ensure")
+        with self.cap() as (out, err):
+            pc.tap_center(10, 20)
+        adb.assert_not_called()
+        self.assertIn("not retrying", err.getvalue())
+
+    def test_tap_old_mux_without_command_uses_adb(self):
+        self.unguard("tap_center")
+        self.allow("wake")
+        self.allow("u2sock", return_value=None)
+        self.allow("_u2_status", new="err unknown command: tap")
         adb = self.allow("adb_or_ensure")
         self.allow("u2_invalidate")
         pc.tap_center(10, 20)
