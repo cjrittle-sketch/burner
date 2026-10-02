@@ -186,12 +186,48 @@ def dump_package(root):
     return max(counts, key=counts.get) if counts else None
 
 
+SCRCPY_PID = os.path.join(ROOT, "run", "scrcpy-mux.pid")
+_scrcpy_checked = False
+
+
+def scrcpy_restart_if_stale():
+    """Stop a scrcpy mux started before its code changed (a `git pull` or
+    update), so the next command starts it fresh. Once per process."""
+    global _scrcpy_checked
+    if _scrcpy_checked:
+        return
+    _scrcpy_checked = True
+    try:
+        src = max(os.path.getmtime(os.path.join(SCRCPY_DIR, f))
+                  for f in ("mux.py", "scrcpy_ctl.py"))
+        if src <= os.path.getmtime(SCRCPY_PID) or src > time.time():
+            return
+        with open(SCRCPY_PID) as f:
+            pid = int(f.read().strip())
+        cmdline = subprocess.run(["ps", "-o", "command=", "-p", str(pid)],
+                                 capture_output=True, text=True, timeout=5).stdout
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return
+    if "mux.py" not in cmdline:
+        return
+    try:
+        os.kill(pid, 15)
+    except OSError:
+        return
+    for name in ("scrcpy-mux.pid", "scrcpy-mux.sock"):
+        try:
+            os.remove(os.path.join(ROOT, "run", name))
+        except OSError:
+            pass
+
+
 def scrcpy_send(line):
     """Send a command to the scrcpy mux (persistent input channel)."""
     global _scrcpy_send
     if os.environ.get("BURNER_SCRCPY") == "0":
         # Test copies must not spawn a second scrcpy mux next to live's.
         raise RuntimeError("scrcpy disabled (BURNER_SCRCPY=0)")
+    scrcpy_restart_if_stale()
     if _scrcpy_send is None:
         sys.path.insert(0, SCRCPY_DIR)
         from scrcpy_ctl import _mux_send
@@ -2413,14 +2449,20 @@ def _scrcpy_swipe(direction):
     """One swipe over the scrcpy helper's open connection (no adb call).
     False if the helper isn't available."""
     x1, y1, x2, y2 = _swipe_coords(direction)
+    t0 = time.time()
     wake()
+    _trace("scroll wake {:.2f}s".format(time.time() - t0))
+    t0 = time.time()
     try:
         if not scrcpy_send("swipe {} {} {} {} 350".format(x1, y1, x2, y2)):
             return False
     except Exception:
         return False
+    _trace("scroll scrcpy swipe {:.2f}s".format(time.time() - t0))
     u2_invalidate()
-    time.sleep(0.6)
+    # The helper's swipe holds still before lifting, so there is no fling
+    # to wait out; this only lets the list redraw.
+    time.sleep(0.15)
     return True
 
 
@@ -2491,13 +2533,17 @@ def _scroll_plain(direction, times):
     open connection, and the UI helper's small device-info call gives the
     screen size and the app in front before and after each swipe, so leaving
     the app is still caught. Falls back to one adb call per swipe."""
+    t0 = time.time()
     dims = live_screen_dims()
+    _trace("scroll screen info {:.2f}s".format(time.time() - t0))
     if dims is not None and _screen_pkg:
         pkg = _screen_pkg
         for i in range(times):
             if not _scrcpy_swipe(direction):
                 return _scroll_plain_adb(direction, times - i)
+            t0 = time.time()
             now = _screen_pkg if live_screen_dims() else None
+            _trace("scroll front-app check {:.2f}s".format(time.time() - t0))
             if now not in (None, pkg):
                 print("scroll left {} (now in {}); stopped.".format(pkg, now),
                       file=sys.stderr)

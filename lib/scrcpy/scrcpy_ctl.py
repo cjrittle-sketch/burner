@@ -111,6 +111,13 @@ class ScrcpyControl:
             y = y1 + (y2 - y1) * t
             self._touch(ACTION_MOVE, x, y, buttons=BUTTON_PRIMARY, screen=screen)
             time.sleep(duration_ms / 1000 / steps)
+        # Hold still before lifting: the finger's speed at release is ~0, so
+        # the list moves exactly the swipe's length and stops, instead of
+        # flinging on for a second (the next screen read would catch it
+        # mid-motion, and a fling can skip past content).
+        time.sleep(0.1)
+        self._touch(ACTION_MOVE, x2, y2, buttons=BUTTON_PRIMARY, screen=screen)
+        time.sleep(0.05)
         self._touch(ACTION_UP, x2, y2, buttons=0, screen=screen)
 
     def text(self, s):
