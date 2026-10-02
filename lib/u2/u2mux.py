@@ -420,11 +420,12 @@ class U2Daemon:
         return b""
 
     def cmd_screen(self, _):
-        """"w h" of the screen at its current rotation, from one small
-        deviceInfo RPC (a full dump costs ~0.8s)."""
+        """"w h pkg": the screen at its current rotation and the app in
+        front, from one small deviceInfo RPC (a full dump costs ~0.8s)."""
         with self._lock:
             i = self.d.jsonrpc.deviceInfo()
-        return "{} {}".format(i["displayWidth"], i["displayHeight"]).encode()
+        return "{} {} {}".format(i["displayWidth"], i["displayHeight"],
+                                 i.get("currentPackageName") or "").strip().encode()
 
     def cmd_shot(self, arg):
         """Screenshot as base64. One RPC returning a JPEG (a few hundred KB)
