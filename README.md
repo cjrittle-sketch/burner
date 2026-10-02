@@ -58,16 +58,17 @@ phone in, leave it in a drawer, and never touch it again.
 
 ## Questions
 
-**Will it buy things on its own?**
-Never without your explicit okay. Every purchase, message, or post waits for
-your yes.
+**What do I need?**
+A spare Android phone, a free Tailscale account and 10 minutes. That's it.
+
+**Do I need to pay or sign up?**
+No. burner is free and open source, and there's no burner account or burner
+server. The one other app it uses, Tailscale, is free for personal use, so a
+normal setup at home costs nothing.
 
 **Does it work when I'm away from home?**
 Yes. The phone stays plugged in at home, and your AI assistant can use it from
 wherever you are.
-
-**What do I need?**
-A spare Android phone, a free Tailscale account and 10 minutes. That's it.
 
 **Is my stuff private?**
 Yes. It runs on your own phone, on your own Wi-Fi at home, not in someone
@@ -85,17 +86,19 @@ live.
 **What if the phone restarts?**
 It comes back on its own. You don't need to do anything.
 
-**Do I need to pay or sign up?**
-No. burner is free and open source, and there's no burner account or burner
-server. The one other app it uses, Tailscale, is free for personal use, so a
-normal setup at home costs nothing.
+**Will it buy things on its own?**
+Never without your explicit okay. Every purchase, message, or post waits for
+your yes.
+
+**Give me the technical details.**
+Start with [How it works](#how-it-works) below. The full setup steps and every
+command are in [SKILL.md](SKILL.md).
 
 **How do I get rid of it?**
 Just tell your AI assistant to uninstall burner.
 
-**Where can I find the technical details?**
-Start with [How it works](#how-it-works) below. The full setup steps and every
-command are in [SKILL.md](SKILL.md).
+**I like this.**
+Thanks. Let me know on X: [@tropoFarmer](https://x.com/tropoFarmer).
 
 ## Security notes
 
