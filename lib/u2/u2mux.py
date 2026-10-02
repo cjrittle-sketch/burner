@@ -419,16 +419,27 @@ class U2Daemon:
         self.invalidate()
         return b""
 
+    def cmd_screen(self, _):
+        """"w h" of the screen at its current rotation, from one small
+        deviceInfo RPC (a full dump costs ~0.8s)."""
+        with self._lock:
+            i = self.d.jsonrpc.deviceInfo()
+        return "{} {}".format(i["displayWidth"], i["displayHeight"]).encode()
+
     def cmd_shot(self, arg):
         """Screenshot as base64. One RPC returning a JPEG (a few hundred KB)
-        instead of a 1.5MB PNG over adb. arg "png" re-encodes it as PNG."""
+        instead of a 1.5MB PNG over adb. arg "png" re-encodes it as PNG.
+        The JPEG is 70% size: vision models shrink a 2400px-tall image to
+        about 1568px anyway, so full size only costs transfer time."""
         import base64
+        png = arg.strip() == "png"
         with self._lock:
             with _t("shot rpc"):
-                data = self.d.jsonrpc.takeScreenshot(1, 85)
+                data = self.d.jsonrpc.takeScreenshot(1 if png else 0.7,
+                                                     100 if png else 80)
         if not data:
             raise RuntimeError("takeScreenshot returned nothing")
-        if arg.strip() == "png":
+        if png:
             import io
             from PIL import Image
             buf = io.BytesIO()

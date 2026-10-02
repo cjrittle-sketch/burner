@@ -1969,6 +1969,35 @@ class FastPathTests(OfflineTestCase):
         self.assertEqual(adb.call_count, 1)
         self.assertIn("monkey -p 'com.example'", adb.call_args[0][1])
 
+    def test_plain_scroll_one_adb_call_and_no_dump(self):
+        self.allow("wake")
+        self.allow("u2_invalidate")
+        self.allow("live_screen_dims", return_value=(1080, 2400))
+        dump = self.allow("ui_dump")
+        focus = "  mCurrentFocus=Window{1 u0 com.example/com.example.Main}\n"
+        adb = self.allow("adb_or_ensure", return_value=SimpleNamespace(
+            stdout=focus + "@@burner@@\n@@burner@@\n" + focus, stderr="", returncode=0))
+        with mock.patch.object(pc.time, "sleep"), self.cap() as (out, err):
+            rc = pc.cmd_scroll(SimpleNamespace(direction="down", times=1, to=None))
+        self.assertEqual(rc, 0)
+        dump.assert_not_called()
+        self.assertEqual(adb.call_count, 1)
+        self.assertIn("input swipe 540 1920 540 480 350", adb.call_args[0][1])
+
+    def test_plain_scroll_stops_when_app_changes(self):
+        self.allow("wake")
+        self.allow("u2_invalidate")
+        self.allow("live_screen_dims", return_value=(1080, 2400))
+        out_txt = ("  mCurrentFocus=Window{1 u0 com.example/com.example.Main}\n"
+                   "@@burner@@\n@@burner@@\n"
+                   "  mCurrentFocus=Window{2 u0 com.android.launcher/x.Home}\n")
+        self.allow("adb_or_ensure", return_value=SimpleNamespace(
+            stdout=out_txt, stderr="", returncode=0))
+        with mock.patch.object(pc.time, "sleep"), self.cap() as (out, err):
+            rc = pc.cmd_scroll(SimpleNamespace(direction="down", times=3, to=None))
+        self.assertEqual(rc, 1)
+        self.assertIn("scroll left com.example", err.getvalue())
+
     def test_start_retries_from_home_when_another_app_stays_in_front(self):
         other = SimpleNamespace(
             stdout="  mFocusedApp=ActivityRecord{1 u0 com.android.vending/.X t3}\n",
