@@ -2100,6 +2100,9 @@ def _scroll_swipe(direction):
     x1, x2 = clamp(x1, w), clamp(x2, w)
     y1, y2 = clamp(y1, h), clamp(y2, h)
     wake()
+    if os.environ.get("BURNER_DEBUG"):
+        print("swipe {},{} -> {},{} on a {}x{} screen".format(
+            x1, y1, x2, y2, w, h), file=sys.stderr)
     adb_or_ensure("shell", "input", "swipe", x1, y1, x2, y2, 350)
     u2_invalidate()
     time.sleep(0.6)
