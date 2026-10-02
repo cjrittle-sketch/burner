@@ -73,6 +73,16 @@ class VerifyTests(unittest.TestCase):
         after = [{"text": "A", "y": 760}, {"text": "B", "y": 960}]
         self.assertLess(verify.movement(before, after, 2400), 0.3)
 
+    def test_fixed_chrome_doesnt_hide_a_scroll(self):  # Pixel 7a All apps
+        bar = [{"text": t, "y": 191} for t in ("Navigate up", "All apps", "Search")]
+        before = bar + [{"text": "A", "y": 1720}, {"text": "B", "y": 1914}]
+        after = bar + [{"text": "A", "y": 301}, {"text": "B", "y": 495}]
+        self.assertAlmostEqual(verify.movement(before, after, 2400), 1419 / 2400)
+
+    def test_nothing_moved_is_zero(self):
+        same = [{"text": "A", "y": 500}]
+        self.assertEqual(verify.movement(same, same, 2400), 0.0)
+
     def test_nothing_shared_means_moved_a_screen(self):
         self.assertIsNone(verify.movement([{"text": "A", "y": 1}], [{"text": "Z", "y": 1}], 2400))
 

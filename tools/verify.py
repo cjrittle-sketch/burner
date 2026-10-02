@@ -64,10 +64,14 @@ def burner(*argv, timeout=90):
     return r.returncode, r.stdout, r.stderr
 
 
-def dump():
-    # A failed read must fail the check: an empty list would pass as "the
-    # screen didn't change" or skip as "too short".
-    rc, out, err = burner("dump", "--json", "--all")
+def dump(fresh=True):
+    """The screen as burner sees it. fresh (the default) skips the UI
+    helper's 2s reuse, since open_settings changes the screen behind
+    burner's back; fresh=False reads what an agent's plain `dump` gets.
+    A failed read fails the check: an empty list would pass as "the screen
+    didn't change" or skip as "too short"."""
+    argv = ["dump", "--json", "--all"] + (["--fresh"] if fresh else [])
+    rc, out, err = burner(*argv)
     try:
         if rc == 0:
             return json.loads(out)["nodes"]
@@ -76,7 +80,20 @@ def dump():
     raise RuntimeError("dump exited {}: {}".format(rc, (err or out).strip()[-120:]))
 
 
+# Settings' search screen is its own app on Pixels, opened inside Settings'
+# task: one BACK only hides its keyboard, and starting Settings again then
+# brings the search screen back, not Settings home.
+SETTINGS_PKGS = ("com.android.settings", "com.google.android.settings.intelligence")
+
+
+def stop_settings():
+    adb_shell("; ".join("am force-stop " + p for p in SETTINGS_PKGS))
+
+
 def open_settings(action="android.settings.SETTINGS"):
+    # Stop Settings first: a plain start resumes it on whatever page an
+    # earlier check left open (Apps, after rowtap), not this one.
+    stop_settings()
     adb_shell("am start -W -a {}".format(action))
     time.sleep(1.5)
 
@@ -109,12 +126,16 @@ def labelled(nodes):
 
 def movement(before, after, h):
     """Fraction of the screen height the list moved, from labels on both
-    dumps. None when nothing is on both (moved more than a screen). Pure."""
+    dumps. None when nothing is on both (moved more than a screen). Labels
+    that stayed put (status bar, toolbar) are left out: on a phone's All
+    apps screen they are half the labels, and their zero shift made a 59%
+    scroll read as 0%. Pure."""
     a, b = labelled(before), labelled(after)
     common = [k for k in a if k in b]
     if not common or not h:
         return None
-    return abs(statistics.median(a[k] - b[k] for k in common)) / h
+    shifts = [a[k] - b[k] for k in common if a[k] != b[k]]
+    return abs(statistics.median(shifts)) / h if shifts else 0.0
 
 
 # ------------------------------------------------------------------ checks
@@ -127,7 +148,7 @@ def check_scroll():
     rc, _, err = burner("scroll", "down")
     if rc != 0:
         return "FAIL", "scroll down exited {}: {}".format(rc, err.strip()[-120:])
-    d1 = dump()
+    d1 = dump(fresh=False)  # what an agent's `dump` right after gets
     time.sleep(1.0)
     d2 = dump()
     burner("scroll", "top")
@@ -150,27 +171,43 @@ def check_rowtap():
 
 def check_dialog():
     open_settings("android.settings.DEVICE_INFO_SETTINGS")
-    before = dump()
-    labels = list(labelled(before))
+    # Settings can take a few seconds to draw About after a fresh start.
+    deadline = time.time() + 6
+    while True:
+        before = dump()
+        labels = list(labelled(before))
+        if "Device name" in labels or time.time() > deadline:
+            break
+        time.sleep(0.5)
     if "Device name" not in labels:
-        return "SKIP", "no 'Device name' row on this phone's About screen"
-    behind = next((l for l in labels if l not in ("Device name", "About phone")
-                   and len(l) > 3), None)
-    if behind is None:
-        return "SKIP", "no other label on the About screen to tap behind the dialog"
+        return "SKIP", "no 'Device name' row on the About screen (saw: {})".format(
+            ", ".join(labels[:6]) or "nothing")
     burner("tap", "Device name")
     time.sleep(1.0)
     during = dump()
     if labelled(during) == labelled(before):
         return "SKIP", "the Device name dialog didn't open"
+    # A row of the About list the dialog doesn't show itself ("Pixel 7a" is
+    # also its text field). The status bar and toolbar sit outside the
+    # dialog's scrim, so a tap there rightly goes through.
+    ys, top, shown = labelled(before), screen_height(before) * 0.15, labelled(during)
+    behind = next((l for l in labels if l not in ("Device name", "About phone")
+                   and l not in shown and len(l) > 3 and ys[l] > top), None)
+    if behind is None:
+        burner("press", "BACK")
+        return "SKIP", "no label behind the dialog to tap"
     rc, out, err = burner("tap", behind)
     burner("press", "BACK")
     if rc == 0:
         return "FAIL", "tap on '{}' behind the dialog went through".format(behind)
-    if "tap refused" not in err + out:  # a dropped phone also exits 1
-        return "FAIL", "tap on '{}' failed, but not as a refusal: {}".format(
-            behind, (err or out).strip()[-120:])
-    return "PASS", "tap on '{}' behind the dialog refused".format(behind)
+    # Either answer keeps the tap off the screen behind: refused (covered),
+    # or no match (some phones' reads hold only the dialog's window). A
+    # dropped phone also exits 1, so anything else fails.
+    for said, how in (("tap refused", "refused"), ("no match", "not found")):
+        if said in err + out:
+            return "PASS", "tap on '{}' behind the dialog {}".format(behind, how)
+    return "FAIL", "tap on '{}' failed, but not as a refusal: {}".format(
+        behind, ((err or out).strip().splitlines() or [""])[0][:120])
 
 
 def check_landscape():
@@ -189,7 +226,8 @@ def check_landscape():
         rc, out, err = burner("tap", "Search settings || Search")
         if rc != 0:
             status = "SKIP" if "no match" in err + out else "FAIL"
-            return status, (err or out).strip()[-160:]
+            msg = (err or out).strip()
+            return status, (msg.splitlines() or [""])[0][:160]
         time.sleep(1.0)
         if not any("EditText" in (n.get("class") or "") for n in dump()):
             return "FAIL", "tap returned ok but the search screen didn't open"
@@ -235,6 +273,10 @@ def main():
         results.append({"check": name, "status": status, "detail": detail})
         if not args.json:
             print("{:<5} {:<10} {}".format(status, name, detail), flush=True)
+    try:  # leave the phone on Settings home, search closed (see SETTINGS_PKGS)
+        open_settings()
+    except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+        print("couldn't put the phone back on Settings: {}".format(e), file=sys.stderr)
     if args.json:
         print(json.dumps(results))
     return 1 if any(r["status"] == "FAIL" for r in results) else 0

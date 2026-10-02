@@ -19,13 +19,16 @@ import sys
 import tempfile
 import time
 
+import verify  # same folder: its adb helper and Settings reset
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BURNER = os.path.join(ROOT, "bin", "burner")
 HISTORY = os.path.join(ROOT, "run", "bench-history.jsonl")
 SHOT = os.path.join(tempfile.gettempdir(), "burner-bench.jpg")
 
-# (name, argv). Order matters: start Settings before tapping in it, and
-# leave the phone where it started (Settings home).
+# (name, argv). Order matters: start Settings before tapping in it. Each
+# pass begins with Settings closed (untimed), so `start` and the search tap
+# measure the same thing every pass.
 COMMANDS = [
     ("help", ["--help"]),
     ("status", ["status"]),
@@ -36,10 +39,12 @@ COMMANDS = [
     ("notifications", ["notifications"]),
     ("apps", ["apps"]),
     ("start", ["start", "com.android.settings"]),
-    ("tap", ["tap", "Search settings || Search"]),
-    ("back", ["press", "BACK"]),
     ("scroll down", ["scroll", "down"]),
     ("scroll up", ["scroll", "up"]),
+    # Last: on Pixels search is its own app and one BACK only hides its
+    # keyboard, so a scroll after this would rightly stop ("left Settings").
+    ("tap", ["tap", "Search settings || Search"]),
+    ("back", ["press", "BACK"]),
 ]
 
 
@@ -87,6 +92,7 @@ def main():
 
     results = {name: {"runs": [], "exit": 0} for name, _ in cmds}
     for p in range(args.runs + 1):  # pass 0 is the cold/warm-up pass
+        verify.stop_settings()
         for name, argv in cmds:
             ms, rc, err = run_once(argv)
             if p == 0:
@@ -95,6 +101,7 @@ def main():
                 results[name]["runs"].append(round(ms))
             if rc != 0:
                 results[name]["exit"] = rc
+                results[name]["error"] = (err.strip().splitlines() or [""])[0][:160]
             if trace and p == args.runs:
                 sys.stderr.write("".join("    " + l + "\n" for l in err.splitlines()))
     for r in results.values():
@@ -110,12 +117,13 @@ def main():
         for name, r in results.items():
             print("{:<16} {:>6}ms {:>6}ms {:>6}ms  {}".format(
                 name, r["median"], r["max"], r.get("cold"),
-                "" if r["exit"] == 0 else "exit {}".format(r["exit"])))
+                "" if r["exit"] == 0 else "exit {}: {}".format(r["exit"], r.get("error", ""))))
         print("commit {}  phone {}".format((record["commit"] or "?")[:7], record["model"] or "?"))
     if args.save:
         os.makedirs(os.path.dirname(HISTORY), exist_ok=True)
         with open(HISTORY, "a") as f:
             f.write(json.dumps(record) + "\n")
+    verify.open_settings()  # leave the phone on Settings home
     # A failing command is a failed round, even if it failed last round too
     # (benchcmp only flags commands that newly fail).
     return 1 if any(r["exit"] != 0 for r in results.values()) else 0
