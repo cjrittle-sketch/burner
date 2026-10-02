@@ -4613,6 +4613,13 @@ def main():
               "the charger with the screen awake and that Tailscale is "
               "connected, then run `burner doctor`.", file=sys.stderr)
         sys.exit(1)
+    except RuntimeError as e:
+        if "kept coming back empty" not in str(e):
+            raise
+        print("burner: couldn't read the phone's screen. Check that it's on "
+              "the charger with the screen awake and that Tailscale is "
+              "connected, then run `burner ensure`.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

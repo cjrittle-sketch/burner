@@ -1802,6 +1802,17 @@ class SetupWizardTests(OfflineTestCase):
         self.assertTrue(f(127, "ping: not found")[0])
         self.assertTrue(f(1, "something odd")[0])
 
+    def test_main_reports_an_unreadable_screen_without_a_traceback(self):
+        fake = SimpleNamespace(fn=mock.Mock(side_effect=RuntimeError(
+            "uiautomator dump kept coming back empty: ''")))
+        err = io.StringIO()
+        with mock.patch.object(pc, "build_parser") as bp,                 mock.patch.object(pc, "record_command_line", return_value=None),                 mock.patch.object(pc, "_arm_watchdog"),                 mock.patch.object(sys, "argv", ["burner", "state"]),                 contextlib.redirect_stderr(err):
+            bp.return_value.parse_args.return_value = fake
+            with self.assertRaises(SystemExit) as cm:
+                pc.main()
+        self.assertEqual(cm.exception.code, 1)
+        self.assertIn("couldn't read the phone's screen", err.getvalue())
+
     def test_parse_status(self):
         nl = chr(10)
         st = pc.parse_status(
