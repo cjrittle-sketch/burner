@@ -2307,6 +2307,50 @@ def cmd_dismiss(args):
     return 0
 
 
+def parse_notifications(root):
+    """Notifications visible in the pulled-down shade, as one line each:
+    "App: title - text". Pure function over a uiautomator dump, no adb."""
+    items, cur = [], None
+    for n in root.iter("node"):
+        if n.attrib.get("package") != "com.android.systemui":
+            continue
+        rid = n.attrib.get("resource-id", "").rsplit("/", 1)[-1]
+        text = (n.attrib.get("text") or "").strip()
+        if not text:
+            continue
+        if rid == "app_name_text":
+            cur = {"app": text}
+            items.append(cur)
+        elif cur is not None and rid in ("title", "text", "big_text"):
+            key = "title" if rid == "title" else "text"
+            cur.setdefault(key, text)
+    out = []
+    for it in items:
+        body = " - ".join(x for x in (it.get("title"), it.get("text")) if x)
+        out.append("{}: {}".format(it["app"], body) if body else it["app"])
+    return out
+
+
+def cmd_notifications(args):
+    """Read the notifications the phone is showing, without touching them.
+    Pulls the shade down, reads it, closes it. Android hides notification
+    text from dumpsys, so the shade is the only place the words are."""
+    wake()
+    adb_or_ensure("shell", "cmd", "statusbar", "expand-notifications")
+    time.sleep(1.2)
+    try:
+        lines = parse_notifications(ui_dump())
+    finally:
+        adb_or_ensure("shell", "cmd", "statusbar", "collapse")
+        u2_invalidate()
+    if not lines:
+        print("no notifications")
+        return 0
+    for line in lines:
+        print(line)
+    return 0
+
+
 def cmd_apps(args):
     """List installed app packages, so the agent can prefer an installed app
     over a website. Exit 1 if a match was asked for and nothing matched."""
@@ -2484,6 +2528,10 @@ def build_parser():
     p.add_argument("--max", type=int, default=4,
                    help="most pop-ups to close in a row (default 4)")
     p.set_defaults(fn=cmd_dismiss)
+
+    p = sub.add_parser("notifications",
+                       help="read the notifications on the phone (changes nothing)")
+    p.set_defaults(fn=cmd_notifications)
 
     p = sub.add_parser("apps", help="list apps installed on the phone")
     p.add_argument("match", nargs="?",
@@ -2802,7 +2850,7 @@ def record_command_line(args):
         non_recordable = {"dump", "snap", "doctor", "state", "shot", "whereami",
                           "route", "forget", "record", "replay", "recipe", "do",
                           "ensure", "gcode", "vcode", "amazon-status", "setup",
-                          "uninstall", "update", "apps", "status", "dismiss",
+                          "uninstall", "update", "apps", "status", "dismiss", "notifications",
                           "recipes", "save"}
         if argv[0] in non_recordable:
             return None
@@ -3807,7 +3855,7 @@ def cmd_uninstall(args):
 
 
 LOCKED_COMMANDS = {"tap", "type", "press", "scroll", "start", "open", "do",
-                   "recipe", "replay", "dismiss"}
+                   "recipe", "replay", "dismiss", "notifications"}
 
 
 def _acquire_lock(path=None, timeout=120):

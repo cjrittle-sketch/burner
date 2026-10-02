@@ -1658,6 +1658,22 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(parts["b"], "three" + nl)
         self.assertEqual(pc.split_marked(""), {})
 
+    def test_parse_notifications(self):
+        def node(rid, text, pkg="com.android.systemui"):
+            return '<node package="{}" resource-id="{}" text="{}"/>'.format(
+                pkg, rid, text)
+        xml = "<hierarchy>" + "".join([
+            node("com.android.systemui:id/app_name_text", "Messenger"),
+            node("android:id/title", "Sam"),
+            node("android:id/text", "are you free?"),
+            node("com.android.systemui:id/app_name_text", "Gmail"),
+            node("android:id/title", "Receipt"),
+            node("android:id/title", "ignored", pkg="com.other"),
+        ]) + "</hierarchy>"
+        self.assertEqual(pc.parse_notifications(ET.fromstring(xml)),
+                         ["Messenger: Sam - are you free?", "Gmail: Receipt"])
+        self.assertEqual(pc.parse_notifications(ET.fromstring("<hierarchy/>")), [])
+
     def test_parse_status(self):
         nl = chr(10)
         st = pc.parse_status(
