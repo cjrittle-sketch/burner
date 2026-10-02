@@ -1,4 +1,4 @@
-> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev 0b784186: if `burner version` shows a different rev, run `burner update`.
+> Install: curl -fsSL https://useburner.si/install.sh | bash (full guide below). Skill rev 8e808d99: if `burner version` shows a different rev, run `burner update`.
 
 # burner
 
@@ -162,10 +162,13 @@ numbered `@e1`, `@e2` and so on, and `burner tap @e3` taps exactly that one
 with no re-matching. Handles only last for one screen: any tap, key press,
 typing or app launch throws them away.
 
-After an important tap, add `--settle`. It waits until the screen stops
-changing (half a second quiet, 10 seconds at most) and prints only what
-appeared or disappeared, or `unchanged`. Use it instead of dumping the screen
-again and again.
+When you need to know what a tap did, add `--settle`. It waits until the screen
+stops changing (half a second quiet, 10 seconds at most) and prints only what
+appeared or disappeared, or `unchanged`. It re-reads the screen at least twice,
+so it adds about 3 seconds: use it on taps whose result you must see, not on
+every tap, and don't follow it with `burner state` or a screenshot (it already
+told you). Waiting for a page or app to load: `burner wait "Text"`, not a fixed
+sleep.
 
 A plain `burner dump` can reuse a read from the last 2 seconds. When the
 screen changes on its own (a page loading, an app updating, someone using the
