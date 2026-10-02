@@ -1571,6 +1571,17 @@ class SetupWizardTests(OfflineTestCase):
         page = {"text": "", "desc": "", "class": "android.view.View",
                 "bounds": "[0,200][1080,2200]", "clickable": False}
         self.assertIsNone(pc.is_point_covered([label, page], 540, 1230, label))
+        # The same control twice (YouTube Music: a "Close" icon and a
+        # "Close" ViewGroup over it) is one button, not a blocker.
+        icon = {"text": "", "desc": "Close", "class": "android.widget.ImageView",
+                "bounds": "[940,150][990,200]", "clickable": False}
+        group = {"text": "", "desc": "Close", "class": "android.view.ViewGroup",
+                 "bounds": "[914,131][1009,226]", "clickable": True}
+        self.assertIsNone(pc.is_point_covered([icon, group], 961, 178, icon))
+        # Something else with its own label on top does block.
+        other = {"text": "Start free trial", "desc": "", "class": "android.view.ViewGroup",
+                 "bounds": "[914,131][1009,226]", "clickable": True}
+        self.assertIs(pc.is_point_covered([icon, other], 961, 178, icon), other)
         # A real dialog covering the label still counts.
         dialog = {"text": "Update?", "desc": "", "class": "android.app.Dialog",
                   "bounds": "[64,1000][1017,1400]", "clickable": False}

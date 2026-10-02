@@ -363,8 +363,13 @@ def _is_blocker(cover, target):
     cls = (cover.get("class") or "").lower()
     if any(k in cls for k in _OVERLAY_CLASS_HINTS):
         return True
-    if cover.get("text") or cover.get("desc"):
-        return True
+    cover_label = (cover.get("text") or cover.get("desc") or "").strip()
+    if cover_label:
+        # The same control twice: a ViewGroup described "Close" around or
+        # beside a "Close" icon is the button itself, not something on top.
+        target_label = ((target or {}).get("text")
+                        or (target or {}).get("desc") or "").strip()
+        return cover_label.lower() != target_label.lower()
     cr = _bounds_rect(cover.get("bounds"))
     if not cr:
         return False
