@@ -95,7 +95,7 @@ Start with [How it works](#how-it-works) below. The full setup steps and every
 command are in [SKILL.md](SKILL.md).
 
 **How do I get rid of it?**
-Just tell your AI assistant to uninstall burner.
+Just tell your AI assistant to uninstall burner and forget it ever existed.
 
 **I like this.**
 Thanks. Let me know on X: [@tropoFarmer](https://x.com/tropoFarmer).
