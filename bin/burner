@@ -626,6 +626,10 @@ def _looks_like_overlay(node, w, h):
         return False
     if short not in _CONTAINER_CLASSES:
         return False
+    # Inside a clickable ancestor (a list row's inner layout), it is part of
+    # that control: the tap lands on the row, which is what was asked.
+    if any(p.attrib.get("clickable") == "true" for p in node.get("parents", [])):
+        return False
     x1, y1, x2, y2 = r
     # A real dialog/popup is a modest floating box; a layout container
     # spans most of the screen width (toolbar, nav bar, list rows). And it

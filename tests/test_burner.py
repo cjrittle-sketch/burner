@@ -628,6 +628,12 @@ class JsonOutputTests(OfflineTestCase):
         self.assertFalse(pc._looks_like_overlay(toolbar, w, h))
         self.assertTrue(pc._looks_like_overlay(sheet_cls, w, h))
         self.assertFalse(pc._looks_like_overlay(fullscreen, w, h))
+        # Live false positive (2026-10-02, Settings home): a list row's inner
+        # RelativeLayout, inside the clickable row, refused a tap on the row.
+        row = ET.fromstring('<node clickable="true"/>')
+        inner = {"class": "android.widget.RelativeLayout",
+                 "bounds": "[189,1039][1038,1234]", "parents": [row]}
+        self.assertFalse(pc._looks_like_overlay(inner, w, h))
 
     def test_json_wait_timeout_errors_to_stderr(self):
         self.allow("u2sock", return_value=pc.U2_NOT_FOUND)
