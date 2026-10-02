@@ -156,18 +156,23 @@ def _update_screen_from_dump(root):
         _screen_wh = "{} {}".format(w, h)
 
 
+_screen_pkg = None  # app in front, from the last live_screen_dims()
+
+
 def live_screen_dims():
     """(w, h) at the current rotation from the UI helper's small device-info
-    call, so a plain scroll needn't dump the screen. None if unavailable."""
-    global _screen_wh
-    r = u2sock("screen", timeout=10)
+    call, so a plain scroll needn't dump the screen. Also notes the app in
+    front in _screen_pkg (None from an older helper). None if unavailable."""
+    global _screen_wh, _screen_pkg
+    parts = (u2sock("screen", timeout=10) or "").split()
     try:
-        w, h = (int(v) for v in (r or "").split())
-    except ValueError:
+        w, h = int(parts[0]), int(parts[1])
+    except (IndexError, ValueError):
         return None
     if w < 300 or h < 300:
         return None
     _screen_wh = "{} {}".format(w, h)
+    _screen_pkg = parts[2] if len(parts) > 2 else None
     return w, h
 
 
@@ -776,18 +781,21 @@ def wake_async():
 
 
 def tap_center(x, y, waker=None):
-    # Use adb input tap: orientation-aware and reliable. Scrcpy taps are
-    # faster (48ms vs 280ms) but the server's cached display metrics go stale
-    # when the foreground app rotates (Chrome forces landscape, launcher is
-    # portrait), causing taps to land wrong and background the app.
-    # Scrcpy is still used for keys (home/back/wake) which are orientation-independent.
+    # Fastest first: the scrcpy helper's open connection (a few ms; its
+    # server runs with video off, so it injects the raw current-rotation
+    # pixels, the same space as dump bounds), then one click RPC on the UI
+    # helper's stream (~0.5s), then adb (a client and a shell per tap).
     # waker: a wake_async() thread already in flight (overlaps the lookup).
     if waker is None:
         wake()
     else:
         waker.join()
-    # One click RPC on the mux's open stream; adb spawns a client and a
-    # shell per tap. Both use current-rotation pixels, like dump bounds.
+    try:
+        if scrcpy_send("tap {} {}".format(x, y)):
+            u2_invalidate()
+            return
+    except Exception:
+        pass
     if u2_action("tap", "{} {}".format(x, y)):
         snap_invalidate()
         return
@@ -2379,9 +2387,7 @@ def cmd_forget(args):
 
 # ------------------------------------------------------------------- main
 
-def _scroll_swipe(direction, want_focus=False):
-    """One swipe. With want_focus, also return the package in front, read
-    in the same adb call (each call costs ~0.3s over the link)."""
+def _swipe_coords(direction):
     w, h = screen_dims()
     cx, cy = w // 2, h // 2
     dx, dy = w * 3 // 10, h * 3 // 10
@@ -2397,10 +2403,32 @@ def _scroll_swipe(direction, want_focus=False):
         return max(int(hi * 0.05), min(int(hi * 0.95), v))
     x1, x2 = clamp(x1, w), clamp(x2, w)
     y1, y2 = clamp(y1, h), clamp(y2, h)
-    wake()
     if os.environ.get("BURNER_DEBUG"):
         print("swipe {},{} -> {},{} on a {}x{} screen".format(
             x1, y1, x2, y2, w, h), file=sys.stderr)
+    return x1, y1, x2, y2
+
+
+def _scrcpy_swipe(direction):
+    """One swipe over the scrcpy helper's open connection (no adb call).
+    False if the helper isn't available."""
+    x1, y1, x2, y2 = _swipe_coords(direction)
+    wake()
+    try:
+        if not scrcpy_send("swipe {} {} {} {} 350".format(x1, y1, x2, y2)):
+            return False
+    except Exception:
+        return False
+    u2_invalidate()
+    time.sleep(0.6)
+    return True
+
+
+def _scroll_swipe(direction, want_focus=False):
+    """One swipe. With want_focus, also return the package in front, read
+    in the same adb call (each call costs ~0.3s over the link)."""
+    x1, y1, x2, y2 = _swipe_coords(direction)
+    wake()
     # adb, not the UI helper: its swipe RPC injects ~70 steps and takes about
     # 2s, where `input swipe` takes about 0.75s.
     script = "input swipe {} {} {} {} 350".format(x1, y1, x2, y2)
@@ -2459,11 +2487,29 @@ def parse_focus(text):
 
 
 def _scroll_plain(direction, times):
-    """Scroll without reading the screen: one adb call per swipe, which also
-    reports the app in front before and after, so leaving the app is still
-    caught."""
-    if live_screen_dims() is None:
+    """Scroll without reading the screen. Swipes go over the scrcpy helper's
+    open connection, and the UI helper's small device-info call gives the
+    screen size and the app in front before and after each swipe, so leaving
+    the app is still caught. Falls back to one adb call per swipe."""
+    dims = live_screen_dims()
+    if dims is not None and _screen_pkg:
+        pkg = _screen_pkg
+        for i in range(times):
+            if not _scrcpy_swipe(direction):
+                return _scroll_plain_adb(direction, times - i)
+            now = _screen_pkg if live_screen_dims() else None
+            if now not in (None, pkg):
+                print("scroll left {} (now in {}); stopped.".format(pkg, now),
+                      file=sys.stderr)
+                return 1
+        print("scrolled {} x{}".format(direction, times))
+        return 0
+    if dims is None:
         ui_dump()  # refreshes the screen size
+    return _scroll_plain_adb(direction, times)
+
+
+def _scroll_plain_adb(direction, times):
     pkg = None
     for i in range(times):
         if i == 0:
@@ -2580,8 +2626,13 @@ def notification_rows(root):
             rows.append((" - ".join(words), y2))
     # A row, its group header and its collapsed copy repeat each other's
     # words: keep the longest and drop any row whose text is inside another.
-    texts = [t for t, _ in rows]
-    return [(t, y) for i, (t, y) in enumerate(rows)
+    keep = drop_repeats([t for t, _ in rows])
+    return [(t, y) for t, y in rows if t in keep]
+
+
+def drop_repeats(texts):
+    """The texts that are not repeated inside (or equal to) another one."""
+    return [t for i, t in enumerate(texts)
             if not any(t in o and (len(o) > len(t) or j < i)
                        for j, o in enumerate(texts) if j != i)]
 
@@ -2618,6 +2669,7 @@ def cmd_notifications(args):
     finally:
         adb_or_ensure("shell", "cmd", "statusbar", "collapse")
         u2_invalidate()
+    lines = drop_repeats(lines)  # the same row seen again after a scroll
     if not lines:
         print("no notifications")
         return 0

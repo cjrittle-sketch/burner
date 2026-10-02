@@ -1687,6 +1687,12 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(pc.notification_rows(ET.fromstring(xml))[-1][1], 1305)
         self.assertEqual(pc.parse_notifications(ET.fromstring("<hierarchy/>")), [])
 
+    def test_drop_repeats(self):
+        self.assertEqual(
+            pc.drop_repeats(["Muse - Stopped.", "Stopped.", "Timeout",
+                             "Timeout - Long", "Muse - Stopped."]),
+            ["Muse - Stopped.", "Timeout - Long"])
+
     def test_parse_status(self):
         nl = chr(10)
         st = pc.parse_status(
@@ -1970,6 +1976,35 @@ class FastPathTests(OfflineTestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(adb.call_count, 1)
         self.assertIn("monkey -p 'com.example'", adb.call_args[0][1])
+
+    def test_tap_prefers_scrcpy(self):
+        self.unguard("tap_center")
+        self.allow("wake")
+        sc = self.allow("scrcpy_send", return_value=True)
+        inv = self.allow("u2_invalidate")
+        u2 = self.allow("u2sock")
+        adb = self.allow("adb_or_ensure")
+        pc.tap_center(10, 20)
+        sc.assert_called_once_with("tap 10 20")
+        inv.assert_called_once()
+        u2.assert_not_called()
+        adb.assert_not_called()
+
+    def test_plain_scroll_via_scrcpy_checks_app_after_each_swipe(self):
+        self.allow("wake")
+        self.allow("u2_invalidate")
+        replies = iter(["1080 2400 com.example", "1080 2400 com.example",
+                        "1080 2400 com.android.launcher"])
+        self.allow("u2sock", side_effect=lambda *a, **k: next(replies))
+        sc = self.allow("scrcpy_send", return_value=True)
+        adb = self.allow("adb_or_ensure")
+        with mock.patch.object(pc.time, "sleep"), self.cap() as (out, err):
+            rc = pc.cmd_scroll(SimpleNamespace(direction="down", times=3, to=None))
+        self.assertEqual(rc, 1)
+        self.assertEqual(sc.call_count, 2)
+        sc.assert_called_with("swipe 540 1920 540 480 350")
+        adb.assert_not_called()
+        self.assertIn("scroll left com.example", err.getvalue())
 
     def test_plain_scroll_one_adb_call_and_no_dump(self):
         self.allow("wake")
