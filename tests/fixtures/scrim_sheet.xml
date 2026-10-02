@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- A modal bottom sheet over a page: a full-screen clickable scrim and the
+     sheet drawn after the page's "Buy now" button. A tap on "Buy now" must
+     be refused (it would close the sheet, not buy); the sheet's own
+     buttons stay tappable. -->
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" package="com.example.shop" bounds="[0,0][1080,2400]" clickable="false" text="" content-desc="" resource-id="">
+    <node class="android.view.ViewGroup" package="com.example.shop" bounds="[0,140][1080,2337]" clickable="false" text="" content-desc="" resource-id="">
+      <node class="android.widget.Button" package="com.example.shop" bounds="[60,2100][1020,2250]" clickable="true" text="Buy now" content-desc="" resource-id="" />
+    </node>
+    <node class="android.view.View" package="com.example.shop" bounds="[0,0][1080,2400]" clickable="true" text="" content-desc="" resource-id="com.example.shop:id/touch_outside" />
+    <node class="android.widget.LinearLayout" package="com.example.shop" bounds="[0,1500][1080,2400]" clickable="false" text="" content-desc="" resource-id="com.example.shop:id/sheet">
+      <node class="android.widget.TextView" package="com.example.shop" bounds="[60,1560][1020,1640]" clickable="false" text="Turn on notifications?" content-desc="" resource-id="" />
+      <node class="android.widget.Button" package="com.example.shop" bounds="[60,2150][520,2280]" clickable="true" text="Not now" content-desc="" resource-id="" />
+    </node>
+  </node>
+</hierarchy>

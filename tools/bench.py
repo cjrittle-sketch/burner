@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+"""Time burner's everyday commands against the phone.
+
+    python3 tools/bench.py                 # 3 runs after a warm-up, median/max table
+    python3 tools/bench.py --runs 5
+    python3 tools/bench.py --save          # also append to run/bench-history.jsonl
+    BURNER_TRACE=1 python3 tools/bench.py  # also show each adb call
+
+The first pass is reported separately as "cold": the first command after
+`burner update` or a helper restart is slow once, and mixing it into the
+median hid real changes last time. tools/benchcmp.py compares saved runs.
+"""
+import argparse
+import json
+import os
+import statistics
+import subprocess
+import sys
+import tempfile
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BURNER = os.path.join(ROOT, "bin", "burner")
+HISTORY = os.path.join(ROOT, "run", "bench-history.jsonl")
+SHOT = os.path.join(tempfile.gettempdir(), "burner-bench.jpg")
+
+# (name, argv). Order matters: start Settings before tapping in it, and
+# leave the phone where it started (Settings home).
+COMMANDS = [
+    ("help", ["--help"]),
+    ("status", ["status"]),
+    ("state", ["state"]),
+    ("dump", ["dump"]),
+    ("dump (cached)", ["dump"]),
+    ("shot", ["shot", "--out", SHOT]),
+    ("notifications", ["notifications"]),
+    ("apps", ["apps"]),
+    ("start", ["start", "com.android.settings"]),
+    ("tap", ["tap", "Search settings || Search"]),
+    ("back", ["press", "BACK"]),
+    ("scroll down", ["scroll", "down"]),
+    ("scroll up", ["scroll", "up"]),
+]
+
+
+def run_once(argv):
+    t0 = time.time()
+    r = subprocess.run([sys.executable, BURNER] + argv,
+                       capture_output=True, text=True, timeout=180)
+    ms = (time.time() - t0) * 1000
+    return ms, r.returncode, r.stderr
+
+
+def phone_model():
+    try:
+        r = subprocess.run([sys.executable, BURNER, "status", "--json"],
+                           capture_output=True, text=True, timeout=60)
+        return (json.loads(r.stdout) or {}).get("model")
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return None
+
+
+def commit():
+    try:
+        r = subprocess.run([sys.executable, BURNER, "version", "--json"],
+                           capture_output=True, text=True, timeout=30)
+        return (json.loads(r.stdout) or {}).get("commit")
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return None
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--runs", type=int, default=3, help="timed passes after the warm-up")
+    ap.add_argument("--save", action="store_true", help="append to " + HISTORY)
+    ap.add_argument("--json", action="store_true", help="print the record as JSON")
+    ap.add_argument("--only", help="comma-separated command names to run")
+    args = ap.parse_args()
+    cmds = COMMANDS
+    if args.only:
+        want = {w.strip() for w in args.only.split(",")}
+        cmds = [c for c in COMMANDS if c[0] in want]
+    trace = bool(os.environ.get("BURNER_TRACE"))
+
+    results = {name: {"runs": [], "exit": 0} for name, _ in cmds}
+    for p in range(args.runs + 1):  # pass 0 is the cold/warm-up pass
+        for name, argv in cmds:
+            ms, rc, err = run_once(argv)
+            if p == 0:
+                results[name]["cold"] = round(ms)
+            else:
+                results[name]["runs"].append(round(ms))
+            if rc != 0:
+                results[name]["exit"] = rc
+            if trace and p == args.runs:
+                sys.stderr.write("".join("    " + l + "\n" for l in err.splitlines()))
+    for r in results.values():
+        r["median"] = round(statistics.median(r["runs"])) if r["runs"] else None
+        r["max"] = max(r["runs"]) if r["runs"] else None
+
+    record = {"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "commit": commit(),
+              "model": phone_model(), "runs": args.runs, "results": results}
+    if args.json:
+        print(json.dumps(record))
+    else:
+        print("{:<16} {:>8} {:>8} {:>8}  {}".format("command", "median", "max", "cold", ""))
+        for name, r in results.items():
+            print("{:<16} {:>6}ms {:>6}ms {:>6}ms  {}".format(
+                name, r["median"], r["max"], r.get("cold"),
+                "" if r["exit"] == 0 else "exit {}".format(r["exit"])))
+        print("commit {}  phone {}".format((record["commit"] or "?")[:7], record["model"] or "?"))
+    if args.save:
+        os.makedirs(os.path.dirname(HISTORY), exist_ok=True)
+        with open(HISTORY, "a") as f:
+            f.write(json.dumps(record) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

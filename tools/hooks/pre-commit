@@ -1,0 +1,17 @@
+#!/bin/sh
+# burner pre-commit: skill copies in sync and the offline tests green.
+# Turn on once per checkout:  git config core.hooksPath tools/hooks
+# Skip in an emergency:       git commit --no-verify
+# It tests the working tree as it is (it never stashes: other sessions may
+# have edits in the same folder).
+cd "$(git rev-parse --show-toplevel)" || exit 1
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*) PY=python ;;   # python3 on Windows is often a Store stub
+  *) PY=$(command -v python3 || command -v python) ;;
+esac
+"$PY" tools/sync_skill.py --check || {
+  echo "pre-commit: run '$PY tools/sync_skill.py' and stage the copies."; exit 1; }
+out=$("$PY" -m unittest discover -s tests -q 2>&1) && exit 0
+printf '%s\n' "$out" | tail -n 30
+echo "pre-commit: tests failed (above). Fix them, or commit with --no-verify."
+exit 1

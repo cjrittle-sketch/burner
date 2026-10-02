@@ -53,6 +53,9 @@ else
   # Copy contents (including dotfiles) into DEST.
   (cd "$SRC" && tar -cf - .) | (cd "$DEST" && tar -xf -) || die "could not copy files into $DEST"
   : > "$DEST/$MARKER" || die "cannot write $DEST/$MARKER"
+  # GitHub tarballs carry their commit id; `burner version` reports it.
+  python3 -c 'import sys, tarfile; print(tarfile.open(sys.argv[1]).pax_headers.get("comment", ""))' \
+    "$TMPDIR_B/burner.tar.gz" > "$DEST/.burner-version" 2>/dev/null || rm -f "$DEST/.burner-version"
   info "extracted to $DEST"
 fi
 

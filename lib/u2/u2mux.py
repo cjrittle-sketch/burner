@@ -36,10 +36,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__
 WORKSPACE = os.environ.get("BURNER_WORKSPACE") or (
     ROOT if os.path.isdir(os.path.join(ROOT, ".android-tools"))
     else os.path.dirname(ROOT))
-# install.sh makes ROOT/.venv; older setups used WORKSPACE/.u2venv.
+# install.sh makes ROOT/.venv.
 VENV_PY = next((p for p in (
-    os.path.join(ROOT, ".venv", "bin", "python"),
-    os.path.join(WORKSPACE, ".u2venv", "bin", "python"))
+    os.path.join(ROOT, ".venv", "bin", "python"),)
     if os.path.exists(p)), sys.executable)
 SOCK_PATH = os.path.join(ROOT, "run", "u2-mux.sock")
 PID_PATH = os.path.join(ROOT, "run", "u2-mux.pid")
@@ -58,13 +57,28 @@ class U2NotFound(Exception):
 import contextlib
 import time as _time
 
+TRACE_FILE = os.path.join(ROOT, "run", "trace.jsonl")
+
+
 @contextlib.contextmanager
 def _t(label):
     t0 = _time.monotonic()
     try:
         yield
     finally:
-        log("%-24s %6.0fms" % (label, (_time.monotonic() - t0) * 1000))
+        ms = (_time.monotonic() - t0) * 1000
+        log("%-24s %6.0fms" % (label, ms))
+        # `BURNER_TRACE=json burner ...` creates the trace file; while it
+        # exists, RPC spans go there too, so tools/tracesum.py can place
+        # them inside the command that asked for them.
+        if os.path.exists(TRACE_FILE):
+            try:
+                with open(TRACE_FILE, "a") as f:
+                    f.write(json.dumps({"src": "u2mux", "step": label,
+                                        "ms": round(ms, 1),
+                                        "t": round(_time.time(), 3)}) + "\n")
+            except OSError:
+                pass
 
 
 class KeepAliveHTTP:

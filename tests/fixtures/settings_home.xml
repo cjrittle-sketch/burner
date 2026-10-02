@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- Reconstructed from the node list reported on Oct 2 (Pixel 7a, Settings
+     home). a point tap at 0.5,0.5 lands on the inner RelativeLayout of the
+     "Apps" row and was wrongly refused as covered by "". -->
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" package="com.android.settings" bounds="[0,0][1080,2400]" clickable="false" text="" content-desc="" resource-id="">
+    <node class="android.widget.LinearLayout" package="com.android.settings" bounds="[0,0][1080,2400]" clickable="false" text="" content-desc="" resource-id="">
+      <node class="android.widget.FrameLayout" package="com.android.settings" bounds="[0,0][1080,2400]" clickable="false" text="" content-desc="" resource-id="android:id/content">
+        <node class="android.widget.ScrollView" package="com.android.settings" bounds="[0,0][1080,2337]" clickable="false" text="" content-desc="" resource-id="">
+          <node class="android.widget.LinearLayout" package="com.android.settings" bounds="[0,120][1080,330]" clickable="true" text="" content-desc="" resource-id="com.android.settings:id/search_bar">
+            <node class="android.widget.TextView" package="com.android.settings" bounds="[160,180][800,270]" clickable="false" text="Search settings" content-desc="" resource-id="com.android.settings:id/search_action_bar_title" />
+          </node>
+          <node class="android.widget.ScrollView" package="com.android.settings" bounds="[0,349][1080,2337]" clickable="false" text="" content-desc="" resource-id="">
+            <node class="androidx.recyclerview.widget.RecyclerView" package="com.android.settings" bounds="[0,349][1080,2337]" clickable="false" text="" content-desc="" resource-id="com.android.settings:id/recycler_view">
+              <node class="android.widget.LinearLayout" package="com.android.settings" bounds="[0,844][1080,1039]" clickable="true" text="" content-desc="" resource-id="">
+                <node class="android.widget.RelativeLayout" package="com.android.settings" bounds="[189,844][1038,1039]" clickable="false" text="" content-desc="" resource-id="">
+                  <node class="android.widget.TextView" package="com.android.settings" bounds="[189,890][700,950]" clickable="false" text="Connected devices" content-desc="" resource-id="android:id/title" />
+                  <node class="android.widget.TextView" package="com.android.settings" bounds="[189,950][900,1000]" clickable="false" text="Bluetooth, pairing" content-desc="" resource-id="android:id/summary" />
+                </node>
+              </node>
+              <node class="android.widget.LinearLayout" package="com.android.settings" bounds="[0,1039][1080,1234]" clickable="true" text="" content-desc="" resource-id="">
+                <node class="android.widget.RelativeLayout" package="com.android.settings" bounds="[189,1039][1038,1234]" clickable="false" text="" content-desc="" resource-id="">
+                  <node class="android.widget.TextView" package="com.android.settings" bounds="[189,1085][400,1145]" clickable="false" text="Apps" content-desc="" resource-id="android:id/title" />
+                  <node class="android.widget.TextView" package="com.android.settings" bounds="[189,1145][1000,1195]" clickable="false" text="Assistant, recent apps, default apps" content-desc="" resource-id="android:id/summary" />
+                </node>
+              </node>
+            </node>
+          </node>
+        </node>
+      </node>
+    </node>
+  </node>
+</hierarchy>

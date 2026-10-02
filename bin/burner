@@ -23,6 +23,8 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
+_T0 = time.time()  # process start (after imports), for the trace's total
+
 HERE = os.path.dirname(os.path.realpath(__file__))
 ROOT = os.path.dirname(HERE)  # the burner folder, e.g. ~/burner
 # Tools (adb, older venvs) live in BURNER_WORKSPACE if set, else in this
@@ -65,10 +67,38 @@ def snap_invalidate():
         pass
 
 
+TRACE_FILE = os.path.join(ROOT, "run", "trace.jsonl")
+_TRACE_RUN = os.environ.get("BURNER_RUN_ID") or "{}-{}".format(
+    int(_T0 * 1000), os.getpid())
+_TRACE_SECS = re.compile(r"(\d+(?:\.\d+)?)s\b")
+
+
+def _trace_json(step, ms, t_end=None):
+    """Append one span to run/trace.jsonl when BURNER_TRACE=json. The UI
+    helper writes its RPC spans to the same file, so tools/tracesum.py can
+    lay out where a command's time went."""
+    if os.environ.get("BURNER_TRACE") != "json":
+        return
+    rec = {"src": "burner", "run": _TRACE_RUN,
+           "cmd": " ".join(sys.argv[1:3]), "step": step,
+           "ms": None if ms is None else round(ms, 1),
+           "t": round(t_end or time.time(), 3)}
+    try:
+        os.makedirs(os.path.dirname(TRACE_FILE), exist_ok=True)
+        with open(TRACE_FILE, "a") as f:
+            f.write(json.dumps(rec) + "\n")
+    except OSError:
+        pass
+
+
 def _trace(msg):
-    """Timing/debug line on stderr when BURNER_TRACE is set."""
+    """Timing/debug line on stderr when BURNER_TRACE is set. A "1.23s" in
+    the message becomes the span's duration in the JSON trace."""
     if os.environ.get("BURNER_TRACE"):
         print("trace " + msg, file=sys.stderr)
+        m = _TRACE_SECS.search(msg)
+        step = _TRACE_SECS.sub("", msg, count=1).replace("  ", " ").strip()
+        _trace_json(step, float(m.group(1)) * 1000 if m else None)
 
 
 def adb(*args, timeout=30):
@@ -77,10 +107,24 @@ def adb(*args, timeout=30):
         [ADB_BIN, "-s", TARGET] + [str(a) for a in args],
         capture_output=True, text=True, timeout=timeout)
     if os.environ.get("BURNER_TRACE"):
-        print("trace adb {:.2f}s {}".format(
-            time.time() - t0, " ".join(str(a) for a in args)[:70]),
-            file=sys.stderr)
+        _trace("adb {:.2f}s {}".format(
+            time.time() - t0, " ".join(str(a) for a in args)[:70]))
     return r
+
+
+def _trace_sleeps():
+    """With BURNER_TRACE on, log every fixed sleep as its own span: several
+    of the speed wins were waits that could be shortened."""
+    real_sleep = time.sleep
+
+    def traced_sleep(secs):
+        real_sleep(secs)
+        _trace("sleep {:.2f}s".format(secs))
+    time.sleep = traced_sleep
+
+
+def _trace_total():
+    _trace("total {:.2f}s".format(time.time() - _T0))
 
 
 def ensure(heal_fast_paths=True):
@@ -145,12 +189,14 @@ def _update_screen_from_dump(root):
     except ValueError:
         rot = 0
     _screen_wh = "2400 1080" if rot in (1, 3) else "1080 2400"
-    # Better than assuming a phone model: the biggest node bounds in the dump
-    # are the real screen size at the current rotation.
+    # Better than assuming a phone model: the biggest window-anchored node
+    # (starting at 0,0) is the real screen size at the current rotation.
+    # A dump with only a dialog's window in it has no such node; its box is
+    # not the screen, and --xy taps were scaled to the dialog's size.
     w = h = 0
     for n in root.iter("node"):
         m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds", ""))
-        if m:
+        if m and m.group(1) == "0" and m.group(2) == "0":
             w, h = max(w, int(m.group(3))), max(h, int(m.group(4)))
     if w >= 300 and h >= 300:
         _screen_wh = "{} {}".format(w, h)
@@ -915,13 +961,26 @@ def snap_resolve(handle):
 
 def cmd_dump(args):
     root = ui_dump()
+    if getattr(args, "save", None):
+        # The raw screen, for tests/fixtures/: replay it offline with
+        # plan_tap to fix a wrong tap decision without the phone.
+        with open(args.save, "wb") as f:
+            f.write(ET.tostring(root, encoding="utf-8"))
+        print("saved {}".format(args.save), file=sys.stderr)
     nodes = [n for n in walk(root)
              if compact_visible(n, args.all)
              # drop the <hierarchy> root itself (no class/label/clickable)
              and (n["class"] or node_label(n) or n["clickable"])]
     if as_json(args):
-        print(json.dumps({"ok": True,
-                          "nodes": [node_compact(n) for n in nodes]}))
+        out = []
+        for n in nodes:
+            d = node_compact(n)
+            if args.all:  # full detail: enough to debug a tap decision
+                d["bounds"] = n["bounds"]
+                if n["rid"]:
+                    d["rid"] = n["rid"]
+            out.append(d)
+        print(json.dumps({"ok": True, "nodes": out}))
         return 0
     if args.verbose:
         # Legacy format: label (+flags) [Class] [x1,y1][x2,y2]
@@ -1170,6 +1229,63 @@ def dedupe_same_control(hits):
     return kept
 
 
+def plan_tap(nodes, w, h, text=None, xy=None, fuzzy=False, index=None,
+             check=True):
+    """Decide what a tap would do on this screen, without touching the phone.
+
+    xy is a pixel point (from --xy or an @eN handle); otherwise text is the
+    label, with "a || b" fallbacks. Returns a dict with "action":
+      tap        xy, node (None for a point tap), moved (covered centre,
+                 so a free point inside the target is used instead)
+      refused    xy, cover (the node that would steal the tap)
+      ambiguous  used (the selector that matched), hits, fuzzy
+      nomatch / nobounds
+    Pure function: no adb. tests/test_fixtures.py replays saved screens
+    through it, so a wrong refusal can be fixed and proven offline."""
+    if xy is not None:
+        x, y = xy
+        if check:
+            cover = topmost_occluder(nodes, x, y, w, h)
+            if cover is not None:
+                return {"action": "refused", "xy": (x, y), "cover": cover}
+        return {"action": "tap", "xy": (x, y), "node": None, "moved": False}
+    # Fallback selectors: "a || b" tries each label in order (first hit wins).
+    selectors = [s.strip() for s in text.split("||")]
+    hits, used, fuzzy_used = [], selectors[0], False
+    for sel in selectors:
+        hits = find_nodes(nodes, sel, exact=not fuzzy)
+        if hits:
+            used = sel
+            break
+    if not hits and not fuzzy:
+        # Auto-retry with fuzzy match before giving up (saves a manual retry
+        # on long labels like Amazon order titles).
+        for sel in selectors:
+            hits = find_nodes(nodes, sel, exact=False)
+            if hits:
+                used, fuzzy_used = sel, True
+                break
+    if not hits:
+        return {"action": "nomatch"}
+    hits = dedupe_same_control(hits)
+    if len(hits) > 1 and index is None:
+        return {"action": "ambiguous", "used": used, "hits": hits,
+                "fuzzy": fuzzy_used}
+    node = hits[index] if index is not None and index < len(hits) else hits[0]
+    pt = clickable_target(node)
+    if pt[0] is None:
+        return {"action": "nobounds"}
+    moved = False
+    if check:
+        cover = is_point_covered(nodes, pt[0], pt[1], node)
+        if cover is not None:
+            alt = find_uncovered_point(node, nodes)
+            if alt is None:
+                return {"action": "refused", "xy": pt, "cover": cover}
+            pt, moved = alt, True
+    return {"action": "tap", "xy": pt, "node": node, "moved": moved}
+
+
 def cmd_tap(args):
     # Occlusion checking needs the local node list, so the daemon fast path
     # (on-device click / coord lookup) only runs with --no-occlusion-check.
@@ -1223,10 +1339,10 @@ def cmd_tap(args):
             nx, ny = xy_norm
             x, y = int(nx * w), int(ny * h)
             tap_label = "--xy {}".format(args.xy)
-        if not args.no_occlusion_check:
-            cover = topmost_occluder(nodes, x, y, w, h)
-            if cover is not None:
-                return _tap_refused(args, x, y, cover)
+        plan = plan_tap(nodes, w, h, xy=(x, y),
+                        check=not args.no_occlusion_check)
+        if plan["action"] == "refused":
+            return _tap_refused(args, x, y, plan["cover"])
         prev_lines = visible_lines(nodes) if args.settle else None
         prev_fp = screen_fingerprint(nodes)  # for nav memory (no extra dump)
         from_nodes = nodes  # for nav recording
@@ -1240,42 +1356,20 @@ def cmd_tap(args):
         nav_record_action(from_nodes, 'tap "{}"'.format(tap_label), to_fp=None, ok=True)
         return _tap_ok(args, tap_label, (x, y))
 
-    # Fallback selectors: "a || b" tries each label in order (first hit wins).
-    selectors = [s.strip() for s in args.text.split("||")]
-    hits, used, fuzzy_used = [], selectors[0], False
-    for sel in selectors:
-        hits = find_nodes(nodes, sel, exact=not args.fuzzy)
-        if hits:
-            used = sel
-            break
-    if not hits and not args.fuzzy:
-        # Auto-retry with fuzzy match before giving up (saves a manual retry
-        # on long labels like Amazon order titles).
-        for sel in selectors:
-            hits = find_nodes(nodes, sel, exact=False)
-            if hits:
-                used, fuzzy_used = sel, True
-                break
-    if not hits:
+    w, h = screen_dims()
+    plan = plan_tap(nodes, w, h, text=args.text, fuzzy=args.fuzzy,
+                    index=args.index, check=not args.no_occlusion_check)
+    if plan["action"] == "nomatch":
         return _tap_fail(args, 'no match for "{}"'.format(args.text))
-    hits = dedupe_same_control(hits)
-    if len(hits) > 1 and args.index is None:
-        return _tap_ambiguous(args, used, hits, fuzzy_used)
-    node = hits[args.index] if args.index is not None \
-        and args.index < len(hits) else hits[0]
-    xy = clickable_target(node)
-    if xy[0] is None:
+    if plan["action"] == "ambiguous":
+        return _tap_ambiguous(args, plan["used"], plan["hits"], plan["fuzzy"])
+    if plan["action"] == "nobounds":
         return _tap_fail(args, "match has no tappable bounds")
-    if not args.no_occlusion_check:
-        cover = is_point_covered(nodes, xy[0], xy[1], node)
-        if cover is not None:
-            alt = find_uncovered_point(node, nodes)
-            if alt is not None:
-                xy = alt
-                if not as_json(args):
-                    print("tap point covered, using {}".format(xy))
-            else:
-                return _tap_refused(args, xy[0], xy[1], cover)
+    if plan["action"] == "refused":
+        return _tap_refused(args, plan["xy"][0], plan["xy"][1], plan["cover"])
+    node, xy = plan["node"], plan["xy"]
+    if plan["moved"] and not as_json(args):
+        print("tap point covered, using {}".format(xy))
     tap_label = node["text"] or node["class"]
     prev_lines = visible_lines(nodes) if args.settle else None
     prev_fp = screen_fingerprint(nodes)  # for nav memory (no extra dump)
@@ -1833,8 +1927,12 @@ def cmd_shot(args):
         if os.path.isdir(out):
             # A new name every time: chat apps cache images by file name and
             # would keep showing the old screenshot.
-            out = os.path.join(out, "burner-{}.jpg".format(
+            # Two shots in the same second used to share a name.
+            stem = os.path.join(out, "burner-{}".format(
                 time.strftime("%Y%m%d-%H%M%S")))
+            out, n = stem + ".jpg", 2
+            while os.path.exists(out) or os.path.exists(out[:-4] + ".png"):
+                out, n = "{}-{}.jpg".format(stem, n), n + 1
             named = True
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     fast_out = out or os.path.join(ROOT, "shots", "shot-{}.jpg".format(
@@ -2843,7 +2941,9 @@ def build_parser():
     p.add_argument("--verbose", action="store_true",
                    help="legacy full format (label [Class] [x1,y1][x2,y2])")
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
-                   help="machine-readable JSON on stdout")
+                   help="machine-readable JSON on stdout (with --all: bounds, ids)")
+    p.add_argument("--save", metavar="FILE",
+                   help="also save the raw screen XML (for tests/fixtures/)")
     p.set_defaults(fn=cmd_dump)
 
     p = sub.add_parser("snap", help="numbered UI snapshot (@e1..@eN handles for tap)")
@@ -3019,6 +3119,12 @@ def build_parser():
     p = sub.add_parser("amazon-status",
                        help="latest Amazon order status (one-shot, stops at order list)")
     p.set_defaults(fn=cmd_amazon_status)
+
+    p = sub.add_parser("version",
+                       help="which burner build and skill revision this is")
+    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                   help="machine-readable JSON on stdout")
+    p.set_defaults(fn=cmd_version)
 
     p = sub.add_parser("doctor", help="run connectivity/health checks")
     p.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
@@ -3673,8 +3779,7 @@ def _run_pair(args):
 def _setup_find_apk():
     """Locate an adb-auto-enable APK locally or download v0.3.5. Returns path."""
     candidates = []
-    for base in (WORKSPACE, os.path.expanduser("~/.cache/burner"),
-                 os.path.expanduser("~/workspace")):
+    for base in (WORKSPACE, os.path.expanduser("~/.cache/burner")):
         try:
             for f in os.listdir(base):
                 if f.endswith(".apk") and "adb" in f.lower():
@@ -4171,6 +4276,50 @@ def _update_recipes():
     return 0
 
 
+def skill_rev(text):
+    """Short content hash of SKILL.md. tools/sync_skill.py prints the same
+    hash in the header of useburner.si/skill.md, so an assistant can tell
+    whether its installed copy matches the site's."""
+    import hashlib
+    return hashlib.sha256(
+        text.replace("\r\n", "\n").encode("utf-8")).hexdigest()[:8]
+
+
+def build_commit():
+    """Commit this install came from: .burner-version (written by the web
+    installer from the release tarball), else the git checkout's HEAD."""
+    try:
+        with open(os.path.join(ROOT, ".burner-version")) as f:
+            sha = f.read().strip()
+        if sha:
+            return sha
+    except OSError:
+        pass
+    try:
+        r = subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD"],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            return r.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def cmd_version(args):
+    sha = build_commit()
+    try:
+        with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as f:
+            rev = skill_rev(f.read())
+    except OSError:
+        rev = None
+    if as_json(args):
+        print(json.dumps({"ok": True, "commit": sha, "skill_rev": rev}))
+        return 0
+    print("burner {} (skill rev {})".format(
+        sha[:7] if sha else "unknown", rev or "unknown"))
+    return 0
+
+
 def cmd_update(args):
     """Re-run the web installer over this install. Keeps config.env, the
     phone pairing and your own recorded recipes; built-in recipes and burner
@@ -4344,6 +4493,10 @@ def main():
     _lock = (_acquire_lock() if sys.argv[1:2] and sys.argv[1] in
              LOCKED_COMMANDS else None)  # noqa: F841 (held until exit)
     _arm_watchdog(args)
+    if os.environ.get("BURNER_TRACE"):
+        import atexit
+        atexit.register(_trace_total)
+        _trace_sleeps()
     sys.exit(args.fn(args))
 
 

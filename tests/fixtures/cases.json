@@ -1,0 +1,20 @@
+[
+  {"screen": "settings_home.xml", "xy": [0.5, 0.5], "expect": "tap",
+   "why": "a point on a list row's inner layout is the row (false refusal, Oct 2)"},
+  {"screen": "settings_home.xml", "tap": "Apps", "expect": "tap"},
+  {"screen": "settings_home.xml", "tap": "Search settings || Search", "expect": "tap"},
+  {"screen": "play_install.xml", "tap": "Install", "expect": "tap",
+   "why": "one button drawn as a View and a TextView is not ambiguous (Oct 2)"},
+  {"screen": "close_icon.xml", "tap": "Close", "expect": "tap",
+   "why": "a Close icon inside a Close ViewGroup is one button (Oct 2)"},
+  {"screen": "close_icon.xml", "xy": [0.932, 0.09], "expect": "tap",
+   "why": "a 95px ViewGroup is an icon, not a dialog (Oct 2)"},
+  {"screen": "device_name_dialog.xml", "tap": "Model", "expect": "nomatch",
+   "why": "labels behind a dialog aren't in its dump, so can't be tapped"},
+  {"screen": "device_name_dialog.xml", "tap": "OK", "expect": "tap"},
+  {"screen": "device_name_dialog.xml", "xy": [0.805, 0.596], "expect": "tap", "at": [869, 1430],
+   "why": "--xy scales to the screen, not the dialog's box (dialog-only dump)"},
+  {"screen": "scrim_sheet.xml", "tap": "Buy now", "expect": "refused",
+   "why": "a modal sheet's scrim would take the tap"},
+  {"screen": "scrim_sheet.xml", "tap": "Not now", "expect": "tap"}
+]

@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- Reconstructed from Oct 2 reports: with About phone > Device name open,
+     the dump shows only the dialog's window. Labels behind it (Model, etc.)
+     are not in the dump at all. -->
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" package="com.android.settings" bounds="[66,880][1014,1520]" clickable="false" text="" content-desc="" resource-id="">
+    <node class="android.widget.LinearLayout" package="com.android.settings" bounds="[66,880][1014,1520]" clickable="false" text="" content-desc="" resource-id="com.android.settings:id/parentPanel">
+      <node class="android.widget.TextView" package="com.android.settings" bounds="[132,946][700,1020]" clickable="false" text="Device name" content-desc="" resource-id="android:id/alertTitle" />
+      <node class="android.widget.EditText" package="com.android.settings" bounds="[132,1080][948,1200]" clickable="true" text="Pixel 7a" content-desc="" resource-id="com.android.settings:id/edittext" />
+      <node class="android.widget.Button" package="com.android.settings" bounds="[560,1380][760,1480]" clickable="true" text="Cancel" content-desc="" resource-id="android:id/button2" />
+      <node class="android.widget.Button" package="com.android.settings" bounds="[780,1380][960,1480]" clickable="true" text="OK" content-desc="" resource-id="android:id/button1" />
+    </node>
+  </node>
+</hierarchy>

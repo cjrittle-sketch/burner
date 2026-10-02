@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- Reconstructed from Oct 2 reports (YouTube Music upsell): a small 95px
+     ViewGroup described "Close" holding an ImageView also described "Close".
+     The tap on it was refused as a "dialog" and the icon was treated as a
+     second, separate "Close". -->
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" package="com.google.android.apps.youtube.music" bounds="[0,0][1080,2400]" clickable="false" text="" content-desc="" resource-id="">
+    <node class="android.view.ViewGroup" package="com.google.android.apps.youtube.music" bounds="[0,140][1080,2337]" clickable="false" text="" content-desc="" resource-id="">
+      <node class="android.widget.TextView" package="com.google.android.apps.youtube.music" bounds="[60,900][1020,1000]" clickable="false" text="Try Premium free for 1 month" content-desc="" resource-id="" />
+      <node class="android.view.ViewGroup" package="com.google.android.apps.youtube.music" bounds="[960,170][1055,265]" clickable="true" text="" content-desc="Close" resource-id="">
+        <node class="android.widget.ImageView" package="com.google.android.apps.youtube.music" bounds="[980,190][1035,245]" clickable="false" text="" content-desc="Close" resource-id="" />
+      </node>
+    </node>
+  </node>
+</hierarchy>

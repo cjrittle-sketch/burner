@@ -1089,6 +1089,7 @@ class OfflineSafetyTests(OfflineTestCase):
         with self.assertRaises(AssertionError):
             pc.u2sock("dump")
 
+    @unittest.skipIf(os.name == "nt", "Unix sockets: burner runs on Linux and macOS")
     def test_guard_blocks_socket(self):
         import socket as _socket
         with self.assertRaises(AssertionError):
@@ -1100,6 +1101,7 @@ class OfflineSafetyTests(OfflineTestCase):
             capture_output=True, text=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    @unittest.skipIf(os.name == "nt", "Windows can't exec bin/burner by its shebang")
     def test_bin_burner_help_offline(self):
         env = dict(os.environ, BURNER_WORKSPACE=ROOT)
         r = subprocess.run(

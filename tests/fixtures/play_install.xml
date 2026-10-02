@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- Reconstructed from Oct 2 reports: Play Store's Install button is a View
+     described "Install" and a TextView reading "Install" at the same spot
+     (tap was refused as ambiguous), with an unlabeled Button drawn after
+     them that is the real tap surface. -->
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" package="com.android.vending" bounds="[0,0][1080,2400]" clickable="false" text="" content-desc="" resource-id="">
+    <node class="android.view.View" package="com.android.vending" bounds="[0,140][1080,2337]" clickable="false" text="" content-desc="" resource-id="">
+      <node class="android.widget.TextView" package="com.android.vending" bounds="[60,300][900,380]" clickable="false" text="Ring - Always Home" content-desc="" resource-id="" />
+      <node class="android.view.View" package="com.android.vending" bounds="[48,700][1032,820]" clickable="false" text="" content-desc="Install" resource-id="">
+        <node class="android.widget.TextView" package="com.android.vending" bounds="[480,735][600,785]" clickable="false" text="Install" content-desc="" resource-id="" />
+        <node class="android.widget.Button" package="com.android.vending" bounds="[48,700][1032,820]" clickable="true" text="" content-desc="" resource-id="" />
+      </node>
+    </node>
+  </node>
+</hierarchy>

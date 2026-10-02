@@ -223,6 +223,7 @@ Health and upkeep
   burner ensure                     reconnect everything (takes about 5 seconds)
   burner setup                      phone setup (see Setup)
   burner update [recipes]           update burner, or only its built-in recipes
+  burner version                    this build and its skill rev (compare with skill.md's header)
   burner uninstall [--yes]          undo the phone changes setup made (lists them without --yes)
 ```
 
