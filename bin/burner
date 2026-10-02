@@ -22,9 +22,12 @@ import time
 import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.realpath(__file__))
-ROOT = os.path.dirname(HERE)  # ~/workspace/phone-control
-# Shared tools live beside the tree (~/workspace); BURNER_WORKSPACE overrides.
-WORKSPACE = os.environ.get("BURNER_WORKSPACE", os.path.dirname(ROOT))
+ROOT = os.path.dirname(HERE)  # the burner folder, e.g. ~/burner
+# Tools (adb, older venvs) live in BURNER_WORKSPACE if set, else in this
+# tree (where install.sh puts them), else in the tree's parent (older layout).
+WORKSPACE = os.environ.get("BURNER_WORKSPACE") or (
+    ROOT if os.path.isdir(os.path.join(ROOT, ".android-tools"))
+    else os.path.dirname(ROOT))
 ADB_BIN = os.path.join(WORKSPACE, ".android-tools", "platform-tools", "adb")
 
 
@@ -1386,8 +1389,15 @@ def cmd_shot(args):
         os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
         cmd.append(out)
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    print(r.stdout.strip())
-    return r.returncode
+    path = (r.stdout or "").strip().splitlines()[-1:] or [""]
+    path = os.path.join(ROOT, path[0]) if path[0] and not os.path.isabs(path[0]) else path[0]
+    if r.returncode != 0 or not path or not os.path.isfile(path):
+        print("screenshot failed: {}".format(
+            ((r.stdout or "") + (r.stderr or "")).strip()[:200] or "no output"),
+            file=sys.stderr)
+        return 1
+    print(path)
+    return 0
 
 # ------------------------------------------------------- Gmail code pull
 

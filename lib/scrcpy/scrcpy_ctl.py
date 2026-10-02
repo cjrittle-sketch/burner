@@ -167,7 +167,10 @@ class ScrcpyControl:
 def _mux_send(line, timeout=30):
     """Send a command to the mux; start the mux daemon if not running."""
     import os as _os
-    run = _os.path.join(_os.path.expanduser("~"), "workspace", "phone-control", "run")
+    # The burner tree this file lives in (lib/scrcpy/scrcpy_ctl.py).
+    root = _os.path.dirname(_os.path.dirname(_os.path.dirname(
+        _os.path.realpath(__file__))))
+    run = _os.path.join(root, "run")
     sock_path = _os.path.join(run, "scrcpy-mux.sock")
 
     def _try():
@@ -191,8 +194,7 @@ def _mux_send(line, timeout=30):
     # start the mux daemon
     import subprocess as _sp
     _os.makedirs(run, exist_ok=True)
-    mux_py = _os.path.join(_os.path.expanduser("~"), "workspace", "phone-control",
-                           "lib", "scrcpy", "mux.py")
+    mux_py = _os.path.join(root, "lib", "scrcpy", "mux.py")
     _sp.Popen([sys.executable, mux_py],
               stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
               start_new_session=True)

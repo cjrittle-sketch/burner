@@ -22,7 +22,12 @@ cd "$(dirname "$0")"
 source ./config.env
 [ $# -eq 2 ] || { echo "usage: pair.sh <pairing-ip> <pairing-port>"; exit 1; }
 
-ADB=~/workspace/.android-tools/platform-tools/adb
+# adb: $BURNER_WORKSPACE, else this folder (install.sh puts it here), else
+# the folder above it (older layout).
+for d in "${BURNER_WORKSPACE:-}" "$PWD" "$(dirname "$PWD")"; do
+  [ -n "$d" ] && [ -x "$d/.android-tools/platform-tools/adb" ] && { ADB="$d/.android-tools/platform-tools/adb"; break; }
+done
+ADB="${ADB:-$(command -v adb)}"
 PAIR_LOCAL=15556
 
 # Tunnel the pairing port the same way as the ADB port.

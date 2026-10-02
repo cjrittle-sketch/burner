@@ -5,7 +5,7 @@ Holds ONE persistent scrcpy control connection (the server handles a single
 client per launch, then exits) and serves local commands over a unix socket,
 so every `burner` invocation gets ~5ms input without paying server startup.
 
-Unix socket: ~/workspace/phone-control/run/scrcpy-mux.sock
+Unix socket: <burner folder>/run/scrcpy-mux.sock
 Line protocol:  "tap 540 1200" | "swipe x1 y1 x2 y2 ms" | "key 4" |
                 "back" | "home" | "wake" | "text hello" | "scroll x y h v" |
                 "startapp com.pkg" | "ping"
@@ -24,11 +24,15 @@ import threading
 import time
 
 HOME = os.path.expanduser("~")
-BASE = os.path.join(HOME, "workspace", "phone-control")
+# The burner tree this file lives in (lib/scrcpy/mux.py).
+BASE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 RUN = os.path.join(BASE, "run")
 SOCK_PATH = os.path.join(RUN, "scrcpy-mux.sock")
 PID_PATH = os.path.join(RUN, "scrcpy-mux.pid")
-ADB = os.path.join(HOME, "workspace", ".android-tools", "platform-tools", "adb")
+ADB = next((p for p in (
+    os.path.join(d, ".android-tools", "platform-tools", "adb")
+    for d in (os.environ.get("BURNER_WORKSPACE"), BASE, os.path.dirname(BASE)) if d)
+    if os.path.exists(p)), "adb")
 ANDROID_SERIAL = os.environ.get("ANDROID_SERIAL", "127.0.0.1:15555")
 SCRCPY_PORT = int(os.environ.get("SCRCPY_PORT", "27183"))
 SERVER_APK_JAR = "/data/local/tmp/scrcpy-server.jar"
@@ -97,7 +101,7 @@ class Mux:
         self._kill_stale_server()
         self._ensure_forward()
         env = dict(os.environ, ANDROID_SERIAL=ANDROID_SERIAL,
-                   SCRCPY_PORT=str(SCRCPY_PORT))
+                   SCRCPY_PORT=str(SCRCPY_PORT), ADB=ADB)
         self.server_proc = subprocess.Popen(
             ["/bin/bash", SCRCPYD], env=env,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

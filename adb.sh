@@ -6,7 +6,12 @@ set -u
 cd "$(dirname "$0")"
 source ./config.env
 
-ADB=~/workspace/.android-tools/platform-tools/adb
+# adb: $BURNER_WORKSPACE, else this folder (install.sh puts it here), else
+# the folder above it (older layout).
+for d in "${BURNER_WORKSPACE:-}" "$PWD" "$(dirname "$PWD")"; do
+  [ -n "$d" ] && [ -x "$d/.android-tools/platform-tools/adb" ] && { ADB="$d/.android-tools/platform-tools/adb"; break; }
+done
+ADB="${ADB:-$(command -v adb)}"
 TARGET="127.0.0.1:${LOCAL_PORT}"
 
 ./tunnel.sh start >/dev/null 2>&1 || { echo "tunnel failed"; exit 1; }

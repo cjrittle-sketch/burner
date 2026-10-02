@@ -34,6 +34,9 @@ case "${1:-start}" in
       echo "tunnel already running (pid $(cat "$PIDFILE")): 127.0.0.1:$LOCAL_PORT -> $PHONE_TAILSCALE_IP:$ADB_PORT"
       exit 0
     fi
+    # A leftover socat (from an earlier run or setup) can still hold the
+    # port without a pid file, so the new one fails to bind. Clear it.
+    pkill -f "TCP-LISTEN:${LOCAL_PORT}," >/dev/null 2>&1 && sleep 0.5
     # -d -d for logging; fork so each adb connection gets its own tunnel leg.
     socat -d -d \
       "TCP-LISTEN:${LOCAL_PORT},bind=127.0.0.1,reuseaddr,fork" \

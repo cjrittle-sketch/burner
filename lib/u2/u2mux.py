@@ -29,10 +29,18 @@ import time
 
 # Paths derive from this file's real location (lib/u2/u2mux.py), so a copy
 # of the tree runs its own daemon. BURNER_WORKSPACE overrides where the shared
-# venv/adb live (default: the tree's parent, i.e. ~/workspace on live).
+# venv/adb live (see WORKSPACE below).
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-WORKSPACE = os.environ.get("BURNER_WORKSPACE", os.path.dirname(ROOT))
-VENV_PY = os.path.join(WORKSPACE, ".u2venv", "bin", "python")
+# Tools (adb, older venvs) live in BURNER_WORKSPACE if set, else in this
+# tree (where install.sh puts them), else in the tree's parent (older layout).
+WORKSPACE = os.environ.get("BURNER_WORKSPACE") or (
+    ROOT if os.path.isdir(os.path.join(ROOT, ".android-tools"))
+    else os.path.dirname(ROOT))
+# install.sh makes ROOT/.venv; older setups used WORKSPACE/.u2venv.
+VENV_PY = next((p for p in (
+    os.path.join(ROOT, ".venv", "bin", "python"),
+    os.path.join(WORKSPACE, ".u2venv", "bin", "python"))
+    if os.path.exists(p)), sys.executable)
 SOCK_PATH = os.path.join(ROOT, "run", "u2-mux.sock")
 PID_PATH = os.path.join(ROOT, "run", "u2-mux.pid")
 TARGET = "127.0.0.1:15555"
@@ -476,6 +484,9 @@ def find_node(xml, needle, fuzzy=True):
 
 
 def run_daemon():
+    # A fresh install has no run/ folder yet; without it bind() fails and
+    # the socket never appears.
+    os.makedirs(os.path.dirname(SOCK_PATH), exist_ok=True)
     # single instance
     if os.path.exists(SOCK_PATH):
         try:
@@ -528,9 +539,11 @@ def serve_conn(daemon, conn):
 def client(argv):
     """Send a command to the daemon, auto-starting it if needed."""
     def start_daemon():
+        os.makedirs(os.path.dirname(SOCK_PATH), exist_ok=True)
+        # Log to run/u2-mux.log so a daemon that dies on start can be seen.
+        logf = open(os.path.join(os.path.dirname(SOCK_PATH), "u2-mux.log"), "a")
         subprocess.Popen([VENV_PY, os.path.abspath(__file__), "daemon"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         start_new_session=True)
+                         stdout=logf, stderr=logf, start_new_session=True)
         for _ in range(100):
             if os.path.exists(SOCK_PATH):
                 break
