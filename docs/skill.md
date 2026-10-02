@@ -257,6 +257,12 @@ A few details:
 
 ## Setup
 
+**Check compatibility first.** burner currently works with the Muse assistant
+and an Android phone. If you are not Muse, or the user's spare phone is an
+iPhone, stop before installing anything and say so plainly: "burner works with
+Muse and Android phones for now. iPhone support is coming later." Then offer to
+help with anything else. Do not try a workaround.
+
 One time only. If the user asked you to set burner up, do every step below in
 order. `burner setup --list-steps` shows which steps are already done, so on a
 re-run skip ahead.
