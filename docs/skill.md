@@ -25,6 +25,7 @@ isn't green, go to [Setup](#setup) first.
 | "Install Snapchat" (any free app) | See "Installing apps" below. Never search the Play Store by tapping, and never tap by screen coordinates. |
 | "Check my burner" / "is my burner on?" / battery, storage | `burner status` answers it in one call. Don't dig through `dumpsys`, which can expose accounts and other personal details. |
 | "Do this every time" / "save that" / a task they repeat | See "Saving a task the user repeats" below: `burner save`. |
+| A short word or name you don't recognize ("about", "weekly-orders") | It may be a saved recipe. Run `burner recipes`; if one matches, `burner recipe <name>`. |
 | "Update my burner" | Run `burner update`, then re-read `~/burner/SKILL.md` (the instructions change with updates), and say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
