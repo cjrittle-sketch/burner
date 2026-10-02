@@ -2332,22 +2332,37 @@ def parse_notifications(root):
 
 
 def cmd_notifications(args):
-    """Read the notifications the phone is showing, without touching them.
-    Pulls the shade down, reads it, closes it. Android hides notification
-    text from dumpsys, so the shade is the only place the words are."""
+    """Summarise every notification the phone is showing, without touching
+    them. Pulls the shade down, reads it (scrolling for more), closes it.
+    Android hides notification text from dumpsys, so the shade is the only
+    place the words are."""
     wake()
     adb_or_ensure("shell", "cmd", "statusbar", "expand-notifications")
     time.sleep(1.2)
+    lines = []
     try:
-        lines = parse_notifications(ui_dump())
+        for _ in range(4):
+            fresh = [l for l in parse_notifications(ui_dump()) if l not in lines]
+            if not fresh:
+                break
+            lines += fresh
+            _scroll_swipe("down")
+            time.sleep(0.6)
     finally:
         adb_or_ensure("shell", "cmd", "statusbar", "collapse")
         u2_invalidate()
     if not lines:
         print("no notifications")
         return 0
+    apps = []
+    for l in lines:
+        a = l.split(":", 1)[0]
+        if a not in apps:
+            apps.append(a)
+    print("{} notification{} from {}".format(
+        len(lines), "" if len(lines) == 1 else "s", ", ".join(apps)))
     for line in lines:
-        print(line)
+        print("- " + line)
     return 0
 
 
