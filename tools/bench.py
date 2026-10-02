@@ -45,8 +45,11 @@ COMMANDS = [
 
 def run_once(argv):
     t0 = time.time()
-    r = subprocess.run([sys.executable, BURNER] + argv,
-                       capture_output=True, text=True, timeout=180)
+    try:
+        r = subprocess.run([sys.executable, BURNER] + argv,
+                           capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:  # one hung command mustn't lose the run
+        return (time.time() - t0) * 1000, 124, "timed out after 180s"
     ms = (time.time() - t0) * 1000
     return ms, r.returncode, r.stderr
 
@@ -113,7 +116,9 @@ def main():
         os.makedirs(os.path.dirname(HISTORY), exist_ok=True)
         with open(HISTORY, "a") as f:
             f.write(json.dumps(record) + "\n")
-    return 0
+    # A failing command is a failed round, even if it failed last round too
+    # (benchcmp only flags commands that newly fail).
+    return 1 if any(r["exit"] != 0 for r in results.values()) else 0
 
 
 if __name__ == "__main__":

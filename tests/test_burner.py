@@ -1534,6 +1534,15 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(pc.screen_dims(), (1080, 2400))
         self.assertEqual(pc.dump_package(root), "com.android.settings")
 
+    def test_screen_size_counts_the_nav_bar_window(self):
+        # An older app's window stops above the nav bar; the screen doesn't.
+        xml = ('<hierarchy rotation="0">'
+               '<node package="com.example" bounds="[0,0][1080,2274]"/>'
+               '<node package="com.android.systemui" bounds="[0,2274][1080,2400]"/>'
+               '</hierarchy>')
+        pc._update_screen_from_dump(pc.ET.fromstring(xml))
+        self.assertEqual(pc.screen_dims(), (1080, 2400))
+
     def test_commands_queue_behind_each_other(self):
         # A fake fcntl so the logic is tested on every platform: flock
         # raises OSError while another "process" holds the lock.

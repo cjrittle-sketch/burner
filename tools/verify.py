@@ -50,8 +50,12 @@ def _target():
 
 
 def adb_shell(cmd):
-    return subprocess.run([_adb_path(), "-s", _target(), "shell", cmd],
-                          capture_output=True, text=True, timeout=30).stdout.strip()
+    r = subprocess.run([_adb_path(), "-s", _target(), "shell", cmd],
+                       capture_output=True, text=True, timeout=30)
+    if r.returncode != 0:
+        raise RuntimeError("adb shell {!r} exited {}: {}".format(
+            cmd, r.returncode, (r.stderr or r.stdout).strip()[-120:]))
+    return r.stdout.strip()
 
 
 def burner(*argv, timeout=90):
@@ -61,11 +65,15 @@ def burner(*argv, timeout=90):
 
 
 def dump():
-    rc, out, _ = burner("dump", "--json", "--all")
+    # A failed read must fail the check: an empty list would pass as "the
+    # screen didn't change" or skip as "too short".
+    rc, out, err = burner("dump", "--json", "--all")
     try:
-        return json.loads(out)["nodes"]
+        if rc == 0:
+            return json.loads(out)["nodes"]
     except (ValueError, KeyError):
-        return []
+        pass
+    raise RuntimeError("dump exited {}: {}".format(rc, (err or out).strip()[-120:]))
 
 
 def open_settings(action="android.settings.SETTINGS"):
@@ -148,6 +156,8 @@ def check_dialog():
         return "SKIP", "no 'Device name' row on this phone's About screen"
     behind = next((l for l in labels if l not in ("Device name", "About phone")
                    and len(l) > 3), None)
+    if behind is None:
+        return "SKIP", "no other label on the About screen to tap behind the dialog"
     burner("tap", "Device name")
     time.sleep(1.0)
     during = dump()
@@ -157,15 +167,23 @@ def check_dialog():
     burner("press", "BACK")
     if rc == 0:
         return "FAIL", "tap on '{}' behind the dialog went through".format(behind)
+    if "tap refused" not in err + out:  # a dropped phone also exits 1
+        return "FAIL", "tap on '{}' failed, but not as a refusal: {}".format(
+            behind, (err or out).strip()[-120:])
     return "PASS", "tap on '{}' behind the dialog refused".format(behind)
 
 
 def check_landscape():
     acc = adb_shell("settings get system accelerometer_rotation")
     rot = adb_shell("settings get system user_rotation")
+    if not (acc.isdigit() and rot.isdigit()):
+        # Can't read them back, so can't put them back: leave rotation alone.
+        return "SKIP", "couldn't read the rotation settings ({!r}, {!r})".format(acc, rot)
     try:
         adb_shell("settings put system accelerometer_rotation 0; "
                   "settings put system user_rotation 1")
+        if adb_shell("settings get system user_rotation") != "1":
+            return "SKIP", "the phone didn't accept the landscape setting"
         open_settings()
         time.sleep(1.0)
         rc, out, err = burner("tap", "Search settings || Search")
@@ -179,8 +197,7 @@ def check_landscape():
     finally:
         burner("press", "BACK")
         adb_shell("settings put system user_rotation {}; "
-                  "settings put system accelerometer_rotation {}".format(
-                      rot if rot.isdigit() else 0, acc if acc.isdigit() else 1))
+                  "settings put system accelerometer_rotation {}".format(rot, acc))
 
 
 def check_shot():

@@ -18,7 +18,7 @@ ok()  { echo "PASS $*"; }
 bad() { echo "FAIL $*"; fail=1; }
 
 # Same file set the release tarball has: tracked files only, no .git.
-(cd "$SRC" && git ls-files -z | xargs -0 tar -cf - 2>/dev/null) | (cd "$DEST" && tar -xf -)
+(cd "$SRC" && git ls-files -z | tar --null -T - -cf -) | (cd "$DEST" && tar -xf -)
 : > "$DEST/.burner-web-install"
 touch "$T/before"
 sleep 1
@@ -45,8 +45,13 @@ if timeout 150 "$B" doctor >"$T/doctor.log" 2>&1; then
   bad "doctor says healthy with no phone"
 else
   rc=$?
-  [ $rc -eq 124 ] && bad "doctor hung (150s)" \
-    || ok "doctor reports no phone, exit $rc, $(( $(date +%s) - s ))s"
+  if [ $rc -eq 124 ]; then
+    bad "doctor hung (150s)"
+  elif grep -q Traceback "$T/doctor.log"; then
+    bad "doctor crashed:"; tail -5 "$T/doctor.log"
+  else
+    ok "doctor reports no phone, exit $rc, $(( $(date +%s) - s ))s"
+  fi
 fi
 
 echo "my-own-flow: steps" > "$DEST/recipes/my-own.burner"

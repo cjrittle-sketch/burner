@@ -58,6 +58,7 @@ import contextlib
 import time as _time
 
 TRACE_FILE = os.path.join(ROOT, "run", "trace.jsonl")
+TRACE_WINDOW_S = 60
 
 
 @contextlib.contextmanager
@@ -68,10 +69,15 @@ def _t(label):
     finally:
         ms = (_time.monotonic() - t0) * 1000
         log("%-24s %6.0fms" % (label, ms))
-        # `BURNER_TRACE=json burner ...` creates the trace file; while it
-        # exists, RPC spans go there too, so tools/tracesum.py can place
-        # them inside the command that asked for them.
-        if os.path.exists(TRACE_FILE):
+        # `BURNER_TRACE=json burner ...` touches the trace file as it starts;
+        # for a minute after that, RPC spans go there too, so
+        # tools/tracesum.py can place them inside the command that asked
+        # for them. Untraced use later doesn't keep growing the file.
+        try:
+            tracing = _time.time() - os.path.getmtime(TRACE_FILE) < TRACE_WINDOW_S
+        except OSError:
+            tracing = False
+        if tracing:
             try:
                 with open(TRACE_FILE, "a") as f:
                     f.write(json.dumps({"src": "u2mux", "step": label,

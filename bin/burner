@@ -71,6 +71,7 @@ TRACE_FILE = os.path.join(ROOT, "run", "trace.jsonl")
 _TRACE_RUN = os.environ.get("BURNER_RUN_ID") or "{}-{}".format(
     int(_T0 * 1000), os.getpid())
 _TRACE_SECS = re.compile(r"(\d+(?:\.\d+)?)s\b")
+_TRACE_TYPED = re.compile(r"(input text |ADB_INPUT_TEXT ).*")
 
 
 def _trace_json(step, ms, t_end=None):
@@ -79,8 +80,11 @@ def _trace_json(step, ms, t_end=None):
     lay out where a command's time went."""
     if os.environ.get("BURNER_TRACE") != "json":
         return
+    # The file outlives the run: keep typed text (passwords, codes) out of it.
+    cmd = " ".join(sys.argv[1:2 if sys.argv[1:2] == ["type"] else 3])
+    step = _TRACE_TYPED.sub(r"\1…", step)
     rec = {"src": "burner", "run": _TRACE_RUN,
-           "cmd": " ".join(sys.argv[1:3]), "step": step,
+           "cmd": cmd, "step": step,
            "ms": None if ms is None else round(ms, 1),
            "t": round(t_end or time.time(), 3)}
     try:
@@ -189,14 +193,16 @@ def _update_screen_from_dump(root):
     except ValueError:
         rot = 0
     _screen_wh = "2400 1080" if rot in (1, 3) else "1080 2400"
-    # Better than assuming a phone model: the biggest window-anchored node
-    # (starting at 0,0) is the real screen size at the current rotation.
-    # A dump with only a dialog's window in it has no such node; its box is
-    # not the screen, and --xy taps were scaled to the dialog's size.
+    # Better than assuming a phone model: the far corner of the nodes that
+    # touch the screen's left or top edge is the real screen size at the
+    # current rotation (the nav bar's window counts, so an app window that
+    # stops above it doesn't shrink the screen). A dump with only a centred
+    # dialog in it has no such node; its box is not the screen, and --xy
+    # taps were scaled to the dialog's size.
     w = h = 0
     for n in root.iter("node"):
         m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds", ""))
-        if m and m.group(1) == "0" and m.group(2) == "0":
+        if m and (m.group(1) == "0" or m.group(2) == "0"):
             w, h = max(w, int(m.group(3))), max(h, int(m.group(4)))
     if w >= 300 and h >= 300:
         _screen_wh = "{} {}".format(w, h)
@@ -4497,6 +4503,7 @@ def main():
         import atexit
         atexit.register(_trace_total)
         _trace_sleeps()
+        _trace_json("start", None)  # touch the file: the UI helper traces too
     sys.exit(args.fn(args))
 
 
