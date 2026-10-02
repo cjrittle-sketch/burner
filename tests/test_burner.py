@@ -975,11 +975,10 @@ class DocsTests(OfflineTestCase):
     def _readme_commands(self):
         with open(os.path.join(ROOT, "SKILL.md"), encoding="utf-8") as f:
             text = f.read()
-        # every "## Command reference ..." section (short and full)
-        sections = [s.split("\n## ", 1)[0]
-                    for s in text.split("## Command reference")[1:]]
+        # the "## Commands" section
+        section = text.split("\n## Commands\n", 1)[1].split("\n## ", 1)[0]
         cmds = {}
-        for line in "\n".join(sections).splitlines():
+        for line in section.splitlines():
             s = line.strip()
             if not s.startswith("burner "):
                 continue
@@ -1017,6 +1016,15 @@ class DocsTests(OfflineTestCase):
                     missing,
                     "SKILL.md flags missing from argparse for %r: %s"
                     % (cmd, sorted(missing)))
+
+    def test_every_command_is_documented(self):
+        documented = set(self._readme_commands())
+        ap = pc.build_parser()
+        sub = next(a for a in ap._actions
+                   if isinstance(a, argparse._SubParsersAction))
+        missing = set(sub.choices) - documented
+        self.assertFalse(missing, "commands missing from SKILL.md's "
+                         "## Commands: %s" % sorted(missing))
 
     def test_no_muse_phone_string_in_tree(self):
         bad = []

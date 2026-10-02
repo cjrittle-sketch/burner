@@ -2,400 +2,352 @@
 
 # burner
 
-Give your AI a physical Android phone. burner is a CLI that controls a
-dedicated Android phone over ADB, so an agent can drive real mobile apps that
-have no API, no MCP server, and no web automation path: marketplaces, banking
-apps, social apps, store apps that block bots in the browser.
+burner gives you, the AI assistant, a real Android phone that the user has set
+aside for you: the burner phone. You drive it with the `burner` command, so you
+can use phone apps that have no API, no MCP server and no website you can
+automate: marketplaces, banking apps, social apps, and stores that block bots
+in the browser.
 
-When the user says "use my burner", "use my burner phone" or "do it on my
-burner", that means this phone: use the `burner` commands below.
+In this guide "you" is the AI assistant and "the user" is the person you're
+helping. When the user says "use my burner", "use my burner phone" or "do it on
+my burner", they mean this phone.
+
+**Not set up yet?** If the `burner` command isn't installed, or `burner doctor`
+isn't green, go to [Setup](#setup) first.
 
 ## Common requests
 
 | The user says | Do this |
 |---|---|
-| "What's on my burner?" | Means the screen right now, not the installed apps. Take a screenshot and send the image back (below). |
-| "Take a screenshot of my burner" | Same: take a screenshot and send the image. |
-| "Use Amazon to check my order" (any app or service by name) | Prefer the phone's installed app over the website. Run `burner apps amazon` to find it, then `burner start <package>`. Use a website only if the app isn't installed. |
-| "Scroll to the top" / "scroll down" | Means inside the app that's open now. Use `burner scroll top`, `burner scroll down`, etc. Don't press HOME or swipe from a screen edge; that leaves the app or opens the app drawer. |
+| "What's on my burner?" or "Take a screenshot of my burner" | They mean the screen right now, not the installed apps. Take a screenshot and send the image (see below). |
+| "Check my Amazon order" | `burner amazon-status` does it in one step. |
+| "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed. |
+| "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
-To send a screenshot, save it where your chat can show files from, usually
+`burner apps` matches package names, not app names. Most match the app
+(`com.tinder`), but some don't (X is `com.twitter.android`). If nothing
+matches, run `burner apps` and read the full list.
+
+**Sending a screenshot.** Save it where your chat can show files from, usually
 your working folder: `burner shot --out .` saves a new, uniquely named file
-there and prints its path; attach that file. Don't reuse one file name:
-chat apps cache images by name and show the old screenshot. Plain `burner shot` saves under `~/burner/shots/`, which many chat
-apps can't display.
+there and prints its path. Attach that file. Don't reuse a file name: chat
+apps cache images by name and keep showing the old screenshot. Plain
+`burner shot` saves under `~/burner/shots/`, which many chat apps can't
+display.
 
-## Prerequisites
+## Rules
 
-- A Linux or macOS VM/container with Python 3.10+ and network access.
-- A spare Android phone (Android 11+) you can dedicate to this. It becomes the
-  agent's side phone, so do not use your daily driver.
-- Tailscale installed on both the VM and the phone (or both on the same LAN).
-- If the agent runs on a hosted service (not your own hardware), its
-  computer joins your tailnet during setup (step 3 of the setup order).
-- A human available once for ~10 minutes to pair the phone (see below).
+**Stop before submitting.** Typing text and submitting it are two separate
+steps, each needing its own go-ahead. Never type into a field and tap
+Send, Post, Buy or Submit in the same unattended flow.
 
-## How to talk to the user during setup
+1. Type the text (`burner type`), then stop.
+2. Check what the phone actually shows: take a screenshot and look at it, or
+   run `burner dump` and confirm the field holds what you meant to type.
+3. Only then tap the submit button, and only if the user approved that exact
+   submission.
 
-Keep updates short, plain and non-technical. Say what's happening for them,
-not how: "Installing burner on my side, this takes a minute" or "Done, now
-one thing on your phone." Most people don't need installer output or the
-names of the parts (platform tools, adb, venv, Python, uiautomator2,
-ports), so leave those out unless they ask. If something fails, say so
-plainly.
+This covers purchases, messages, posts, emails, forms and anything else that
+can't be undone.
 
-## Setup order
+**Never buy on your own.** Every purchase needs the user's explicit approval,
+every time, for the exact item, price and payment method, not "buy something
+like this".
 
-Go in this order, so the user sees progress before being asked for anything:
+**Verification codes come from email, never SMS.** The burner phone has no
+SIM, so a screen that sends a code by text message is a dead end. `burner
+gcode` and `burner vcode` read the code from the user's connected Gmail and
+type it as plain text. Codes are never stored, and you never ask the user to
+paste one.
 
-1. Tell them you're starting ("Setting up burner, I'll install it on my side
-   first") and run the install (below).
-2. Ask which device they're on (next section).
-3. Get this computer onto their tailnet: run `burner setup --step tailnet`.
-   If it's already on, move on. If not, it prints an approval
-   link: send the link as its own message with one plain line ("Tap this to
-   let my computer reach your phone, then tell me when it's done"), wait,
-   and re-run the step. A fresh assistant session can be a new computer
-   that needs approving again. Same-Wi-Fi setups skip this.
-4. Walk them through the phone steps, then finish with burner.
+**Privacy.** Typed text is never recorded. Navigation memory (`burner
+whereami`, `burner route`) stores screen layouts and the kind of action taken,
+never typed text, passwords or messages. Screenshots are never stored in it.
 
-## First, work out where the user is
+**Keep the phone on its charger.** The screen only stays on while charging,
+and when it goes dark `burner dump` comes back empty.
 
-Work out which device they are talking to you from before asking. Use what
-you already know: the app or client they're chatting in, its platform or
-user agent, or anything they've said (a mobile app on Android usually means
-they're holding a phone, a desktop or web client means a computer). Then
-always ask with these three choices, putting your best guess first:
+## Tapping precisely
+
+`burner tap` refuses to guess. If a label matches two or more things on screen,
+it fails and lists them instead of tapping the first one. Re-run with
+`--index N` to pick one, or use a longer label that's unique. `"A || B"` tries
+labels in order, so `burner tap "Checkout || Proceed to checkout"` survives a
+rename. `--fuzzy` allows partial matches.
+
+For multi-step flows, `burner snap` lists the same rows as `burner dump`,
+numbered `@e1`, `@e2` and so on, and `burner tap @e3` taps exactly that one
+with no re-matching. Handles only last for one screen: any tap, key press,
+typing or app launch throws them away.
+
+After an important tap, add `--settle`. It waits until the screen stops
+changing (half a second quiet, 10 seconds at most) and prints only what
+appeared or disappeared, or `unchanged`. Use it instead of dumping the screen
+again and again.
+
+## Commands
+
+Run `burner <command> --help` for every option.
+
+```
+Look at the screen
+  burner shot [--out PATH]          screenshot (--out . to send it in chat)
+  burner state                      open app + the main text on screen
+  burner dump [--all]               every item on screen: text, type, position
+  burner snap [--all]               numbered list (@e1…) for exact taps
+
+Act
+  burner tap "Text"                 tap by label (--index N, --fuzzy, --settle, "A || B")
+  burner tap @e3                    tap a snap handle
+  burner tap --xy 0.5,0.8           tap a spot (0 to 1 across and down)
+  burner type "text"                type letter by letter (--field "Hint", --clear)
+  burner scroll [down|up|left|right|top|bottom]   scroll the open app (--times N, --to "Text")
+  burner press BACK|HOME|ENTER|…    press a key (--repeat N)
+  burner wait "Text"                wait for text to show (--timeout 30, --absent to wait for it to go)
+
+Apps and links
+  burner apps [name]                installed apps (--all includes system apps)
+  burner start <package>            open an app
+  burner open <url> [package]       open a link, in one app if a package is given
+
+Flows
+  burner do 'step; step'            run several steps in one call, stopping at the first failure
+  burner sleep <seconds>            pause between steps inside burner do
+  burner recipe <name>              run a saved flow from recipes/<name>.burner
+  burner record <name>              record what you do into a recipe (burner record --stop)
+  burner replay <name>              replay a recording step by step
+  burner whereami                   which screen this is and where you can go from it
+  burner route "Label"              how to get to a screen, from navigation memory
+  burner forget --yes               clear navigation memory
+
+Verification codes
+  burner gcode --from 'from:sender@example.com'   newest code from Gmail (--mins 15)
+  burner vcode --from 'from:sender@example.com'   wait for the code box, fetch, type, submit (--submit "Continue")
+
+Shortcuts
+  burner amazon-status              latest Amazon order status
+
+Health and upkeep
+  burner doctor                     full health check
+  burner ensure                     reconnect everything (takes about 5 seconds)
+  burner setup                      phone setup (see Setup)
+  burner update [recipes]           update burner, or only its built-in recipes
+  burner uninstall [--yes]          undo the phone changes setup made (lists them without --yes)
+```
+
+A few details:
+
+- `burner type` works in apps that ignore normal typed input (React Native
+  apps and Meta's Bloks screens). `--field "Hint"` taps the field first, `--clear`
+  empties it first.
+- `burner open` with a deep link skips menus, e.g. `burner open
+  https://www.amazon.com/gp/css/order-history`. Adding a package skips the
+  "Open with" chooser, e.g. `burner open market://details?id=com.example.app
+  com.android.vending`.
+- A recipe file has one step per line in the same format as `burner do`, with
+  `#` comments. `$VAR` in a step comes from the environment, and a missing one
+  stops the recipe before it starts: `PLAY_PACKAGE=com.example.app burner
+  recipe play-install`.
+- `--from` for `gcode` and `vcode` is a Gmail search, so
+  `from:security@example.com` works, as does anything else Gmail search
+  understands.
+- `burner update` keeps `config.env`, the phone pairing and any recipes saved
+  under your own names.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| Phone unreachable after a restart | Give it about 2 minutes (60 to 90 seconds to start, then about 30 seconds for adb-auto-enable to reopen port 5555), then run `burner ensure`. If it's still down, check adb-auto-enable is still installed and exempt from battery optimization. |
+| Commands hang, or the helper on the phone stopped | `burner ensure` restarts the connection and the helper in about 5 seconds. |
+| `burner dump` comes back empty | The screen went dark. Make sure the phone is on its charger, then `burner ensure`. |
+| `adb unauthorized` | The phone forgot this computer. Pair again ([step 5](#5-pair)) with a fresh code. |
+| First connection right after pairing fails | Run `burner ensure` once more. It usually works the second time. |
+| Phone shows "Unsafe app blocked: ATX" | An older burner tried to install a keyboard app it doesn't need. Tap OK, then `burner update`. |
+| No Wireless debugging in Developer options | It needs Android 11 or newer (Settings > About phone > Android version). On 11 or newer, search Settings for "Wireless debugging". On Android 10 or older, the phone can't be a burner phone. |
+| adb missing after install | The installer puts it in `.android-tools/` and burner uses it from there. Check `.android-tools/platform-tools/adb` exists, or re-run the installer. |
+
+## Setup
+
+One time only. If the user asked you to set burner up, do every step below in
+order. `burner setup --list-steps` shows which steps are already done, so on a
+re-run skip ahead.
+
+**What's needed:**
+- A Linux or macOS computer or container for you, with Python 3.10+ and
+  internet access.
+- A spare Android phone (Android 11 or newer) the user can give over to this.
+  Not their everyday phone.
+- A free Tailscale account, or the computer and phone on the same Wi-Fi.
+- The user, once, for about 10 minutes.
+
+**How to talk to the user during setup.** Keep updates short, plain and about
+them: "Installing burner on my side, this takes a minute" or "Done, now one
+thing on your phone." Leave out installer output and the names of parts (adb,
+Python, ports and so on) unless they ask. If something fails, say so plainly.
+Walk them through their steps one at a time: say what to tap, then wait for
+them to say it's done. Never hand them a list to do "meanwhile". Once the phone
+is paired, don't go quiet: post a short line as each finishing step completes.
+
+### 1. Install
+
+Tell the user you're starting ("Setting up burner, I'll install it on my side
+first"), then run:
+
+```bash
+curl -fsSL https://useburner.si/install.sh | bash
+export BURNER_WORKSPACE="$HOME/burner"
+export PATH="$HOME/burner/bin:$PATH"
+```
+
+This puts burner in `~/burner` (or `$BURNER_DIR`). It's safe to re-run, needs
+no sudo and writes nothing outside that folder: it fetches adb if needed, sets
+up Python packages in `.venv/`, and copies `config.env.example` to `config.env`
+(never overwriting one that exists). `BURNER_WORKSPACE` tells burner where its
+downloaded tools live.
+
+### 2. Find out where the user is
+
+Work out which device the user is chatting from: the app or client they're
+using, its platform, or anything they've said (a mobile app on Android usually
+means they're holding a phone; a desktop or web client means a computer). Then
+always ask, with your best guess first, as tappable choices if your app has
+them:
 
 - This is my spare phone (the one I'm setting up)
 - I'm on my everyday phone
 - I'm on a computer
 
-If your app can show tappable choices, use them. Then follow that path:
+Also work out the phone's brand (Pixel, Samsung and so on) from their device
+details or what they've said, because Settings menus differ. Ask only if you
+can't tell. The paths below are for Pixel, with Samsung noted.
 
-- **From the spare phone itself:** that phone is the burner phone. Skip any
-  "find a spare phone" advice and do the human steps below on the phone they
-  are holding. Switching apps closes the pairing dialog and cancels the
-  code, so before step 3 have them put Settings and this chat side by side
-  in split screen: open Recent apps (swipe up and hold), tap the Settings
-  icon at the top of its card, tap "Split screen" (Samsung: "Open in split
-  screen view"), then pick this chat app. Only then tap "Pair device with
-  pairing code" in the Settings half and type the code into the chat half.
-- **From a computer or their everyday phone:** they need the spare phone in
-  hand for the human steps below. If they don't have one yet, stop and tell
-  them what to get.
+- **On the spare phone itself:** that's the burner phone. Skip any "get a spare
+  phone" advice. Pairing (step 5) needs split screen, explained there.
+- **On a computer or their everyday phone:** they need the spare phone in hand.
+  If they don't have one yet, stop and tell them what to get.
 
-## Install
+### 3. Get this computer onto the user's tailnet
+
+Run `burner setup --step tailnet`. If it's already on, move on. If not, it
+prints an approval link: send the link as its own message with one plain line
+("Tap this to let my computer reach your phone, then tell me when it's done"),
+wait, and run the step again. A new assistant session can be a new computer
+that needs approving again. If the computer and phone share a Wi-Fi network,
+skip this.
+
+### 4. The user's steps on the phone
+
+You can't do these for them. Give the full Settings path for every tap. After
+the user finishes each one, record it with `burner setup --step <name>
+--confirm`.
+
+1. **Tailscale** (`tailscale-phone`): connect the phone to Wi-Fi, install
+   Tailscale from the Play Store, sign in, and leave it on. If
+   `burner setup --list-steps` already shows `tailscale-phone` done (the
+   tailnet has an Android phone online), tell them it's done and move on.
+2. **Developer options** (`dev-options`): Settings > About phone > tap
+   **Build number** 7 times until it says "You are now a developer" (enter the
+   phone PIN if asked). Samsung: Settings > About phone > Software
+   information > Build number.
+3. **Wireless debugging** (`wireless-debug`): Settings > System > Developer
+   options (Samsung: Developer options is at the bottom of the main Settings
+   list). In the Debugging section, turn on **Wireless debugging**. When it
+   asks "Allow wireless debugging on this network?", check **Always allow on
+   this network**, then tap Allow. Shortcut: search Settings for "Wireless
+   debugging".
+
+### 5. Pair
+
+First make sure Tailscale is on in the phone (it doesn't start by itself after
+a restart yet), or the pairing screen shows a Wi-Fi address you can't reach.
+
+**If the user is on the burner phone itself, this is where people get stuck.**
+The pairing code only works while its pop-up stays open. Closing it, tapping
+outside it, going Back or switching to the chat app turns pairing off. So
+before they open it, tell them that in plain words and get them into split
+screen, Settings in one half and this chat in the other: open Recent apps
+(swipe up and hold), tap the Settings icon at the top of its card, tap "Split
+screen" (Samsung: "Open in split screen view"), then pick this chat app. Once
+the pop-up is open, they leave it alone, take a screenshot and send it from
+the chat half. If it closes anyway, that's fine: they tap "Pair device with
+pairing code" again for a new code.
+
+Then:
+
+1. Have the user tap the words **Wireless debugging** (not the switch) to open
+   its screen, and send you the "IP address & Port" line shown there, as text
+   or a screenshot.
+2. Have them tap **Pair device with pairing code** and send you what the
+   pop-up shows: the 6-digit code and its own "IP address & Port" line (same
+   address, different port).
+
+Read the values off what they send rather than asking for each one. The code
+lasts about a minute, so run this as soon as it arrives:
 
 ```bash
-curl -fsSL https://useburner.si/install.sh | bash
+burner setup --step pair --code 123456 --ip 100.x.y.z --pair-port 41234 --connect-port 38765
 ```
 
-This fetches the source into `~/burner` (or `$BURNER_DIR`) and runs its
-`install.sh`. `install.sh` is idempotent and writes nothing outside the repo: it finds or
-downloads platform-tools (adb), creates `.venv/`, installs `uiautomator2`,
-copies `config.env.example` to `config.env` (never overwrites an existing
-one), and makes `bin/burner` executable. No sudo, no system-wide writes.
+`--ip`, `--pair-port` and `--code` come from the pop-up; `--connect-port` is
+the port from the Wireless debugging screen. If the code expired, ask for a
+fresh one.
 
-Then put it on your PATH or call it directly:
+### 6. Verify
 
-```bash
-export BURNER_WORKSPACE="$HOME/burner"
-export PATH="$HOME/burner/bin:$PATH"
-```
+Right away, tell the user it worked, before running anything else, e.g.
+"Paired, your phone is connected. I'm finishing setup now. Your phone may flip
+through screens on its own for a few minutes; you can set it down."
 
-## Pair the phone (HUMAN REQUIRED steps marked)
+Then run `burner setup --step verify` (it runs `burner doctor`). burner must
+be green before going on.
 
-The guided path is `burner setup`: it walks through every step below, runs the agent
-steps itself, and finishes with `burner doctor`. Pairing codes only last about a minute, so
-run the pair step as soon as the user sends one. If a code expires, ask for
-a fresh one.
+### 7. Finish the phone
 
-Do these on the phone. The agent cannot do them for you.
+You do the rest yourself, one `burner setup --step <name>` each, in this
+order. Post a short line to the user as each one finishes ("Screen set to stay
+on while charging", "Tailscale will now start by itself after a restart").
 
-Walk the user through them one at a time, as part of setup: say what to tap
-and wait for them to say it's done before the next
-step. Never hand them a list to do "meanwhile" while you install. Give the
-full Settings path for every tap, never just a screen name. Menus differ by
-brand (paths below are Pixel, with Samsung noted), so know the brand first:
-infer it from their device if you can (a phone model in the user agent, or
-something they said), and ask only if you can't.
+- `tailscale-battery`: sets Tailscale's battery use to Unrestricted, so
+  Android doesn't stop it.
+- `stay-awake`: the screen stays on while charging, so the phone never sleeps
+  mid-task.
+- `screen-lock`: turns off the lock screen so the phone opens straight to the
+  home screen after a restart. If the phone has a PIN, pattern or password,
+  burner can't remove it. Ask the user to: Settings > Security & privacy >
+  Device unlock > Screen lock > None (Samsung: Settings > Lock screen > Screen
+  lock type > None). This is the only thing left for them to tap.
+- `install-adb-auto-enable`: first tell the user this downloads a small free
+  app from GitHub, so if their assistant asks to reach api.github.com or
+  github.com, that's expected. It installs **adb-auto-enable** (open source,
+  `com.tpn.adbautoenable`,
+  https://github.com/mouldybread/adb-auto-enable/releases), grants it
+  `WRITE_SECURE_SETTINGS` and exempts it from battery optimization.
+- `self-pair`: opens the app, reads a pairing code off the phone's screen and
+  hands it to the app. Best effort: if the app's pairing page doesn't come up,
+  the step skips itself. burner still works; the only cost is that after a
+  restart the user turns Wireless debugging back on once. Tell them that in a
+  sentence and carry on. There's nothing for them to fix.
+- `always-on-vpn`: sets Tailscale as the always-on VPN, so it starts by itself
+  after a restart. Lockdown stays off, so if Tailscale ever fails the phone
+  still has normal internet.
+- `fix-port`: pins the phone's debugging port to **5555** and saves it in
+  `config.env`. From then on adb-auto-enable reopens it on every restart, and
+  restarts need nothing from the user.
 
-1. **HUMAN REQUIRED:** Connect the phone to WiFi, install Tailscale from the
-   Play Store, sign in, and leave it connected. Check first: if
-   `burner setup --list-steps` shows `tailscale-phone` done (your tailnet
-   already has an Android phone online), this step is already done; just
-   tell them so and move on.
-2. **HUMAN REQUIRED:** Enable Developer options, then turn on
-   **Wireless debugging**:
-   - Settings > About phone > tap **Build number** 7 times, until it says
-     "You are now a developer" (enter the phone PIN if asked). On Samsung,
-     Build number is in Settings > About phone > Software information.
-   - Go back to Settings > System > **Developer options** (on Samsung,
-     Developer options is at the bottom of the main Settings list).
-   - Scroll down to the Debugging section and turn on **Wireless debugging**.
-     When it asks "Allow wireless debugging on this network?", check
-     **Always allow on this network**, then tap Allow. Shortcut: search
-     Settings for "Wireless debugging".
-3. **HUMAN REQUIRED:** Tap the words **Wireless debugging** (not the switch)
-   to open its screen, tap "Pair device with pairing code", and send the agent
-   the code and the numbers under "IP address & Port" exactly as shown.
+### 8. Wrap up
 
-   **If they're chatting on the burner phone itself, this is where people
-   get stuck.** The pairing code only works while its dialog stays open.
-   Closing it, tapping outside it, going Back, or switching to the chat app
-   turns pairing off and the code stops working. So before they tap "Pair
-   device with pairing code", tell them this in plain words and get them
-   into split screen first, Settings in one half and this chat in the other
-   (steps in "First, work out where the user is"). Once the dialog is open,
-   they leave it alone, take a screenshot, and send it from the chat half.
-   If the dialog closes, it's fine: tap "Pair device with pairing code"
-   again for a new code.
-
-   Read the IP, port and code off what they send, rather
-   than asking for each value separately. **Turn Tailscale on first** -
-   after a reboot it does not auto-start, and the dialog shows the unreachable
-   WiFi IP instead of the tailnet IP.
-4. The agent runs the one-time pairing (`adb pair`), then
-   `burner setup --step verify` (`burner doctor`). **burner must be green
-   before anything else**: the remaining steps are niceties, and the agent
-   does them itself with burner, so there is nothing more for the user to
-   tap except removing a PIN (step 5).
-
-   **Keep the user posted from here on; the rest takes a few minutes and
-   silence feels broken.** The moment pairing works, send a message before
-   running anything else, e.g. "Paired, your phone is connected. I'm
-   finishing setup now. Your phone may flip through screens on its own for
-   a few minutes; you can set it down." Then run the step 5 commands one at
-   a time and send a short line as each finishes ("Screen set to stay on
-   while charging", "Tailscale will now start by itself after a restart"),
-   so they always see what just happened. End with a clear "All done".
-5. The agent finishes the phone with burner, one `burner setup --step` each:
-   - `tailscale-battery`: Tailscale battery usage set to Unrestricted, so
-     Android doesn't stop it.
-   - `stay-awake`: screen stays on while charging, so the phone never
-     sleeps mid-task.
-   - `screen-lock`: turns off the lock screen so the phone opens straight to
-     the home screen after a restart. If the phone has a PIN, pattern or
-     password, burner can't remove it (it needs their PIN): ask the user to
-     do it in Settings > Security & privacy > Device unlock > Screen lock >
-     None (Samsung: Settings > Lock screen > Screen lock type > None).
-   - `install-adb-auto-enable`: tell the user first that this downloads a
-     small free app from GitHub, so if their assistant asks to reach
-     api.github.com or github.com, that's expected. Installs
-     **adb-auto-enable** (open source, `com.tpn.adbautoenable`,
-     https://github.com/mouldybread/adb-auto-enable/releases), grants it
-     `WRITE_SECURE_SETTINGS`, and exempts it from battery optimization.
-   - `self-pair`: opens the app once, opens the pairing dialog in Settings,
-     reads the code off the screen, and hands it to the app. This step is
-     optional and best effort: if the app's pairing page doesn't come up,
-     the step skips itself. burner still works; the only cost is that after
-     a phone restart the user turns Wireless debugging back on once. Tell
-     the user that in a sentence and carry on; there's nothing for them to
-     fix.
-   - `always-on-vpn`: sets Always-on VPN for Tailscale, so Tailscale starts
-     itself after a reboot (lockdown stays off, so if Tailscale ever fails
-     the phone still has normal internet).
-   - `fix-port`: pins adbd to port **5555** and writes `ADB_PORT="5555"` to
-     `config.env`. From then on the app re-enables ADB on every boot, the
-     random wireless-debugging port is never used again, and reboots need
-     no human action.
-
-Last, close with a short message that's about them, not the setup parts,
-e.g. "All done. Plug the phone into a charger and leave it there on Wi-Fi."
-(The screen only stays on while charging, which is why it lives on the
-charger.) Done.
+Close with a short message about them, not the setup, e.g. "All done. Plug the
+phone into a charger and leave it there on Wi-Fi." (The screen only stays on
+while charging, which is why it lives on the charger.)
 
 ## Security notes
 
-- Port 5555 listens on all the phone's interfaces (WiFi and Tailscale), but
-  only to trusted networks - nothing is exposed to the internet. The ADB
-  protocol itself is unencrypted, so only use the phone on networks you trust.
-- Every new computer that connects triggers an on-device "Allow USB
-  debugging?" prompt with a key fingerprint. Never approve one you did not
-  initiate - that prompt is the tripwire.
+- Port 5555 listens on the phone's Wi-Fi and Tailscale connections only, never
+  the open internet. The connection itself isn't encrypted, so only use the
+  phone on networks the user trusts.
+- Every new computer that connects makes the phone ask "Allow USB debugging?"
+  with a key fingerprint. Never approve one you didn't start. That prompt is
+  the tripwire.
 
-## Verify
-
-```bash
-burner doctor     # end-to-end health check: tunnel, adb, uiautomator2, screen
-burner dump       # list visible UI text on the phone screen
-burner tap "Settings"   # tap the first node with that text
-```
-
-If `burner doctor` reports green, the agent can drive the phone.
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| Phone unreachable after a reboot / adb connect fails | Wait 60-90s for boot plus ~30s for adb-auto-enable to switch adbd to port 5555, then run `burner ensure`. If it stays down, check the app is still installed and exempt from battery optimization. |
-| No Wireless debugging option in Developer options | It needs Android 11 or newer. Check Settings > About phone > Android version. If it's 11+, scroll to the Debugging section of Developer options or search Settings for "Wireless debugging". On Android 10 or older, the phone can't be a burner phone. |
-| Phone shows "Unsafe app blocked: ATX" | An older burner tried to install an extra keyboard app burner doesn't need. Tap OK to dismiss it, then update burner (re-run the installer). |
-| `adb unauthorized` | The adb key was revoked. Re-run the pairing flow above (send a fresh pairing code). |
-| u2 daemon dead / commands hang | Run `burner ensure`: it restarts the tunnel, the u2 daemon, and the adb server (~5s). |
-| Dumps come back empty | The screen must stay awake. Keep the phone on its charger; use `burner sleep`-free flows, and do not let the display time out mid-run. |
-| adb missing after install | `install.sh` downloads platform-tools to `.android-tools/` and `bin/burner` uses it automatically. Check `.android-tools/platform-tools/adb` exists. |
-
-## Command reference (short)
-
-```
-burner state                 focused app + top screen texts
-burner dump [--all]          every UI node: text, class, bounds
-burner snap [--all]          numbered snapshot: @e1..@eN handles for exact taps
-burner tap "Text" [--fuzzy]  tap matching node; refuses when ambiguous (see below)
-burner tap @e3                tap a snap handle's exact coordinates (no re-matching)
-burner tap "A || B"          fallback labels: tries A, then B
-burner tap "Text" --settle   wait for the screen to stop changing, show the diff
-burner wait "Text" [--timeout 30]   wait for text to appear (or --absent to vanish)
-burner type "text" --clear    type char-by-char, Bloks/RN-safe (--field "Hint" focuses first)
-burner scroll [down|up|left|right|top|bottom] [--times N] [--to "Text"]   scroll the open app
-burner press BACK|HOME        key events (--repeat N, --delay MS, --ctrl/--shift/--alt/--meta)
-burner apps [name]           installed apps (e.g. burner apps amazon)
-burner start com.app.pkg     launch an app
-burner shot                  screenshot to shots/
-burner open <url> [pkg]      open a deep link / URL (pkg targets one app)
-burner do 'step; step'       run a ;-separated flow in one call
-burner recipe <name>         run a saved flow from recipes/<name>.burner
-burner record <name>         record actions to recipes/<name>.burner (stop with --stop)
-burner replay <name>         replay a recorded session step-by-step
-burner whereami              current screen fingerprint + known transitions
-burner route "Label"         find a route to a screen via navigation memory
-burner forget --yes          clear navigation memory
-burner ensure                heal the tunnel + adb + daemon stack
-burner gcode --from ...      pull newest verification code from Gmail (transient, never stored)
-burner vcode --from ...      one-shot: wait for code field, pull code, type, submit
-burner amazon-status         latest Amazon order status, one shot
-burner doctor                full health check
-```
-
-Codes are pulled from the user's connected Gmail, typed as plain text, and
-never stored. The tool never makes purchases on its own: any buy needs explicit
-human approval each time.
-
-## Command reference (full)
-
-```
-burner setup [--list-steps] [--step NAME] [--confirm] [--yes]
-    Guided phone setup wizard. --list-steps shows each step's status;
-    --step runs one step; --confirm records a human step as done.
-    Pairing codes passed via --code are never stored.
-
-burner dump [--verbose] [--all] [--json]
-    List visible UI text and bounds. --all includes empty-text nodes.
-
-burner tap "Text" [--fuzzy] [--index N] [--xy] [--no-occlusion-check] [--json]
-    Tap the first node matching the text. --index picks the Nth match,
-    --fuzzy allows close matches, --xy taps raw coordinates.
-
-burner wait "Text" [--timeout 30] [--fuzzy] [--absent] [--json]
-    Poll until text appears (exit 1 on timeout), or until it disappears
-    with --absent.
-
-burner type "text" [--field "Hint"] [--clear] [--unicode] [--ascii]
-    Type char-by-char, safe on React Native / Bloks fields where bulk
-    `adb shell input text` is ignored. --field taps the field first,
-    --clear empties it first.
-
-burner press BACK|HOME|<keycode>
-    Key events: BACK, HOME, ENTER, DEL, volume, dpad, wake/sleep...
-
-burner state [--json]
-    Focused app plus the top screen texts and orientation.
-
-burner start com.example.app
-    Launch an app by package name.
-
-burner shot [--out PATH]
-    Screenshot, saved under shots/ or to PATH.
-
-burner open <url> [package]
-    Open a URL or deep link via VIEW intent. Deep links skip menu
-    navigation, e.g. burner open https://www.amazon.com/gp/css/order-history
-    A package targets one app and skips the "Open with" chooser, e.g.
-    burner open market://details?id=com.example.app com.android.vending
-
-burner sleep <seconds>
-    Sleep, mainly for use inside burner do flows.
-
-burner do 'open URL; wait "Cart" --timeout 30; tap "Checkout"'
-    Run a ;-separated flow in one call, stopping on the first failure.
-
-burner recipe <name>
-    Run a saved flow from recipes/<name>.burner (same ;-separated format,
-    one step per line, # comments allowed). $VAR in a step expands from the
-    environment; an unset $VAR stops the recipe before it runs.
-    PLAY_PACKAGE=com.example.app burner recipe play-install
-
-burner ensure
-    Heal the stack: restart tunnel, reconnect adb, revive the u2 daemon.
-
-burner gcode --from "sender@example.com" [--mins 15]
-    Pull the newest verification code from Gmail. Transient: read, used,
-    never stored.
-
-burner vcode --from "sender@example.com" [--mins 15] [--timeout 60] [--submit "Continue"]
-    One-shot code flow: wait for the code field, pull the email code,
-    clear, type char-by-char, wait for the submit button to enable, tap it.
-
-burner amazon-status
-    Latest Amazon order status in one shot (stops at the order list).
-
-burner doctor [--json]
-    End-to-end health check: tunnel, adb auth, u2 daemon, screen state.
-
-burner update [recipes]
-    Update burner and its built-in recipes to the latest. Keeps config.env,
-    the phone pairing and recipes you recorded under your own names.
-    `burner update recipes` refreshes only the built-in recipes.
-
-burner uninstall [--yes]
-    Undo the phone changes setup made (stay awake, lock screen, always-on
-    VPN, helper apps, wireless debugging). Without --yes it only lists them.
-```
-
-Verification codes come from email, never SMS: the side phone has no SIM, so
-any SMS code screen is a dead end. `gcode`/`vcode` pull the code from the
-connected Gmail, type it as plain text, and never store it or ask the user to
-paste it.
-
-## Tapping precisely (read this before driving the UI)
-
-`burner tap` refuses to guess. If a label matches two or more nodes it fails with
-the candidate list instead of tapping the first one - re-run with `--index N`
-(picks the Nth candidate) or a longer, unique label. `"A || B"` tries fallback
-labels in order, so `burner tap "Checkout || Proceed to checkout"` survives
-renames. `--fuzzy` substring matching auto-retries when the exact label
-misses, and is flagged in ambiguity errors.
-
-For multi-step flows, `burner snap` prints the same rows as `dump` numbered
-`@e1..@eN`, and `burner tap @eN` taps that handle's exact coordinates - no
-re-matching, no ambiguity. Handles are single-use: any tap, press, type, or
-launch deletes the snap, so a handle can never outlive its screen.
-
-After important taps, `--settle` re-reads the screen until it stops changing
-(500ms quiet, 10s max) and prints only what appeared/disappeared, capped at
-80 lines, or `unchanged`. Use it instead of `dump` → eyeball → `dump` loops.
-
-## Safety: stop before submission (read this before automating purchases, messages, or posts)
-
-Text entry and submission are two separately authorized steps. Never type
-into a field and tap Send/Post/Buy/Submit in the same unattended flow.
-
-1. Type the text (`burner type`), then STOP.
-2. Verify what the phone actually rendered: `burner shot` and read the screenshot,
-   or `burner dump` and confirm the field's text matches what you intended.
-3. Only then, with the rendered text confirmed, tap the submit button - and
-   only when the human explicitly approved that specific submission.
-
-This applies to purchases, messages, posts, emails, form submissions, and
-anything irreversible. The tool never makes purchases on its own: any buy
-needs explicit human approval each time, and the approval covers the exact
-item, price, and payment method - not "buy something like this."
-
-**Privacy:** typed text is never recorded. The navigation memory (`burner whereami` /
-`burner route`) stores screen structures and action types only - never the content
-of typed text, passwords, or messages. Screenshots are never stored in the
-navigation database.
-
-How it works, security notes and gotchas: see `README.md`.
+More about how burner works: https://github.com/useburner/burner#how-it-works

@@ -101,12 +101,12 @@ burner installed. Next steps:
 
   2. Pair your phone: on the phone, enable Developer options, turn on
      Wireless debugging, tap "Pair device with pairing code", and hand the
-     IP + pairing port + 6-digit code to your agent for the one-time pair
+     IP + pairing port + 6-digit code to your AI assistant for the one-time pair
      (turn Tailscale on first so the dialog shows the tailnet IP).
 
-  3. Your agent installs adb-auto-enable (re-enables ADB on every boot,
+  3. Your AI assistant installs adb-auto-enable (re-enables ADB on every boot,
      fixed port 5555). Put ADB_PORT="5555" in config.env, then run:
        burner doctor
 
-See SKILL.md for the agent guide and README.md for full docs.
+See SKILL.md for the guide your AI assistant follows, and README.md for the rest.
 EOF
