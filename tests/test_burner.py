@@ -1461,6 +1461,16 @@ class SetupWizardTests(OfflineTestCase):
         self.assertIn("Run with --yes", out.getvalue())
         m.assert_not_called()
 
+    def test_scroll_to_stops_when_text_visible(self):
+        xml = '<hierarchy><node text="Checkout" bounds="[0,0][10,10]"/></hierarchy>'
+        with mock.patch.object(pc, "ui_dump",
+                               return_value=pc.ET.fromstring(xml)),                 mock.patch.object(pc, "adb_or_ensure") as sw:
+            with self.cap() as (out, err):
+                rc = pc.cmd_scroll(SimpleNamespace(direction="down", times=1,
+                                                   to="Checkout"))
+        self.assertEqual(rc, 0)
+        sw.assert_not_called()
+
     def test_read_pair_dialog(self):
         xml = ('<hierarchy><node text="Pair with device" bounds="[0,0][1,1]"/>'
                '<node text="Wi-Fi pairing code" bounds="[0,0][1,1]"/>'

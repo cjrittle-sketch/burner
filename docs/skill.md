@@ -246,6 +246,7 @@ burner tap "A || B"          fallback labels: tries A, then B
 burner tap "Text" --settle   wait for the screen to stop changing, show the diff
 burner wait "Text" [--timeout 30]   wait for text to appear (or --absent to vanish)
 burner type "text" --clear    type char-by-char, Bloks/RN-safe (--field "Hint" focuses first)
+burner scroll [down|up|left|right] [--times N] [--to "Text"]   scroll; --to stops when Text shows
 burner press BACK|HOME        key events (--repeat N, --delay MS, --ctrl/--shift/--alt/--meta)
 burner start com.app.pkg     launch an app
 burner shot                  screenshot to shots/

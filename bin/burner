@@ -1957,6 +1957,39 @@ def cmd_forget(args):
 
 # ------------------------------------------------------------------- main
 
+def cmd_scroll(args):
+    """Scroll like a finger would. `down` reveals content below (the finger
+    swipes up). With --to, stop as soon as the text is visible."""
+    times = args.times if (args.times != 1 or not args.to) else 10
+    root = ui_dump()  # also refreshes the screen size
+    for i in range(times + 1):
+        if args.to and find_nodes(walk(root), args.to, exact=False):
+            print("found: {}".format(args.to))
+            return 0
+        if i == times:
+            break
+        w, h = screen_dims()
+        cx, cy = w // 2, h // 2
+        dx, dy = w * 3 // 10, h * 3 // 10
+        x1, y1, x2, y2 = {
+            "down": (cx, cy + dy, cx, cy - dy),
+            "up": (cx, cy - dy, cx, cy + dy),
+            "right": (cx + dx, cy, cx - dx, cy),
+            "left": (cx - dx, cy, cx + dx, cy),
+        }[args.direction]
+        wake()
+        adb_or_ensure("shell", "input", "swipe", x1, y1, x2, y2, 350)
+        u2_invalidate()
+        time.sleep(0.6)
+        root = ui_dump()
+    if args.to:
+        print("not found after {} scrolls: {}".format(times, args.to),
+              file=sys.stderr)
+        return 1
+    print("scrolled {} x{}".format(args.direction, times))
+    return 0
+
+
 def cmd_open(args):
     cmd = ["shell", "am", "start", "-a", "android.intent.action.VIEW",
            "-d", args.url]
@@ -2083,6 +2116,15 @@ def build_parser():
     p.add_argument("--ascii", action="store_true",
                    help="force the legacy path even for non-ASCII text")
     p.set_defaults(fn=cmd_type)
+
+    p = sub.add_parser("scroll", help="scroll the screen (down shows more below)")
+    p.add_argument("direction", nargs="?", default="down",
+                   choices=["down", "up", "left", "right"])
+    p.add_argument("--times", type=int, default=1, help="how many scrolls")
+    p.add_argument("--to", metavar="TEXT",
+                   help="keep scrolling until TEXT is on screen (max --times, "
+                        "default 10)")
+    p.set_defaults(fn=cmd_scroll)
 
     p = sub.add_parser("press", help="keyevent (BACK, HOME, 224, 67, ...)")
     p.add_argument("key")
