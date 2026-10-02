@@ -61,8 +61,9 @@ that, plug the phone in, leave it in a drawer, and never touch it again.
 **Why would I want this?**
 Because a lot of what you'd want your AI assistant to do lives on a phone. Amazon
 blocks AI assistants, Tinder only works as a phone app, and your lamp talks
-bluetooth. burner gives it a real phone on your own Wi-Fi at home, so it can use
-the apps you use, and apps and websites don't think you're in another country.
+bluetooth. burner gives it a real phone on your own Wi-Fi with bluetooth at home,
+so it can use the apps you use, and apps and websites don't think you're in
+another country.
 
 **What do I need?**
 A spare Android phone (iPhone soon), a free Tailscale account and 10 minutes.
