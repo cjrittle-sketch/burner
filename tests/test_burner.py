@@ -462,14 +462,14 @@ class DoctorTests(OfflineTestCase):
     def test_doctor_all_pass_exit_0(self):
         rc, out, err = self._run_doctor(["doctor"])
         self.assertEqual(rc, 0)
-        self.assertIn("7/7 checks passed", out)
+        self.assertIn("8/8 checks passed", out)
 
     def test_doctor_all_pass_json(self):
         rc, out, err = self._run_doctor(["doctor", "--json"])
         self.assertEqual(rc, 0)
         data = json.loads(out)
         self.assertTrue(data["ok"])
-        self.assertEqual(len(data["checks"]), 7)
+        self.assertEqual(len(data["checks"]), 8)
         self.assertTrue(all(c["ok"] for c in data["checks"]))
         self.assertIsInstance(data["latency_ms"], int)
 
@@ -1780,6 +1780,15 @@ class SetupWizardTests(OfflineTestCase):
         self.assertEqual(cm.exception.code, 1)
         self.assertIn("didn't answer in time", err.getvalue())
         self.assertNotIn("Traceback", err.getvalue())
+
+    def test_parse_phone_ping(self):
+        f = pc.parse_phone_ping
+        self.assertTrue(f(0, "1 packets transmitted, 1 received")[0])
+        self.assertFalse(f(1, "ping: unknown host connectivitycheck.gstatic.com")[0])
+        self.assertIn("DNS", f(1, "ping: bad address 'x'")[1])
+        self.assertFalse(f(1, "connect: Network is unreachable")[0])
+        self.assertTrue(f(127, "ping: not found")[0])
+        self.assertTrue(f(1, "something odd")[0])
 
     def test_parse_status(self):
         nl = chr(10)

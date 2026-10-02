@@ -2137,6 +2137,22 @@ def _doctor_check(name, fn, fix=None):
             "fix": fix}
 
 
+def parse_phone_ping(rc, text):
+    """(ok, detail) from `ping` run on the phone. A phone with no usable
+    internet is a common reason apps misbehave while adb still works. A
+    phone without a ping command counts as fine: we can't tell."""
+    low = (text or "").lower()
+    if rc == 0:
+        return True, "phone reaches the internet"
+    if "not found" in low or "inaccessible" in low or "no such file" in low:
+        return True, "ping isn't available on this phone; skipped"
+    if "unknown host" in low or "bad address" in low:
+        return False, "phone has no working DNS (name lookups fail)"
+    if "unreachable" in low or "100% packet loss" in low or "timed out" in low:
+        return False, "phone has no internet"
+    return True, "couldn't tell ({}); skipped".format((text or "").strip()[:60])
+
+
 def cmd_doctor(args):
     """Run connectivity/health checks and summarize. Exit 0 iff all pass."""
     checks = []
@@ -2205,10 +2221,20 @@ def cmd_doctor(args):
         "device state", check_device_state,
         fix="If 'unauthorized', re-run pairing (fresh code from phone). "
             "If 'offline', run `adb kill-server` then `burner ensure`"))
+    def check_phone_internet():
+        r = adb("shell", "ping", "-c", "1", "-W", "3",
+                "connectivitycheck.gstatic.com", timeout=15)
+        return parse_phone_ping(r.returncode, (r.stdout or "") + (r.stderr or ""))
+
     checks.append(_doctor_check(
         "dump pipeline", check_dump_pipeline,
         fix="Keep the phone screen awake (charger + `svc power stayon true`); "
             "run `burner ensure` to restart the u2 stack"))
+    checks.append(_doctor_check(
+        "phone internet", check_phone_internet,
+        fix="In the Tailscale app on the phone, turn off \"Use Tailscale DNS "
+            "settings\" (the tailnet's DNS servers may be offline), and check "
+            "the phone's Wi-Fi"))
 
     # Latency: one cached dump round-trip through the daemon socket.
     t0 = time.time()
