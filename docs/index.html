@@ -89,6 +89,8 @@
     display: inline-flex; align-items: center; justify-content: center;
   }
   .copy:hover { background: #FF8A4C; }
+  .term.msg { cursor: pointer; }
+  .term.msg:hover .copy { background: #FF8A4C; }
   .copy:focus-visible { outline: 2px solid var(--code-ink); outline-offset: 2px; }
 
   section { border-top: 1px solid var(--rule); padding: 44px 0; }
@@ -218,9 +220,14 @@
 
 </div>
 <script>
-  document.querySelectorAll('.copy').forEach(function (b) {
+  // Clicking anywhere on a prompt box copies it, not just the copy button.
+  document.querySelectorAll('.term').forEach(function (box) {
+    var b = box.querySelector('.copy');
+    if (!b) return;
     var icon = b.innerHTML;
-    b.addEventListener('click', function () {
+    box.addEventListener('click', function (e) {
+      if (e.target.closest('a')) return;
+      if (String(window.getSelection())) return;
       var t = b.getAttribute('data-copy');
       var done = function () {
         b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
