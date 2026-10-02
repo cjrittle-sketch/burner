@@ -22,6 +22,7 @@ isn't green, go to [Setup](#setup) first.
 | "What's on my burner?" or "Take a screenshot of my burner" | They mean the screen right now, not the installed apps. Take a screenshot and send the image (see below). |
 | "Check my Amazon order" | `burner amazon-status` does it in one step. |
 | "Use Tinder to…" (any app or service by name) | Use the phone's app, not a website. `burner apps tinder` finds its package, then `burner start <package>`. Use the website in the phone's browser only if the app isn't installed. |
+| "Install Snapchat" (any free app) | Find its package name (e.g. `com.snapchat.android`), then `PLAY_PACKAGE=<package> burner recipe play-install`. It opens the Play Store listing directly, taps Install and waits for the download. Don't search the Play Store or tap by screen coordinates. It stops on paid apps; never buy one. |
 | "Update my burner" | Run `burner update`, then say in one line that it's up to date. |
 | "Scroll to the top" or "scroll down" | They mean inside the app that's open now. Use `burner scroll top`, `burner scroll down` and so on. Don't press HOME or swipe from a screen edge: that leaves the app or opens the app drawer. |
 
