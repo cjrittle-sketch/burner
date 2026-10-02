@@ -478,8 +478,17 @@ def fast_dump(fresh=False):
         print("trace u2 dump {:.2f}s".format(time.time() - t0), file=sys.stderr)
     if xml is None and not os.path.exists(U2_SOCK):
         # Nothing restarts the mux on its own, so without this every dump
-        # after a reboot or crash stays on the slow adb path.
+        # after a reboot or crash stays on the slow adb path. Then wait for
+        # it: while the UI helper's server runs on the phone, adb's own
+        # `uiautomator dump` comes back empty, so the slow path can't read
+        # the screen either (the first command after `burner update`).
         u2_start_background()
+        t1 = time.time()
+        while time.time() - t1 < 15 and not os.path.exists(U2_SOCK):
+            time.sleep(0.5)
+        if os.path.exists(U2_SOCK):
+            xml = u2sock("dump", "fresh" if fresh else "", timeout=40)
+        _trace("u2 helper start wait {:.2f}s".format(time.time() - t1))
     if xml and ("<hierarchy" in xml or "<?xml" in xml):
         try:
             root = ET.fromstring(xml)
