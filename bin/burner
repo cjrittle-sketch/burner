@@ -1661,30 +1661,48 @@ def cmd_status(args):
 
 def foreground_package():
     """Package of the app in front, or None if it can't be read."""
-    r = adb("shell", "dumpsys", "activity", "activities", timeout=20)
-    m = re.search(r"mFocusedApp=.*?\s+u0\s+([\w.]+)/", r.stdout or "")
-    if not m:
-        m = re.search(r"mResumedActivity.*?\s+u0\s+([\w.]+)/", r.stdout or "")
+    # Filter on the phone: the full dump is large and crosses a slow link.
+    return parse_front(adb("shell", FRONT_LINES, timeout=20).stdout or "")
+
+
+FRONT_LINES = "dumpsys activity activities | grep -m1 mFocusedApp"
+
+
+def launch_and_check(pkg, home_first=False):
+    """Launch an app and report which package is in front, in ONE adb call
+    (each call costs ~0.3s over the link). The phone polls until the app is
+    resumed (up to ~3s) instead of us sleeping a fixed 1.5s and then pulling
+    the whole activity dump. The app must be in front on two checks in a
+    row, so a splash that hands over to another app (the Play Store's
+    transparent screen) isn't taken for success. Returns the front package,
+    or None."""
+    q = _sh_quote(pkg)
+    script = (
+        "{home}monkey -p {p} -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; "
+        "n=0; for i in 1 2 3 4 5 6 7 8 9 10 11 12; do sleep 0.3; "
+        "f=$({front}); case \"$f\" in *\" \"{p}/*) n=$((n+1));; *) n=0;; esac; "
+        "[ $n -ge 2 ] && break; done; "
+        "echo \"$f\"").format(
+            home="input keyevent KEYCODE_HOME; sleep 0.5; " if home_first else "",
+            p=q, front=FRONT_LINES)
+    r = adb_or_ensure("shell", script, timeout=30)
+    return parse_front(r.stdout or "")
+
+
+def parse_front(text):
+    m = re.search(r"mFocusedApp=.*?\s+u0\s+([\w.]+)/", text)
     return m.group(1) if m else None
 
 
 def cmd_start(args):
-    launch = ["shell", "monkey", "-p", args.package,
-              "-c", "android.intent.category.LAUNCHER", "1"]
-    adb_or_ensure(*launch)
     # Another app (the Play Store's transparent screen, a dialog host) can
     # keep the front after a launch. Check, and if so go Home first and
     # launch again before reporting success.
     for attempt in range(2):
-        time.sleep(1.5)
-        front = foreground_package()
+        front = launch_and_check(args.package, home_first=attempt > 0)
         if front is None or front == args.package:
             break
-        if attempt == 0:
-            adb_or_ensure("shell", "input", "keyevent", "KEYCODE_HOME")
-            time.sleep(0.8)
-            adb_or_ensure(*launch)
-        else:
+        if attempt == 1:
             print("{} didn't come to the front; {} is still open. Try "
                   "`burner press BACK` or `burner press HOME`, then start it "
                   "again.".format(args.package, front), file=sys.stderr)
@@ -2332,7 +2350,9 @@ def cmd_forget(args):
 
 # ------------------------------------------------------------------- main
 
-def _scroll_swipe(direction):
+def _scroll_swipe(direction, want_focus=False):
+    """One swipe. With want_focus, also return the package in front, read
+    in the same adb call (each call costs ~0.3s over the link)."""
     w, h = screen_dims()
     cx, cy = w // 2, h // 2
     dx, dy = w * 3 // 10, h * 3 // 10
@@ -2352,12 +2372,15 @@ def _scroll_swipe(direction):
     if os.environ.get("BURNER_DEBUG"):
         print("swipe {},{} -> {},{} on a {}x{} screen".format(
             x1, y1, x2, y2, w, h), file=sys.stderr)
-    if u2_action("swipe", "{} {} {} {} 350".format(x1, y1, x2, y2)):
-        snap_invalidate()
-    else:
-        adb_or_ensure("shell", "input", "swipe", x1, y1, x2, y2, 350)
-        u2_invalidate()
+    # adb, not the UI helper: its swipe RPC injects ~70 steps and takes about
+    # 2s, where `input swipe` takes about 0.75s.
+    script = "input swipe {} {} {} {} 350".format(x1, y1, x2, y2)
+    if want_focus:
+        script += "; " + FOCUS_LINE
+    r = adb_or_ensure("shell", script)
+    u2_invalidate()
     time.sleep(0.6)
+    return parse_focus(r.stdout or "") if want_focus else None
 
 
 def _scroll_to_end(direction, max_scrolls=15):
@@ -2385,8 +2408,14 @@ def _scroll_to_end(direction, max_scrolls=15):
 
 def focused_package_fast():
     """Package in front, from one small adb call (no UI dump). None if unknown."""
-    r = adb("shell", "dumpsys window | grep mCurrentFocus", timeout=20)
-    m = re.search(r"mCurrentFocus=.*?\s([\w.]+)/", r.stdout or "")
+    return parse_focus(adb("shell", FOCUS_LINE, timeout=20).stdout or "")
+
+
+FOCUS_LINE = "dumpsys window | grep mCurrentFocus"
+
+
+def parse_focus(text):
+    m = re.search(r"mCurrentFocus=.*?\s([\w.]+)/", text)
     return m.group(1) if m else None
 
 
@@ -2404,14 +2433,12 @@ def cmd_scroll(args):
             return 0
         if i == times:
             break
-        _scroll_swipe(args.direction)
         # Looking for text needs a fresh dump each time. A plain scroll only
-        # needs to know the app is still in front, which is much cheaper.
+        # needs to know the app is still in front, read with the swipe.
+        now = _scroll_swipe(args.direction, want_focus=not args.to)
         if args.to:
             root = ui_dump()
             now = dump_package(root)
-        else:
-            now = focused_package_fast()
         if pkg and now not in (None, pkg):
             print("scroll left {} (now in {}); stopped.".format(pkg, now),
                   file=sys.stderr)

@@ -220,7 +220,7 @@ DUMP_TTL = 2.0  # seconds a cached hierarchy dump stays valid
 
 
 # Commands that change the screen: never replayed after an error.
-NO_RETRY = {"tap", "swipe", "click_text", "set_text"}
+NO_RETRY = {"tap", "click_text", "set_text"}
 
 
 class U2Daemon:
@@ -409,15 +409,6 @@ class U2Daemon:
         with self._lock:
             with _t("tap rpc"):
                 self.d.jsonrpc.click(x, y)
-        self.invalidate()
-        return b""
-
-    def cmd_swipe(self, arg):
-        """arg: "x1 y1 x2 y2 ms". One swipe RPC (5ms per step)."""
-        x1, y1, x2, y2, ms = (int(v) for v in arg.split())
-        with self._lock:
-            with _t("swipe rpc"):
-                self.d.jsonrpc.swipe(x1, y1, x2, y2, max(2, ms // 5))
         self.invalidate()
         return b""
 

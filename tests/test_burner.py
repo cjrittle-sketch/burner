@@ -1957,5 +1957,31 @@ class FastPathTests(OfflineTestCase):
         self.assertIsNone(pc.shot_fast(os.path.join(tempfile.gettempdir(), "x.jpg")))
 
 
+    def test_start_one_adb_call_when_app_comes_up(self):
+        adb = self.allow("adb_or_ensure", return_value=SimpleNamespace(
+            stdout="  mFocusedApp=ActivityRecord{1 u0 com.example/.Main t3}\n",
+            stderr="", returncode=0))
+        self.allow("u2_invalidate")
+        self.allow("nav_record")
+        with self.cap() as (out, err):
+            rc = pc.cmd_start(SimpleNamespace(package="com.example"))
+        self.assertEqual(rc, 0)
+        self.assertEqual(adb.call_count, 1)
+        self.assertIn("monkey -p 'com.example'", adb.call_args[0][1])
+
+    def test_start_retries_from_home_when_another_app_stays_in_front(self):
+        other = SimpleNamespace(
+            stdout="  mFocusedApp=ActivityRecord{1 u0 com.android.vending/.X t3}\n",
+            stderr="", returncode=0)
+        adb = self.allow("adb_or_ensure", return_value=other)
+        self.allow("u2_invalidate")
+        with self.cap() as (out, err):
+            rc = pc.cmd_start(SimpleNamespace(package="com.example"))
+        self.assertEqual(rc, 1)
+        self.assertEqual(adb.call_count, 2)
+        self.assertIn("KEYCODE_HOME", adb.call_args[0][1])
+        self.assertIn("com.android.vending is still open", err.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
