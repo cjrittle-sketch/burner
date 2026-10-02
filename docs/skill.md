@@ -16,6 +16,7 @@ burner", that means this phone: use the `burner` commands below.
 |---|---|
 | "What's on my burner?" | Means the screen right now, not the installed apps. Take a screenshot and send the image back (below). |
 | "Take a screenshot of my burner" | Same: take a screenshot and send the image. |
+| "Use Amazon to check my order" (any app or service by name) | Prefer the phone's installed app over the website. Run `burner apps amazon` to find it, then `burner start <package>`. Use a website only if the app isn't installed. |
 | "Scroll to the top" / "scroll down" | Means inside the app that's open now. Use `burner scroll top`, `burner scroll down`, etc. Don't press HOME or swipe from a screen edge; that leaves the app or opens the app drawer. |
 
 To send a screenshot, save it where your chat can show files from, usually
@@ -250,6 +251,7 @@ burner wait "Text" [--timeout 30]   wait for text to appear (or --absent to vani
 burner type "text" --clear    type char-by-char, Bloks/RN-safe (--field "Hint" focuses first)
 burner scroll [down|up|left|right|top|bottom] [--times N] [--to "Text"]   scroll the open app
 burner press BACK|HOME        key events (--repeat N, --delay MS, --ctrl/--shift/--alt/--meta)
+burner apps [name]           installed apps (e.g. burner apps amazon)
 burner start com.app.pkg     launch an app
 burner shot                  screenshot to shots/
 burner open <url> [pkg]      open a deep link / URL (pkg targets one app)
