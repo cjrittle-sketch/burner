@@ -363,9 +363,13 @@ def _is_own_click_surface(cover, target):
         return False
     contains = (cr[0] <= tr[0] and cr[1] <= tr[1]
                 and cr[2] >= tr[2] and cr[3] >= tr[3])
-    short = (cover.get("class") or "").lower().split(".")[-1]
-    return (contains and (cr[3] - cr[1]) <= 400 and cr[2] - cr[0] <= 1100
-            and (short.endswith("button") or cover.get("clickable")))
+    cls = (cover.get("class") or "").lower()
+    # Compose apps draw buttons and tabs as plain android.view.View nodes,
+    # so don't insist on a Button class or a clickable flag. A dialog,
+    # sheet or popup is still a blocker.
+    if any(k in cls for k in _OVERLAY_CLASS_HINTS):
+        return False
+    return contains and (cr[3] - cr[1]) <= 400 and cr[2] - cr[0] <= 1100
 
 
 def is_point_covered(nodes, x, y, exclude_node):

@@ -1559,6 +1559,13 @@ class SetupWizardTests(OfflineTestCase):
                   "bounds": "[64,1176][1017,1281]", "clickable": True}
         nodes = [label, button]
         self.assertIsNone(pc.is_point_covered(nodes, 540, 1230, label))
+        # Compose draws tabs as plain, unlabeled Views (the Play Store bottom
+        # bar "Search" tab): also the tap surface, not a blocker.
+        tab = {"text": "Search", "desc": "", "class": "android.widget.TextView",
+               "bounds": "[470,2230][610,2280]", "clickable": False}
+        view = {"text": "", "desc": "", "class": "android.view.View",
+                "bounds": "[432,2169][648,2337]", "clickable": False}
+        self.assertIsNone(pc.is_point_covered([tab, view], 540, 2253, tab))
         # A real dialog covering the label still counts.
         dialog = {"text": "Update?", "desc": "", "class": "android.app.Dialog",
                   "bounds": "[64,1000][1017,1400]", "clickable": False}
