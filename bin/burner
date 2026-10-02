@@ -464,8 +464,12 @@ def _looks_like_overlay(node, w, h):
         return False
     x1, y1, x2, y2 = r
     # A real dialog/popup is a modest floating box; a layout container
-    # spans most of the screen width (toolbar, nav bar, list rows).
-    return (x2 - x1) < 0.85 * w and (y2 - y1) < 0.85 * h
+    # spans most of the screen width (toolbar, nav bar, list rows). And it
+    # has real size: a small ViewGroup is an icon or button (a 95px "Close"
+    # ViewGroup used to count as a dialog and refuse the tap on itself).
+    area = (x2 - x1) * (y2 - y1)
+    return ((x2 - x1) < 0.85 * w and (y2 - y1) < 0.85 * h
+            and area >= 0.03 * w * h)
 
 
 def topmost_occluder(nodes, x, y, w, h):
@@ -956,6 +960,33 @@ def _tap_ambiguous(args, used, hits, fuzzy_used):
     return _tap_fail(args, msg)
 
 
+def dedupe_same_control(hits):
+    """Collapse matches that are one control drawn twice.
+
+    Play Store's Install button shows up as a View described "Install" and a
+    TextView reading "Install", at the same place; tapping "Install" was
+    refused as ambiguous. Two matches with the same label whose bounds
+    overlap (one contains the other's center) are one button: keep the first.
+    Pure function: no adb, unit-testable."""
+    kept = []
+    for n in hits:
+        label = (n.get("text") or n.get("desc") or "").strip().lower()
+        r = _bounds_rect(n.get("bounds"))
+        dup = False
+        for k in kept:
+            kl = (k.get("text") or k.get("desc") or "").strip().lower()
+            kr = _bounds_rect(k.get("bounds"))
+            if label and label == kl and r and kr:
+                cx, cy = (r[0] + r[2]) / 2, (r[1] + r[3]) / 2
+                kx, ky = (kr[0] + kr[2]) / 2, (kr[1] + kr[3]) / 2
+                if (kr[0] <= cx <= kr[2] and kr[1] <= cy <= kr[3]) or                         (r[0] <= kx <= r[2] and r[1] <= ky <= r[3]):
+                    dup = True
+                    break
+        if not dup:
+            kept.append(n)
+    return kept
+
+
 def cmd_tap(args):
     # Occlusion checking needs the local node list, so the daemon fast path
     # (on-device click / coord lookup) only runs with --no-occlusion-check.
@@ -1044,6 +1075,7 @@ def cmd_tap(args):
                 break
     if not hits:
         return _tap_fail(args, 'no match for "{}"'.format(args.text))
+    hits = dedupe_same_control(hits)
     if len(hits) > 1 and args.index is None:
         return _tap_ambiguous(args, used, hits, fuzzy_used)
     node = hits[args.index] if args.index is not None \

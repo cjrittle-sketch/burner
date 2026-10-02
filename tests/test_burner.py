@@ -60,7 +60,7 @@ TAP_XML = """<hierarchy rotation="0">
 OVERLAY_XML = """<hierarchy rotation="0">
   <node text="" class="android.widget.FrameLayout" bounds="[0,0][1080,2400]" clickable="false" enabled="true" focused="false" checked="false">
     <node text="Hi" class="android.widget.Button" bounds="[100,200][300,400]" clickable="true" enabled="true" focused="false" checked="false"/>
-    <node text="Dialog" class="android.widget.FrameLayout" bounds="[500,1100][600,1300]" clickable="false" enabled="true" focused="false" checked="false"/>
+    <node text="Dialog" class="android.widget.FrameLayout" bounds="[200,900][880,1500]" clickable="false" enabled="true" focused="false" checked="false"/>
   </node>
 </hierarchy>"""
 
@@ -614,7 +614,9 @@ class JsonOutputTests(OfflineTestCase):
     def test_looks_like_overlay(self):
         w, h = 1080, 2400
         dialog = {"class": "android.widget.FrameLayout",
-                  "bounds": "[500,1100][600,1300]"}   # floating box
+                  "bounds": "[200,900][880,1500]"}    # floating box
+        icon = {"class": "android.view.ViewGroup",
+                "bounds": "[914,131][1009,226]"}      # a 95px button
         toolbar = {"class": "android.view.ViewGroup",
                    "bounds": "[0,0][1080,200]"}       # edge-to-edge
         sheet_cls = {"class": "android.widget.BottomSheet",
@@ -622,6 +624,7 @@ class JsonOutputTests(OfflineTestCase):
         fullscreen = {"class": "android.widget.FrameLayout",
                       "bounds": "[0,0][1080,2400]"}
         self.assertTrue(pc._looks_like_overlay(dialog, w, h))
+        self.assertFalse(pc._looks_like_overlay(icon, w, h))
         self.assertFalse(pc._looks_like_overlay(toolbar, w, h))
         self.assertTrue(pc._looks_like_overlay(sheet_cls, w, h))
         self.assertFalse(pc._looks_like_overlay(fullscreen, w, h))
@@ -1603,6 +1606,16 @@ class SetupWizardTests(OfflineTestCase):
         # Never picks agreeing buttons.
         self.assertIsNone(pc.pick_dismiss([n("Allow"), n("OK"), n("Accept")]))
         self.assertIsNone(pc.pick_dismiss([]))
+
+    def test_dedupe_same_control(self):
+        # Play Store: Install is a View described "Install" and a TextView
+        # reading "Install" at the same spot. That's one button.
+        view = {"text": "", "desc": "Install", "bounds": "[64,1176][1017,1281]"}
+        text = {"text": "Install", "desc": "", "bounds": "[470,1200][610,1260]"}
+        other = {"text": "Install", "desc": "", "bounds": "[64,300][400,380]"}
+        self.assertEqual(pc.dedupe_same_control([view, text]), [view])
+        # A different Install elsewhere on screen stays separate.
+        self.assertEqual(len(pc.dedupe_same_control([view, text, other])), 2)
 
     def test_split_marked(self):
         nl = chr(10)
