@@ -2180,6 +2180,13 @@ def _scroll_to_end(direction, max_scrolls=15):
     return 0
 
 
+def focused_package_fast():
+    """Package in front, from one small adb call (no UI dump). None if unknown."""
+    r = adb("shell", "dumpsys window | grep mCurrentFocus", timeout=20)
+    m = re.search(r"mCurrentFocus=.*?\s([\w.]+)/", r.stdout or "")
+    return m.group(1) if m else None
+
+
 def cmd_scroll(args):
     """Scroll like a finger would. `down` reveals content below (the finger
     swipes up). With --to, stop as soon as the text is visible."""
@@ -2195,10 +2202,16 @@ def cmd_scroll(args):
         if i == times:
             break
         _scroll_swipe(args.direction)
-        root = ui_dump()
-        if pkg and dump_package(root) not in (None, pkg):
-            print("scroll left {} (now in {}); stopped.".format(
-                pkg, dump_package(root)), file=sys.stderr)
+        # Looking for text needs a fresh dump each time. A plain scroll only
+        # needs to know the app is still in front, which is much cheaper.
+        if args.to:
+            root = ui_dump()
+            now = dump_package(root)
+        else:
+            now = focused_package_fast()
+        if pkg and now not in (None, pkg):
+            print("scroll left {} (now in {}); stopped.".format(pkg, now),
+                  file=sys.stderr)
             return 1
     if args.to:
         print("not found after {} scrolls: {}".format(times, args.to),
