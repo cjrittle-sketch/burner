@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Burner Dashboard</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0b0d12; --card:#151922; --line:#2b3240; --text:#eef2f7; --muted:#98a2b3; --accent:#ff6b35; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; background:radial-gradient(circle at top,#202432 0,var(--bg) 38%); color:var(--text); font:15px/1.4 system-ui,-apple-system,sans-serif; }
+    header { max-width:1100px; margin:auto; padding:24px 18px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    h1 { margin:0; font-size:clamp(22px,4vw,32px); letter-spacing:-.04em; }
+    h1 span { color:var(--accent); }
+    .status { color:var(--muted); font-size:13px; }
+    main { max-width:1100px; margin:auto; padding:0 18px 30px; display:grid; grid-template-columns:minmax(270px,430px) 1fr; gap:18px; align-items:start; }
+    .card { background:rgba(21,25,34,.94); border:1px solid var(--line); border-radius:16px; padding:16px; box-shadow:0 15px 50px #0005; }
+    .phone-bar,.row { display:flex; gap:9px; align-items:center; }
+    .phone-bar { justify-content:space-between; margin-bottom:12px; }
+    h2 { font-size:15px; margin:0; letter-spacing:.05em; text-transform:uppercase; color:#c5ccd7; }
+    button,input { font:inherit; }
+    button { color:var(--text); background:#252b37; border:1px solid #384151; border-radius:10px; padding:9px 13px; cursor:pointer; font-weight:650; }
+    button:hover { border-color:var(--accent); background:#2c303b; }
+    button:disabled { opacity:.5; cursor:wait; }
+    .primary { background:var(--accent); border-color:var(--accent); color:#17120f; }
+    .screen { min-height:300px; border-radius:12px; overflow:hidden; background:#07080b; display:grid; place-items:center; position:relative; }
+    #shot { display:block; max-width:100%; max-height:72vh; width:auto; height:auto; cursor:crosshair; user-select:none; -webkit-user-drag:none; }
+    .hint { margin:10px 2px 0; color:var(--muted); font-size:12px; text-align:center; }
+    .controls { display:grid; gap:18px; }
+    section + section { border-top:1px solid var(--line); padding-top:16px; }
+    section h2 { margin-bottom:11px; }
+    input { min-width:0; flex:1; color:var(--text); background:#0e1117; border:1px solid #384151; border-radius:10px; padding:10px 12px; }
+    .nav button { flex:1; }
+    .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; max-height:260px; overflow:auto; }
+    .list button { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left; font-size:13px; }
+    .empty { color:var(--muted); padding:10px 0; }
+    #toast { position:fixed; right:18px; bottom:18px; max-width:min(380px,calc(100vw - 36px)); padding:11px 15px; border-radius:10px; background:#eef2f7; color:#141820; box-shadow:0 8px 35px #0008; opacity:0; transform:translateY(10px); transition:.2s; pointer-events:none; }
+    #toast.show { opacity:1; transform:none; }
+    #toast.error { background:#ffddd3; color:#53180a; }
+    @media (max-width:760px) { main { grid-template-columns:1fr; } #shot { max-height:68vh; } }
+  </style>
+</head>
+<body>
+  <header><h1><span>Burner</span> Dashboard</h1><div class="status" id="status">Connecting…</div></header>
+  <main>
+    <div class="card">
+      <div class="phone-bar"><h2>Live device</h2><button id="pause">Pause</button></div>
+      <div class="screen"><img id="shot" alt="Android emulator screen"></div>
+      <div class="hint">Tap the screen to tap the emulator · refreshes every 2 seconds</div>
+    </div>
+    <div class="card controls">
+      <section>
+        <h2>Type text</h2>
+        <form class="row" id="typeForm"><input id="text" autocomplete="off" placeholder="Text to type on the device"><button class="primary">Send</button></form>
+      </section>
+      <section>
+        <h2>Navigation</h2>
+        <div class="row nav"><button data-key="back">← Back</button><button data-key="home">⌂ Home</button></div>
+      </section>
+      <section>
+        <h2>Installed apps</h2>
+        <div class="list" id="apps"><div class="empty">Loading apps…</div></div>
+      </section>
+      <section>
+        <h2>Recipes</h2>
+        <div class="list" id="recipes"><div class="empty">Loading recipes…</div></div>
+      </section>
+    </div>
+  </main>
+  <div id="toast"></div>
+  <script>
+    const shot = document.querySelector('#shot');
+    const status = document.querySelector('#status');
+    const pauseButton = document.querySelector('#pause');
+    let paused = false;
+    let loadingShot = false;
+
+    function toast(message, error = false) {
+      const box = document.querySelector('#toast');
+      box.textContent = message; box.className = `show${error ? ' error' : ''}`;
+      clearTimeout(box.timer); box.timer = setTimeout(() => box.className = '', 3000);
+    }
+
+    async function api(url, options = {}) {
+      options.headers = {'Content-Type': 'application/json', ...(options.headers || {})};
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        let message = `Request failed (${response.status})`;
+        try { message = (await response.json()).error || message; } catch (_) {}
+        throw new Error(message);
+      }
+      return response.json();
+    }
+
+    function refreshShot() {
+      if (paused || loadingShot) return;
+      loadingShot = true;
+      const next = new Image();
+      next.onload = () => { shot.src = next.src; status.textContent = 'Live'; loadingShot = false; };
+      next.onerror = () => { status.textContent = 'Screenshot unavailable'; loadingShot = false; };
+      next.src = `/shot?t=${Date.now()}`;
+    }
+
+    pauseButton.onclick = () => {
+      paused = !paused;
+      pauseButton.textContent = paused ? 'Resume' : 'Pause';
+      status.textContent = paused ? 'Paused' : 'Live';
+      if (!paused) refreshShot();
+    };
+
+    shot.onclick = async event => {
+      const bounds = shot.getBoundingClientRect();
+      const x = (event.clientX - bounds.left) / bounds.width * 1000;
+      const y = (event.clientY - bounds.top) / bounds.height * 1000;
+      try { await api('/tap', {method:'POST', body:JSON.stringify({x, y})}); refreshShot(); }
+      catch (error) { toast(error.message, true); }
+    };
+
+    document.querySelector('#typeForm').onsubmit = async event => {
+      event.preventDefault(); const input = document.querySelector('#text');
+      if (!input.value) return;
+      try { await api('/type', {method:'POST', body:JSON.stringify({text:input.value})}); input.value = ''; toast('Text sent'); refreshShot(); }
+      catch (error) { toast(error.message, true); }
+    };
+
+    document.querySelectorAll('[data-key]').forEach(button => button.onclick = async () => {
+      try { await api('/press', {method:'POST', body:JSON.stringify({key:button.dataset.key})}); refreshShot(); }
+      catch (error) { toast(error.message, true); }
+    });
+
+    async function fillList(url, id, field, onClick) {
+      const list = document.querySelector(`#${id}`);
+      try {
+        const values = (await api(url))[field]; list.replaceChildren();
+        if (!values.length) { list.innerHTML = '<div class="empty">None found</div>'; return; }
+        values.forEach(value => { const button = document.createElement('button'); button.textContent = value; button.title = value; button.onclick = () => onClick(value, button); list.append(button); });
+      } catch (error) { list.innerHTML = `<div class="empty">${error.message}</div>`; }
+    }
+
+    fillList('/apps', 'apps', 'apps', async (name, button) => {
+      button.disabled = true;
+      try { await api('/launch', {method:'POST', body:JSON.stringify({package:name})}); toast(`Launched ${name}`); refreshShot(); }
+      catch (error) { toast(error.message, true); } finally { button.disabled = false; }
+    });
+    fillList('/recipes', 'recipes', 'recipes', async (name, button) => {
+      if (!confirm(`Run recipe “${name}”? This will control the emulator.`)) return;
+      button.disabled = true;
+      try { await api(`/recipe/${encodeURIComponent(name)}`, {method:'POST'}); toast(`Recipe ${name} finished`); refreshShot(); }
+      catch (error) { toast(error.message, true); } finally { button.disabled = false; }
+    });
+
+    refreshShot(); setInterval(refreshShot, 2000);
+  </script>
+</body>
+</html>
